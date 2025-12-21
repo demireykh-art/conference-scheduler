@@ -1875,6 +1875,7 @@
             <button class="btn btn-secondary btn-small" onclick="openTypoCheckModal()" title="맞춤법 검사">✏️ 오타검증</button>
             <button class="btn btn-primary btn-small" onclick="openUploadModal()">📤 강의 일괄 업로드</button>
             <button class="btn btn-secondary btn-small" onclick="openBackupModal()">💾 백업 관리</button>
+            <span id="conflictButtonContainer"></span>
             <button class="btn btn-secondary btn-small admin-only-btn" onclick="resetAllData()" style="color:#e74c3c; display:none;">🔄 초기화</button>
         </div>
     </div>
@@ -4954,9 +4955,10 @@ const SPEAKERS_DATA = JSON.parse('[{"name":"Yesin Lae","nameEn":"Yesin Lae","aff
                 // 세션 시작
                 if (session) {
                     currentSession = session;
-                    html += `<tr style="background: ${session.color || '#9B59B6'}15;">
-                        <td colspan="2" style="padding: 0.5rem; border: 1px solid #ddd; font-weight: bold; color: ${session.color || '#9B59B6'};">
-                            📌 ${session.name} ${session.moderator ? `(좌장: ${session.moderator})` : ''}
+                   html += `<tr style="background: ${session.color || '#9B59B6'}15; cursor: pointer;" 
+    onclick="showChairModalWithAffiliation('${session.id}', '${session.name}')">
+    <td colspan="2" style="...">
+        ★ ${session.name} <span style="font-weight:normal; margin-left:8px;">${typeof renderChairBadges === 'function' ? renderChairBadges(session.id) : ''}</span>
                         </td>
                     </tr>`;
                 }
@@ -7837,6 +7839,13 @@ const SPEAKERS_DATA = JSON.parse('[{"name":"Yesin Lae","nameEn":"Yesin Lae","aff
                 event.target.classList.remove('active');
             }
         }
+        // 충돌 버튼 주기적 업데이트
+setInterval(() => {
+    const container = document.getElementById('conflictButtonContainer');
+    if (container && typeof renderConflictButton === 'function') {
+        container.innerHTML = renderConflictButton();
+    }
+}, 3000);
     </script>
     <script src="chairs-patch.js"></script>
 </body>
