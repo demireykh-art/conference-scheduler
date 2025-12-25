@@ -68,32 +68,54 @@ window.AppConfig = {
     },
 
     // 카테고리 색상
+    // 카테고리 그룹 (3개씩 행 배열용)
+    categoryGroups: [
+        // 1행: 주요 카테고리
+        ['Injectables', 'Laser & EBDs', 'Bio-Stimulators'],
+        // 2행: 디바이스
+        ['Aesthetic Devices', 'Lifting Devices', 'Body Contouring'],
+        // 3행: 재생/스킨
+        ['Regeneratives', 'Threads', 'Dermatology'],
+        // 4행: 특수 분야
+        ['Hair', 'Stem Cell & Functional', 'Anatomy'],
+        // 5행: 기타 의료
+        ['Diagnostic Devices', 'Sedation & Analgesia Devices', 'Medical Supplies'],
+        // 6행: 학술/교육
+        ['International Faculty & Global Trends', 'ASLS', 'Management & Marketing'],
+        // 7행: 디지털/비즈니스
+        ['AI & CRM', 'Digital Solutions', 'Cosmeceuticals'],
+        // 8행: 소모품/기타
+        ['Consumables', 'Safety Equipment', 'Others'],
+        // 9행: 기타
+        ['Other Solutions']
+    ],
+
     categoryColors: {
-        'Laser & EBDs': '#3B82F6',
-        'Aesthetic Devices': '#60A5FA',
-        'Diagnostic Devices': '#93C5FD',
-        'Injectables': '#F97316',
-        'Bio-Stimulators': '#FB923C',
-        'Regeneratives': '#FDBA74',
-        'Threads': '#8B5CF6',
-        'Lifting Devices': '#A78BFA',
-        'Body Contouring': '#10B981',
-        'Hair': '#34D399',
-        'Dermatology': '#EC4899',
-        'Stem Cell & Functional': '#F472B6',
-        'International Faculty & Global Trends': '#F9A8D4',
-        'Anatomy': '#FBCFE8',
-        'ASLS': '#FCE7F3',
-        'Management & Marketing': '#6B7280',
-        'AI & CRM': '#9CA3AF',
-        'Digital Solutions': '#D1D5DB',
-        'Cosmeceuticals': '#EAB308',
-        'Consumables': '#FACC15',
-        'Medical Supplies': '#FDE047',
-        'Safety Equipment': '#FEF08A',
-        'Sedation & Analgesia Devices': '#FEF9C3',
-        'Others': '#D4D4D4',
-        'Other Solutions': '#E5E5E5'
+        'Injectables': '#E65100',
+        'Laser & EBDs': '#1565C0',
+        'Bio-Stimulators': '#EF6C00',
+        'Aesthetic Devices': '#1976D2',
+        'Lifting Devices': '#7B1FA2',
+        'Body Contouring': '#00897B',
+        'Regeneratives': '#F57C00',
+        'Threads': '#6A1B9A',
+        'Dermatology': '#C2185B',
+        'Hair': '#00796B',
+        'Stem Cell & Functional': '#D81B60',
+        'Anatomy': '#AD1457',
+        'Diagnostic Devices': '#0277BD',
+        'Sedation & Analgesia Devices': '#558B2F',
+        'Medical Supplies': '#9E9D24',
+        'International Faculty & Global Trends': '#5E35B1',
+        'ASLS': '#8E24AA',
+        'Management & Marketing': '#455A64',
+        'AI & CRM': '#546E7A',
+        'Digital Solutions': '#607D8B',
+        'Cosmeceuticals': '#F9A825',
+        'Consumables': '#FBC02D',
+        'Safety Equipment': '#AFB42B',
+        'Others': '#757575',
+        'Other Solutions': '#9E9E9E'
     },
 
     // 초기 업체 목록

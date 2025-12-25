@@ -119,46 +119,68 @@ window.updateLectureList = function() {
         if (speakersInResults.length > 0 && speakersInResults.length <= 5) {
             // 연자별 통계 계산
             let statsHtml = '<div class="search-stats" style="background: #f0f4ff; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.75rem; font-size: 0.8rem;">';
-            statsHtml += '<div style="font-weight: bold; margin-bottom: 0.5rem;">📊 일자별 강의 현황</div>';
+            statsHtml += '<div style="font-weight: bold; margin-bottom: 0.5rem;">📊 연자별 강의 현황</div>';
             
             speakersInResults.forEach(speaker => {
                 // 해당 연자의 일자별 강의 개수 계산
                 let dateStats = [];
                 AppConfig.CONFERENCE_DATES.forEach(d => {
                     const dateData = AppState.dataByDate?.[d.date];
-                    let count = 0;
+                    let totalCount = 0;
                     let scheduledCount = 0;
                     
-                    // 해당 날짜 스케줄에서 카운트
+                    // 해당 날짜 강의 목록에서 전체 개수 카운트
+                    if (dateData?.lectures) {
+                        dateData.lectures.forEach(lecture => {
+                            if ((lecture.speakerKo || '') === speaker) {
+                                totalCount++;
+                            }
+                        });
+                    }
+                    
+                    // 해당 날짜 스케줄에서 배치된 개수 카운트
                     if (dateData?.schedule) {
                         Object.values(dateData.schedule).forEach(lecture => {
-                            if ((lecture.speakerKo || '').toLowerCase().includes(speaker.toLowerCase())) {
+                            if ((lecture.speakerKo || '') === speaker) {
                                 scheduledCount++;
                             }
                         });
                     }
                     
-                    // 해당 날짜 강의 목록에서 카운트
-                    if (dateData?.lectures) {
-                        dateData.lectures.forEach(lecture => {
-                            if ((lecture.speakerKo || '').toLowerCase().includes(speaker.toLowerCase())) {
-                                count++;
-                            }
-                        });
-                    }
-                    
-                    if (count > 0 || scheduledCount > 0) {
+                    if (totalCount > 0) {
                         const dayLabel = d.day === 'sat' ? '토' : '일';
-                        dateStats.push(`<span style="background: ${scheduledCount > 0 ? '#4CAF50' : '#ff9800'}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; margin-right: 0.25rem;">${dayLabel}: ${scheduledCount}/${count}개</span>`);
+                        const unscheduledCount = totalCount - scheduledCount;
+                        
+                        let statusHtml = '';
+                        if (unscheduledCount === 0) {
+                            // 전부 배치됨
+                            statusHtml = `<span style="background: #4CAF50; color: white; padding: 0.15rem 0.5rem; border-radius: 4px; margin-right: 0.3rem;">
+                                <strong>${dayLabel}</strong> ✓완료 (${totalCount}개)
+                            </span>`;
+                        } else if (scheduledCount === 0) {
+                            // 하나도 배치 안됨
+                            statusHtml = `<span style="background: #f44336; color: white; padding: 0.15rem 0.5rem; border-radius: 4px; margin-right: 0.3rem;">
+                                <strong>${dayLabel}</strong> 미배치 ${unscheduledCount}개
+                            </span>`;
+                        } else {
+                            // 일부만 배치됨
+                            statusHtml = `<span style="background: #ff9800; color: white; padding: 0.15rem 0.5rem; border-radius: 4px; margin-right: 0.3rem;">
+                                <strong>${dayLabel}</strong> 배치${scheduledCount} / 미배치${unscheduledCount}
+                            </span>`;
+                        }
+                        dateStats.push(statusHtml);
                     }
                 });
                 
                 if (dateStats.length > 0) {
-                    statsHtml += `<div style="margin-bottom: 0.3rem;">👤 <strong>${speaker}</strong>: ${dateStats.join(' ')}</div>`;
+                    statsHtml += `<div style="margin-bottom: 0.4rem; display: flex; align-items: center; flex-wrap: wrap;">
+                        <span style="min-width: 80px;">👤 <strong>${speaker}</strong></span>
+                        ${dateStats.join('')}
+                    </div>`;
                 }
             });
             
-            statsHtml += '<div style="font-size: 0.7rem; color: #666; margin-top: 0.4rem;">* 배치됨/전체 (초록: 배치완료, 주황: 미배치있음)</div>';
+            statsHtml += '<div style="font-size: 0.7rem; color: #666; margin-top: 0.5rem; border-top: 1px solid #ddd; padding-top: 0.4rem;">🟢완료 | 🟠일부배치 | 🔴미배치</div>';
             statsHtml += '</div>';
             list.innerHTML = statsHtml;
         }
@@ -471,6 +493,7 @@ window.createCategoryFilters = function() {
     });
     const totalCount = AppState.lectures.length;
 
+    // 전체 버튼
     const allBtn = document.createElement('button');
     allBtn.className = 'category-filter-btn active';
     allBtn.style.borderColor = '#2E1A47';
@@ -478,20 +501,55 @@ window.createCategoryFilters = function() {
     allBtn.style.color = '#FFFFFF';
     allBtn.innerHTML = `전체<span class="category-count">${totalCount}</span>`;
     allBtn.onclick = () => filterLectures('all');
-    container.appendChild(allBtn);
+    
+    // 첫 번째 행에 전체 버튼
+    const firstRow = document.createElement('div');
+    firstRow.className = 'category-row';
+    firstRow.style.cssText = 'display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; justify-content: flex-start;';
+    firstRow.appendChild(allBtn);
+    container.appendChild(firstRow);
 
-    Object.keys(AppConfig.categoryColors).forEach(category => {
-        const count = categoryCounts[category] || 0;
-        const btn = document.createElement('button');
-        btn.className = 'category-filter-btn';
-        const color = AppConfig.categoryColors[category];
-        btn.style.borderColor = color;
-        btn.style.color = color;
-        btn.innerHTML = `${category}${count > 0 ? `<span class="category-count" style="background:${color};">${count}</span>` : ''}`;
-        btn.onclick = () => filterLectures(category);
-        btn.dataset.category = category;
-        container.appendChild(btn);
-    });
+    // 그룹별로 카테고리 버튼 생성
+    if (AppConfig.categoryGroups) {
+        AppConfig.categoryGroups.forEach(group => {
+            const row = document.createElement('div');
+            row.className = 'category-row';
+            row.style.cssText = 'display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; justify-content: flex-start;';
+            
+            group.forEach(category => {
+                if (!AppConfig.categoryColors[category]) return;
+                
+                const count = categoryCounts[category] || 0;
+                const btn = document.createElement('button');
+                btn.className = 'category-filter-btn';
+                const color = AppConfig.categoryColors[category];
+                btn.style.borderColor = color;
+                btn.style.color = color;
+                btn.innerHTML = `${category}${count > 0 ? `<span class="category-count" style="background:${color};">${count}</span>` : ''}`;
+                btn.onclick = () => filterLectures(category);
+                btn.dataset.category = category;
+                row.appendChild(btn);
+            });
+            
+            if (row.children.length > 0) {
+                container.appendChild(row);
+            }
+        });
+    } else {
+        // 그룹이 없으면 기존 방식
+        Object.keys(AppConfig.categoryColors).forEach(category => {
+            const count = categoryCounts[category] || 0;
+            const btn = document.createElement('button');
+            btn.className = 'category-filter-btn';
+            const color = AppConfig.categoryColors[category];
+            btn.style.borderColor = color;
+            btn.style.color = color;
+            btn.innerHTML = `${category}${count > 0 ? `<span class="category-count" style="background:${color};">${count}</span>` : ''}`;
+            btn.onclick = () => filterLectures(category);
+            btn.dataset.category = category;
+            container.appendChild(btn);
+        });
+    }
 };
 
 /**

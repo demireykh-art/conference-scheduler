@@ -111,14 +111,32 @@ window.updateSpeakerList = function() {
             
             if (totalCount > 0) {
                 const dayLabel = d.day === 'sat' ? '토' : '일';
-                const bgColor = scheduledCount === totalCount ? '#4CAF50' : (scheduledCount > 0 ? '#ff9800' : '#e0e0e0');
-                const textColor = scheduledCount === totalCount || scheduledCount > 0 ? 'white' : '#666';
-                lectureStats.push(`<span style="background: ${bgColor}; color: ${textColor}; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.65rem; margin-left: 0.2rem;">${dayLabel}:${scheduledCount}/${totalCount}</span>`);
+                const unscheduledCount = totalCount - scheduledCount;
+                
+                let bgColor, textColor, statusText;
+                if (unscheduledCount === 0) {
+                    // 전부 배치
+                    bgColor = '#4CAF50';
+                    textColor = 'white';
+                    statusText = `${dayLabel}✓${totalCount}`;
+                } else if (scheduledCount === 0) {
+                    // 하나도 배치 안됨
+                    bgColor = '#f44336';
+                    textColor = 'white';
+                    statusText = `${dayLabel}✗${totalCount}`;
+                } else {
+                    // 일부만 배치됨
+                    bgColor = '#ff9800';
+                    textColor = 'white';
+                    statusText = `${dayLabel}${scheduledCount}/${totalCount}`;
+                }
+                
+                lectureStats.push(`<span style="background: ${bgColor}; color: ${textColor}; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.7rem; margin-left: 0.25rem;">${statusText}</span>`);
             }
         });
         
         const statsHtml = lectureStats.length > 0 
-            ? `<span style="margin-left: 0.5rem;">${lectureStats.join('')}</span>` 
+            ? `<span style="margin-left: 0.3rem;">${lectureStats.join('')}</span>` 
             : '';
         
         return `
