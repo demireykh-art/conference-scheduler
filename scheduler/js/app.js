@@ -26,6 +26,7 @@ const SPEAKERS_DATA = [
 window.startRealtimeListeners = function() {
     listenToOnlineUsers();
     loadTimeSettingsFromFirebase();
+    loadLastBackupTime();
 
     database.ref('/data').on('value', (snapshot) => {
         const data = snapshot.val();
@@ -60,6 +61,20 @@ window.startRealtimeListeners = function() {
             }
             updateSyncStatus('synced', '준비됨');
         }
+    });
+};
+
+/**
+ * 마지막 백업 시간 로드
+ */
+window.loadLastBackupTime = function() {
+    database.ref('/backups').orderByChild('timestamp').limitToLast(1).once('value', (snapshot) => {
+        snapshot.forEach(child => {
+            const backup = child.val();
+            if (backup && backup.dateStr) {
+                updateBackupStatus(backup.dateStr);
+            }
+        });
     });
 };
 
@@ -596,10 +611,266 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.classList.toggle('active', btn.dataset.date === AppState.currentDate);
     });
 
+    // 자동 백업 시작 (5분마다)
+    startAutoBackup();
+
     console.log('=== 초기화 완료 ===');
     console.log('Speakers:', AppState.speakers.length);
     console.log('Categories:', AppState.categories.length);
     console.log('Companies:', AppState.companies.length);
 });
+
+// ============================================
+// 자동 백업 시스템
+// ============================================
+
+let autoBackupInterval = null;
+const BACKUP_INTERVAL = 5 * 60 * 1000; // 5분
+const MAX_BACKUPS = 10; // 최대 백업 개수
+
+/**
+ * 자동 백업 시작
+ */
+window.startAutoBackup = function() {
+    if (autoBackupInterval) {
+        clearInterval(autoBackupInterval);
+    }
+    
+    autoBackupInterval = setInterval(() => {
+        if (canEdit()) {
+            createAutoBackup();
+        }
+    }, BACKUP_INTERVAL);
+    
+    console.log('⏰ 자동 백업 시작 (5분 간격)');
+};
+
+/**
+ * 자동 백업 생성
+ */
+window.createAutoBackup = function() {
+    createBackup('auto');
+};
+
+/**
+ * 수동 백업 생성
+ */
+window.createManualBackup = function() {
+    createBackup('manual');
+    alert('✅ 백업이 생성되었습니다.');
+};
+
+/**
+ * 백업 생성
+ */
+window.createBackup = function(type = 'manual') {
+    if (!canEdit()) {
+        console.log('백업 권한 없음');
+        return;
+    }
+    
+    const timestamp = Date.now();
+    const dateStr = new Date(timestamp).toLocaleString('ko-KR');
+    
+    const backupData = {
+        timestamp: timestamp,
+        dateStr: dateStr,
+        type: type,
+        createdBy: AppState.currentUser ? AppState.currentUser.email : 'unknown',
+        data: {
+            dataByDate: AppState.dataByDate,
+            speakers: AppState.speakers,
+            companies: AppState.companies,
+            categories: AppState.categories,
+            timeSettingsByDate: AppState.timeSettingsByDate
+        }
+    };
+    
+    // Firebase에 백업 저장
+    database.ref(`/backups/${timestamp}`).set(backupData)
+        .then(() => {
+            console.log(`💾 백업 생성: ${dateStr} (${type})`);
+            updateBackupStatus(dateStr);
+            cleanupOldBackups();
+        })
+        .catch(err => console.error('백업 실패:', err));
+};
+
+/**
+ * 오래된 백업 정리 (최대 개수 유지)
+ */
+window.cleanupOldBackups = function() {
+    database.ref('/backups').orderByChild('timestamp').once('value', (snapshot) => {
+        const backups = [];
+        snapshot.forEach(child => {
+            backups.push({ key: child.key, ...child.val() });
+        });
+        
+        // 오래된 순으로 정렬
+        backups.sort((a, b) => a.timestamp - b.timestamp);
+        
+        // MAX_BACKUPS 초과 시 오래된 것 삭제
+        while (backups.length > MAX_BACKUPS) {
+            const oldBackup = backups.shift();
+            database.ref(`/backups/${oldBackup.key}`).remove();
+            console.log(`🗑️ 오래된 백업 삭제: ${oldBackup.dateStr}`);
+        }
+    });
+};
+
+/**
+ * 백업 상태 UI 업데이트
+ */
+window.updateBackupStatus = function(dateStr) {
+    const statusEl = document.getElementById('lastBackupTime');
+    if (statusEl) {
+        statusEl.textContent = dateStr;
+    }
+};
+
+/**
+ * 백업 목록 모달 열기
+ */
+window.openBackupModal = function() {
+    const modal = document.getElementById('backupModal');
+    const list = document.getElementById('backupList');
+    
+    list.innerHTML = '<p style="text-align: center; padding: 2rem;">백업 목록 로딩 중...</p>';
+    modal.classList.add('active');
+    
+    // Firebase에서 백업 목록 로드
+    database.ref('/backups').orderByChild('timestamp').once('value', (snapshot) => {
+        const backups = [];
+        snapshot.forEach(child => {
+            backups.push({ key: child.key, ...child.val() });
+        });
+        
+        // 최신순 정렬
+        backups.sort((a, b) => b.timestamp - a.timestamp);
+        
+        if (backups.length === 0) {
+            list.innerHTML = '<p style="text-align: center; padding: 2rem; color: #999;">백업이 없습니다.</p>';
+            return;
+        }
+        
+        list.innerHTML = backups.map((backup, idx) => {
+            const typeLabel = backup.type === 'auto' ? '🔄 자동' : '💾 수동';
+            const isLatest = idx === 0;
+            
+            return `
+                <div class="backup-item" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid #eee; ${isLatest ? 'background: #f0fff0;' : ''}">
+                    <div>
+                        <div style="font-weight: ${isLatest ? 'bold' : 'normal'};">
+                            ${backup.dateStr} ${isLatest ? '(최신)' : ''}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #666;">
+                            ${typeLabel} · ${backup.createdBy || '알 수 없음'}
+                        </div>
+                    </div>
+                    <div>
+                        <button class="btn btn-secondary btn-small" onclick="previewBackup('${backup.key}')" style="margin-right: 0.25rem;">미리보기</button>
+                        <button class="btn btn-primary btn-small" onclick="restoreBackup('${backup.key}')">복원</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    });
+};
+
+/**
+ * 백업 모달 닫기
+ */
+window.closeBackupModal = function() {
+    document.getElementById('backupModal').classList.remove('active');
+};
+
+/**
+ * 백업 미리보기
+ */
+window.previewBackup = function(backupKey) {
+    database.ref(`/backups/${backupKey}`).once('value', (snapshot) => {
+        const backup = snapshot.val();
+        if (!backup || !backup.data) {
+            alert('백업 데이터를 불러올 수 없습니다.');
+            return;
+        }
+        
+        const data = backup.data;
+        let summary = `📅 백업 시점: ${backup.dateStr}\n`;
+        summary += `👤 생성자: ${backup.createdBy || '알 수 없음'}\n\n`;
+        
+        // 각 날짜별 데이터 요약
+        if (data.dataByDate) {
+            Object.keys(data.dataByDate).forEach(date => {
+                const dateData = data.dataByDate[date];
+                const lectureCount = dateData.lectures ? dateData.lectures.length : 0;
+                const scheduleCount = dateData.schedule ? Object.keys(dateData.schedule).length : 0;
+                const sessionCount = dateData.sessions ? dateData.sessions.length : 0;
+                summary += `[${date}]\n`;
+                summary += `  - 강의: ${lectureCount}개\n`;
+                summary += `  - 배치됨: ${scheduleCount}개\n`;
+                summary += `  - 세션: ${sessionCount}개\n`;
+            });
+        }
+        
+        summary += `\n연자: ${data.speakers ? data.speakers.length : 0}명`;
+        summary += `\n카테고리: ${data.categories ? data.categories.length : 0}개`;
+        
+        alert(summary);
+    });
+};
+
+/**
+ * 백업 복원
+ */
+window.restoreBackup = function(backupKey) {
+    if (!canEdit()) {
+        alert('편집 권한이 없습니다.');
+        return;
+    }
+    
+    if (!confirm('⚠️ 현재 데이터가 백업 시점으로 덮어씌워집니다.\n복원 전 현재 상태를 수동 백업하시겠습니까?')) {
+        return;
+    }
+    
+    // 복원 전 현재 상태 백업
+    createBackup('before-restore');
+    
+    database.ref(`/backups/${backupKey}`).once('value', (snapshot) => {
+        const backup = snapshot.val();
+        if (!backup || !backup.data) {
+            alert('백업 데이터를 불러올 수 없습니다.');
+            return;
+        }
+        
+        const data = backup.data;
+        
+        // 데이터 복원
+        if (data.dataByDate) AppState.dataByDate = data.dataByDate;
+        if (data.speakers) AppState.speakers = data.speakers;
+        if (data.companies) AppState.companies = data.companies;
+        if (data.categories) AppState.categories = data.categories;
+        if (data.timeSettingsByDate) AppState.timeSettingsByDate = data.timeSettingsByDate;
+        
+        // 현재 날짜 데이터 로드
+        loadDateData(AppState.currentDate);
+        generateTimeSlots();
+        
+        // Firebase에 복원된 데이터 저장
+        saveToFirebase();
+        if (data.timeSettingsByDate) {
+            saveTimeSettingsToFirebase();
+        }
+        
+        // UI 업데이트
+        createScheduleTable();
+        updateLectureList();
+        updateCategoryDropdowns();
+        createCategoryFilters();
+        
+        closeBackupModal();
+        alert(`✅ ${backup.dateStr} 시점으로 복원되었습니다.`);
+    });
+};
 
 console.log('✅ app.js 로드 완료');

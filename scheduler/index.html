@@ -47,6 +47,13 @@
                 <span id="syncText">동기화됨</span>
             </div>
             
+            <!-- 백업 상태 -->
+            <div class="backup-status" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: rgba(255,255,255,0.8);">
+                <button class="btn btn-small" onclick="createManualBackup()" title="수동 백업" style="background: rgba(255,255,255,0.2); color: white; padding: 0.25rem 0.5rem; font-size: 0.7rem;">💾</button>
+                <button class="btn btn-small" onclick="openBackupModal()" title="백업 관리" style="background: rgba(255,255,255,0.2); color: white; padding: 0.25rem 0.5rem; font-size: 0.7rem;">📋</button>
+                <span style="font-size: 0.65rem;">마지막: <span id="lastBackupTime">-</span></span>
+            </div>
+            
             <!-- 온라인 사용자 -->
             <div class="online-users" id="onlineUsers">
                 <span>👥</span>
@@ -677,6 +684,38 @@
                 <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
                     <button class="btn btn-secondary" onclick="closeTimeSettingsModal()">취소</button>
                     <button class="btn btn-primary" onclick="applyTimeSettings()">✅ 적용</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 백업 관리 모달 -->
+    <div class="modal" id="backupModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>💾 백업 관리</h2>
+                <button class="modal-close" onclick="closeBackupModal()">×</button>
+            </div>
+            
+            <div style="padding: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <div style="font-size: 0.85rem; color: #666;">
+                        🔄 자동 백업: 5분마다 · 최대 10개 유지
+                    </div>
+                    <button class="btn btn-primary btn-small" onclick="createManualBackup()">
+                        💾 지금 백업
+                    </button>
+                </div>
+                
+                <div style="background: #f5f5f5; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <p style="font-size: 0.8rem; color: #666; margin: 0;">
+                        ℹ️ 복원 시 현재 데이터가 선택한 시점으로 대체됩니다.<br>
+                        복원 전 자동으로 현재 상태가 백업됩니다.
+                    </p>
+                </div>
+                
+                <div id="backupList" style="max-height: 400px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px;">
+                    <p style="text-align: center; padding: 2rem; color: #999;">로딩 중...</p>
                 </div>
             </div>
         </div>
