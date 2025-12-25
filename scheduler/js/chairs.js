@@ -84,60 +84,52 @@ window.updateSpeakerList = function() {
     list.innerHTML = displaySpeakers.map(speaker => {
         const originalIndex = AppState.speakers.indexOf(speaker);
         
-        // 연자별 일자별 강의 개수 계산
-        let lectureStats = [];
+        // 연자별 전체 강의 수 및 일자별 배치 개수 계산
+        let totalLectures = 0;
+        let satScheduled = 0;
+        let sunScheduled = 0;
+        
         AppConfig.CONFERENCE_DATES.forEach(d => {
             const dateData = AppState.dataByDate?.[d.date];
-            let totalCount = 0;
-            let scheduledCount = 0;
             
             // 해당 날짜 강의 목록에서 카운트
             if (dateData?.lectures) {
                 dateData.lectures.forEach(lecture => {
                     if ((lecture.speakerKo || '') === speaker.name) {
-                        totalCount++;
+                        totalLectures++;
                     }
                 });
             }
             
-            // 해당 날짜 스케줄에서 카운트
+            // 해당 날짜 스케줄에서 배치 카운트
             if (dateData?.schedule) {
                 Object.values(dateData.schedule).forEach(lecture => {
                     if ((lecture.speakerKo || '') === speaker.name) {
-                        scheduledCount++;
+                        if (d.day === 'sat') satScheduled++;
+                        else sunScheduled++;
                     }
                 });
             }
-            
-            if (totalCount > 0) {
-                const dayLabel = d.day === 'sat' ? '토' : '일';
-                const unscheduledCount = totalCount - scheduledCount;
-                
-                let bgColor, textColor, statusText;
-                if (unscheduledCount === 0) {
-                    // 전부 배치
-                    bgColor = '#4CAF50';
-                    textColor = 'white';
-                    statusText = `${dayLabel}✓${totalCount}`;
-                } else if (scheduledCount === 0) {
-                    // 하나도 배치 안됨
-                    bgColor = '#f44336';
-                    textColor = 'white';
-                    statusText = `${dayLabel}✗${totalCount}`;
-                } else {
-                    // 일부만 배치됨
-                    bgColor = '#ff9800';
-                    textColor = 'white';
-                    statusText = `${dayLabel}${scheduledCount}/${totalCount}`;
-                }
-                
-                lectureStats.push(`<span style="background: ${bgColor}; color: ${textColor}; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.7rem; margin-left: 0.25rem;">${statusText}</span>`);
-            }
         });
         
-        const statsHtml = lectureStats.length > 0 
-            ? `<span style="margin-left: 0.3rem;">${lectureStats.join('')}</span>` 
-            : '';
+        let statsHtml = '';
+        if (totalLectures > 0) {
+            const totalScheduled = satScheduled + sunScheduled;
+            const unscheduled = totalLectures - totalScheduled;
+            
+            // 통계 문자열 생성
+            let statParts = [`총${totalLectures}`];
+            if (satScheduled > 0) statParts.push(`토${satScheduled}`);
+            if (sunScheduled > 0) statParts.push(`일${sunScheduled}`);
+            if (unscheduled > 0) statParts.push(`미배치${unscheduled}`);
+            
+            // 배경색 결정
+            let bgColor = '#4CAF50'; // 전부 배치
+            if (unscheduled > 0 && totalScheduled > 0) bgColor = '#ff9800'; // 일부 배치
+            else if (unscheduled > 0 && totalScheduled === 0) bgColor = '#f44336'; // 미배치
+            
+            statsHtml = `<span style="background: ${bgColor}; color: white; padding: 0.1rem 0.5rem; border-radius: 3px; font-size: 0.7rem; margin-left: 0.5rem;">${statParts.join(' / ')}</span>`;
+        }
         
         return `
             <div class="speaker-item">

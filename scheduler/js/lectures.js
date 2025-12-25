@@ -122,65 +122,50 @@ window.updateLectureList = function() {
             statsHtml += '<div style="font-weight: bold; margin-bottom: 0.5rem;">📊 연자별 강의 현황</div>';
             
             speakersInResults.forEach(speaker => {
-                // 해당 연자의 일자별 강의 개수 계산
-                let dateStats = [];
+                // 해당 연자의 전체 강의 수 (현재 강의목록에서)
+                const totalLectures = filteredLectures.filter(l => (l.speakerKo || '') === speaker).length;
+                
+                // 일자별 배치된 강의 수
+                let satScheduled = 0;
+                let sunScheduled = 0;
+                
                 AppConfig.CONFERENCE_DATES.forEach(d => {
                     const dateData = AppState.dataByDate?.[d.date];
-                    let totalCount = 0;
-                    let scheduledCount = 0;
-                    
-                    // 해당 날짜 강의 목록에서 전체 개수 카운트
-                    if (dateData?.lectures) {
-                        dateData.lectures.forEach(lecture => {
-                            if ((lecture.speakerKo || '') === speaker) {
-                                totalCount++;
-                            }
-                        });
-                    }
                     
                     // 해당 날짜 스케줄에서 배치된 개수 카운트
                     if (dateData?.schedule) {
                         Object.values(dateData.schedule).forEach(lecture => {
                             if ((lecture.speakerKo || '') === speaker) {
-                                scheduledCount++;
+                                if (d.day === 'sat') satScheduled++;
+                                else sunScheduled++;
                             }
                         });
                     }
-                    
-                    if (totalCount > 0) {
-                        const dayLabel = d.day === 'sat' ? '토' : '일';
-                        const unscheduledCount = totalCount - scheduledCount;
-                        
-                        let statusHtml = '';
-                        if (unscheduledCount === 0) {
-                            // 전부 배치됨
-                            statusHtml = `<span style="background: #4CAF50; color: white; padding: 0.15rem 0.5rem; border-radius: 4px; margin-right: 0.3rem;">
-                                <strong>${dayLabel}</strong> ✓완료 (${totalCount}개)
-                            </span>`;
-                        } else if (scheduledCount === 0) {
-                            // 하나도 배치 안됨
-                            statusHtml = `<span style="background: #f44336; color: white; padding: 0.15rem 0.5rem; border-radius: 4px; margin-right: 0.3rem;">
-                                <strong>${dayLabel}</strong> 미배치 ${unscheduledCount}개
-                            </span>`;
-                        } else {
-                            // 일부만 배치됨
-                            statusHtml = `<span style="background: #ff9800; color: white; padding: 0.15rem 0.5rem; border-radius: 4px; margin-right: 0.3rem;">
-                                <strong>${dayLabel}</strong> 배치${scheduledCount} / 미배치${unscheduledCount}
-                            </span>`;
-                        }
-                        dateStats.push(statusHtml);
-                    }
                 });
                 
-                if (dateStats.length > 0) {
-                    statsHtml += `<div style="margin-bottom: 0.4rem; display: flex; align-items: center; flex-wrap: wrap;">
-                        <span style="min-width: 80px;">👤 <strong>${speaker}</strong></span>
-                        ${dateStats.join('')}
-                    </div>`;
-                }
+                const totalScheduled = satScheduled + sunScheduled;
+                const unscheduled = totalLectures - totalScheduled;
+                
+                // 통계 문자열 생성
+                let statParts = [`총 ${totalLectures}개`];
+                
+                if (satScheduled > 0) statParts.push(`토 ${satScheduled}`);
+                if (sunScheduled > 0) statParts.push(`일 ${sunScheduled}`);
+                if (unscheduled > 0) statParts.push(`미배치 ${unscheduled}`);
+                
+                // 배경색 결정
+                let bgColor = '#4CAF50'; // 전부 배치
+                if (unscheduled > 0 && totalScheduled > 0) bgColor = '#ff9800'; // 일부 배치
+                else if (unscheduled > 0 && totalScheduled === 0) bgColor = '#f44336'; // 미배치
+                
+                statsHtml += `<div style="margin-bottom: 0.4rem; display: flex; align-items: center; flex-wrap: wrap;">
+                    <span style="min-width: 70px;">👤 <strong>${speaker}</strong></span>
+                    <span style="background: ${bgColor}; color: white; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem;">
+                        ${statParts.join(' / ')}
+                    </span>
+                </div>`;
             });
             
-            statsHtml += '<div style="font-size: 0.7rem; color: #666; margin-top: 0.5rem; border-top: 1px solid #ddd; padding-top: 0.4rem;">🟢완료 | 🟠일부배치 | 🔴미배치</div>';
             statsHtml += '</div>';
             list.innerHTML = statsHtml;
         }

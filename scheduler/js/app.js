@@ -128,6 +128,8 @@ window.loadTimeSettingsFromFirebase = function() {
         if (snapshot.exists()) {
             AppState.timeSettingsByDate = snapshot.val();
             generateTimeSlots();
+            createScheduleTable();
+            updateScheduleDisplay();
             console.log('시간 설정 로드 완료:', AppState.timeSettingsByDate);
         }
     });
@@ -386,7 +388,7 @@ window.generateFullScheduleHTML = function() {
             // 세션 헤더 표시
             if (session) {
                 cellStyle += `background: ${session.color || '#9B59B6'}20;`;
-                cellContent += `<div style="font-size: 0.65rem; color: ${session.color || '#9B59B6'}; font-weight: bold;">📌 ${session.name}</div>`;
+                cellContent += `<div style="font-size: 0.65rem; color: ${session.color || '#9B59B6'}; font-weight: bold; margin-bottom: 0.2rem;">📌 ${session.name}</div>`;
             }
 
             if (lecture) {
@@ -407,13 +409,14 @@ window.generateFullScheduleHTML = function() {
                 const categoryColor = AppConfig.categoryColors[lecture.category] || '#9B59B6';
                 
                 // 세션에 속한 강의는 세션 색상 배경 사용
-                if (sessionColor) {
+                if (sessionColor && !session) {
                     cellStyle = `padding: 0.3rem; border: 1px solid #ddd; vertical-align: top; background: ${sessionColor}30;`;
                 }
                 
                 const endTime = calculateEndTime(time, duration);
                 
-                cellContent = `<div style="background: ${categoryColor}; color: white; padding: 0.3rem 0.4rem; border-radius: 4px; font-size: 0.7rem; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center;">
+                // 세션 제목이 있으면 유지하고 강의 블록 추가
+                cellContent += `<div style="background: ${categoryColor}; color: white; padding: 0.3rem 0.4rem; border-radius: 4px; font-size: 0.7rem; height: ${session ? 'auto' : '100%'}; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center;">
                     <strong style="display: block; line-height: 1.3; margin-bottom: 0.2rem;">${lecture.titleKo || lecture.titleEn || '제목 없음'}</strong>
                     <div style="font-size: 0.6rem; opacity: 0.9;">👤 ${lecture.speakerKo || '미정'}</div>
                     <div style="font-size: 0.55rem; opacity: 0.8;">⏱️ ${time}~${endTime} (${duration}분)</div>
@@ -450,20 +453,13 @@ window.closeRoomScheduleModal = function() {
 };
 
 window.generateRoomScheduleHTML = function(room) {
-    const timeUnit = AppConfig.TIME_UNIT || 5;
-    const occupiedSlots = {}; // { timeIdx: true }
-    
     // 세션 맵
     const sessionMap = {};
     AppState.sessions.forEach(session => {
         if (session.room === room) {
-            const key = `${session.time}-${room}`;
             sessionMap[session.time] = session;
         }
     });
-    
-    // 현재 활성 세션 추적
-    let currentSession = null;
     
     let html = '<table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">';
 
@@ -473,22 +469,13 @@ window.generateRoomScheduleHTML = function(room) {
 
     html += '<tbody>';
 
-    AppState.timeSlots.forEach((time, timeIdx) => {
-        // 이미 이전 강의로 차지된 슬롯이면 건너뛰기
-        if (occupiedSlots[timeIdx]) {
-            return;
-        }
-        
+    AppState.timeSlots.forEach((time) => {
         const key = `${time}-${room}`;
         const lecture = AppState.schedule[key];
         const session = sessionMap[time];
         const isHourMark = time.endsWith(':00');
-        
-        // 세션 시작점이면 현재 세션 업데이트
-        if (session) {
-            currentSession = session;
-        }
 
+        // 세션 헤더 표시
         if (session) {
             html += `<tr style="background: ${session.color || '#9B59B6'}15;">
                 <td colspan="2" style="padding: 0.5rem; border: 1px solid #ddd; font-weight: bold; color: ${session.color || '#9B59B6'};">
@@ -497,38 +484,26 @@ window.generateRoomScheduleHTML = function(room) {
             </tr>`;
         }
 
+        // 강의 표시
         if (lecture) {
             const categoryColor = AppConfig.categoryColors[lecture.category] || '#9B59B6';
             const duration = lecture.duration || 15;
             const endTime = calculateEndTime(time, duration);
-            const slotsNeeded = Math.ceil(duration / timeUnit);
-            
-            // 이 강의가 차지하는 시간대 마킹
-            for (let i = 1; i < slotsNeeded; i++) {
-                if (timeIdx + i < AppState.timeSlots.length) {
-                    occupiedSlots[timeIdx + i] = true;
-                }
-            }
-            
-            // 세션에 속한 강의는 세션 색상 배경
-            const bgColor = currentSession ? `${currentSession.color || '#9B59B6'}15` : (isHourMark ? '#f9f9f9' : 'white');
 
-            html += `<tr style="background: ${bgColor};">
-                <td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center; font-weight: ${isHourMark ? 'bold' : 'normal'}; vertical-align: top;" rowspan="${slotsNeeded}">
+            html += `<tr style="background: ${isHourMark ? '#f9f9f9' : 'white'};">
+                <td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center; font-weight: ${isHourMark ? 'bold' : 'normal'};">
                     ${time}<br><span style="font-size: 0.7rem; color: #999;">~${endTime}</span>
                 </td>
-                <td style="padding: 0.5rem; border: 1px solid #ddd; vertical-align: top;" rowspan="${slotsNeeded}">
-                    <div style="background: ${categoryColor}; color: white; padding: 0.5rem; border-radius: 6px; height: 100%; box-sizing: border-box;">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                            <div style="flex: 1;">
-                                <strong style="font-size: 0.95rem; display: block; margin-bottom: 0.3rem;">${lecture.titleKo || lecture.titleEn || '제목 없음'}</strong>
-                                <div style="font-size: 0.8rem; opacity: 0.95; margin-top: 0.25rem;">
-                                    👤 ${lecture.speakerKo || '미정'} ${lecture.affiliation ? `(${lecture.affiliation})` : ''}
-                                </div>
-                                <div style="font-size: 0.75rem; opacity: 0.85;">⏱️ ${duration}분</div>
+                <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="flex: 1;">
+                            <strong style="font-size: 0.95rem;">${lecture.titleKo || lecture.titleEn || '제목 없음'}</strong>
+                            <div style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">
+                                👤 ${lecture.speakerKo || '미정'} ${lecture.affiliation ? `(${lecture.affiliation})` : ''}
                             </div>
-                            <span style="background: rgba(255,255,255,0.25); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; white-space: nowrap; margin-left: 0.5rem;">${lecture.category}</span>
+                            <div style="font-size: 0.75rem; color: #999;">⏱️ ${duration}분</div>
                         </div>
+                        <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; white-space: nowrap; margin-left: 0.5rem;">${lecture.category}</span>
                     </div>
                 </td>
             </tr>`;
