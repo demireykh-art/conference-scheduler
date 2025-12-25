@@ -261,6 +261,10 @@ window.updateScheduleDisplay = function() {
         const title = AppState.currentLanguage === 'en' && lecture.titleEn ? lecture.titleEn : lecture.titleKo;
         const speaker = AppState.currentLanguage === 'en' && lecture.speakerEn ? lecture.speakerEn : lecture.speakerKo;
 
+        // 호버 시 전체 제목 표시를 위한 data 속성
+        const fullTooltip = `${title}\n👤 ${speaker || '미정'} | ⏱️ ${duration}분`;
+        lectureDiv.dataset.fullTitle = fullTooltip;
+
         lectureDiv.innerHTML = `
             <button class="remove-btn" onclick="event.stopPropagation(); removeLecture('${key}')">×</button>
             <div class="lecture-title-display">${title}</div>

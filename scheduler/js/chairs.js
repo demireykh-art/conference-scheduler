@@ -83,10 +83,48 @@ window.updateSpeakerList = function() {
 
     list.innerHTML = displaySpeakers.map(speaker => {
         const originalIndex = AppState.speakers.indexOf(speaker);
+        
+        // 연자별 일자별 강의 개수 계산
+        let lectureStats = [];
+        AppConfig.CONFERENCE_DATES.forEach(d => {
+            const dateData = AppState.dataByDate?.[d.date];
+            let totalCount = 0;
+            let scheduledCount = 0;
+            
+            // 해당 날짜 강의 목록에서 카운트
+            if (dateData?.lectures) {
+                dateData.lectures.forEach(lecture => {
+                    if ((lecture.speakerKo || '') === speaker.name) {
+                        totalCount++;
+                    }
+                });
+            }
+            
+            // 해당 날짜 스케줄에서 카운트
+            if (dateData?.schedule) {
+                Object.values(dateData.schedule).forEach(lecture => {
+                    if ((lecture.speakerKo || '') === speaker.name) {
+                        scheduledCount++;
+                    }
+                });
+            }
+            
+            if (totalCount > 0) {
+                const dayLabel = d.day === 'sat' ? '토' : '일';
+                const bgColor = scheduledCount === totalCount ? '#4CAF50' : (scheduledCount > 0 ? '#ff9800' : '#e0e0e0');
+                const textColor = scheduledCount === totalCount || scheduledCount > 0 ? 'white' : '#666';
+                lectureStats.push(`<span style="background: ${bgColor}; color: ${textColor}; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.65rem; margin-left: 0.2rem;">${dayLabel}:${scheduledCount}/${totalCount}</span>`);
+            }
+        });
+        
+        const statsHtml = lectureStats.length > 0 
+            ? `<span style="margin-left: 0.5rem;">${lectureStats.join('')}</span>` 
+            : '';
+        
         return `
             <div class="speaker-item">
                 <div class="speaker-info">
-                    <strong>${speaker.name}${speaker.nameEn ? ' / ' + speaker.nameEn : ''}</strong>
+                    <strong>${speaker.name}${speaker.nameEn ? ' / ' + speaker.nameEn : ''}${statsHtml}</strong>
                     <small>${speaker.affiliation}${speaker.affiliationEn ? ' / ' + speaker.affiliationEn : ''}</small>
                 </div>
                 <div class="speaker-actions">

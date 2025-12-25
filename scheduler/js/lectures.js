@@ -3,6 +3,62 @@
  */
 
 /**
+ * 연자별 일자별 강의 통계 계산
+ */
+window.getSpeakerLectureStats = function(speakerName) {
+    if (!speakerName) return null;
+    
+    const stats = {
+        total: 0,
+        scheduled: 0,
+        byDate: {} // { '2026-04-11': { total: 0, scheduled: 0 }, ... }
+    };
+    
+    // 날짜별 초기화
+    AppConfig.CONFERENCE_DATES.forEach(d => {
+        stats.byDate[d.date] = { total: 0, scheduled: 0, label: d.label };
+    });
+    
+    // 전체 강의에서 해당 연자 강의 찾기
+    AppState.lectures.forEach(lecture => {
+        const lectureSpeaker = (lecture.speakerKo || '').toLowerCase();
+        if (lectureSpeaker.includes(speakerName.toLowerCase())) {
+            stats.total++;
+        }
+    });
+    
+    // 스케줄에서 일자별로 찾기
+    Object.entries(AppState.dataByDate || {}).forEach(([date, dateData]) => {
+        if (!dateData) return;
+        
+        // 해당 날짜의 강의 목록
+        const dateLectures = dateData.lectures || [];
+        dateLectures.forEach(lecture => {
+            const lectureSpeaker = (lecture.speakerKo || '').toLowerCase();
+            if (lectureSpeaker.includes(speakerName.toLowerCase())) {
+                if (stats.byDate[date]) {
+                    stats.byDate[date].total++;
+                }
+            }
+        });
+        
+        // 해당 날짜의 스케줄 (배치된 강의)
+        const dateSchedule = dateData.schedule || {};
+        Object.values(dateSchedule).forEach(lecture => {
+            const lectureSpeaker = (lecture.speakerKo || '').toLowerCase();
+            if (lectureSpeaker.includes(speakerName.toLowerCase())) {
+                stats.scheduled++;
+                if (stats.byDate[date]) {
+                    stats.byDate[date].scheduled++;
+                }
+            }
+        });
+    });
+    
+    return stats;
+};
+
+/**
  * 강의 목록 업데이트
  */
 window.updateLectureList = function() {
@@ -49,6 +105,63 @@ window.updateLectureList = function() {
         }
         list.innerHTML = `<p style="text-align: center; color: var(--text-light); padding: 2rem;">${message}</p>`;
         return;
+    }
+
+    // 검색어가 있을 때 연자별 일자별 통계 표시
+    if (AppState.lectureSearchTerm) {
+        // 검색 결과에서 연자 목록 추출 (중복 제거)
+        const speakersInResults = [...new Set(
+            filteredLectures
+                .map(l => l.speakerKo)
+                .filter(s => s && s !== '미정' && s.trim() !== '')
+        )];
+        
+        if (speakersInResults.length > 0 && speakersInResults.length <= 5) {
+            // 연자별 통계 계산
+            let statsHtml = '<div class="search-stats" style="background: #f0f4ff; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.75rem; font-size: 0.8rem;">';
+            statsHtml += '<div style="font-weight: bold; margin-bottom: 0.5rem;">📊 일자별 강의 현황</div>';
+            
+            speakersInResults.forEach(speaker => {
+                // 해당 연자의 일자별 강의 개수 계산
+                let dateStats = [];
+                AppConfig.CONFERENCE_DATES.forEach(d => {
+                    const dateData = AppState.dataByDate?.[d.date];
+                    let count = 0;
+                    let scheduledCount = 0;
+                    
+                    // 해당 날짜 스케줄에서 카운트
+                    if (dateData?.schedule) {
+                        Object.values(dateData.schedule).forEach(lecture => {
+                            if ((lecture.speakerKo || '').toLowerCase().includes(speaker.toLowerCase())) {
+                                scheduledCount++;
+                            }
+                        });
+                    }
+                    
+                    // 해당 날짜 강의 목록에서 카운트
+                    if (dateData?.lectures) {
+                        dateData.lectures.forEach(lecture => {
+                            if ((lecture.speakerKo || '').toLowerCase().includes(speaker.toLowerCase())) {
+                                count++;
+                            }
+                        });
+                    }
+                    
+                    if (count > 0 || scheduledCount > 0) {
+                        const dayLabel = d.day === 'sat' ? '토' : '일';
+                        dateStats.push(`<span style="background: ${scheduledCount > 0 ? '#4CAF50' : '#ff9800'}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; margin-right: 0.25rem;">${dayLabel}: ${scheduledCount}/${count}개</span>`);
+                    }
+                });
+                
+                if (dateStats.length > 0) {
+                    statsHtml += `<div style="margin-bottom: 0.3rem;">👤 <strong>${speaker}</strong>: ${dateStats.join(' ')}</div>`;
+                }
+            });
+            
+            statsHtml += '<div style="font-size: 0.7rem; color: #666; margin-top: 0.4rem;">* 배치됨/전체 (초록: 배치완료, 주황: 미배치있음)</div>';
+            statsHtml += '</div>';
+            list.innerHTML = statsHtml;
+        }
     }
 
     filteredLectures.forEach(lecture => {

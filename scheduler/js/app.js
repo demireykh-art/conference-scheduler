@@ -289,16 +289,69 @@ window.openFullScheduleModal = function() {
     content.innerHTML = generateFullScheduleHTML();
 
     document.getElementById('fullScheduleModal').classList.add('active');
+    document.addEventListener('keydown', handleScheduleModalEsc);
 };
 
 window.closeFullScheduleModal = function() {
     document.getElementById('fullScheduleModal').classList.remove('active');
+    document.removeEventListener('keydown', handleScheduleModalEsc);
+};
+
+// ESC 키로 모달 닫기
+window.handleScheduleModalEsc = function(e) {
+    if (e.key === 'Escape') {
+        const fullModal = document.getElementById('fullScheduleModal');
+        const roomModal = document.getElementById('roomScheduleModal');
+        if (roomModal && roomModal.classList.contains('active')) {
+            closeRoomScheduleModal();
+        } else if (fullModal && fullModal.classList.contains('active')) {
+            closeFullScheduleModal();
+        }
+    }
 };
 
 window.generateFullScheduleHTML = function() {
+    const timeUnit = AppConfig.TIME_UNIT || 5;
+    
+    // 각 룸별로 어떤 시간대가 이미 강의로 차지되어 있는지 추적
+    const occupiedCells = {}; // { roomIndex: { timeSlotIndex: true } }
+    AppState.rooms.forEach((room, idx) => {
+        occupiedCells[idx] = {};
+    });
+    
+    // 강의 정보를 시간-룸 키로 빠르게 찾기 위한 맵
+    const lectureMap = {};
+    Object.entries(AppState.schedule).forEach(([key, lecture]) => {
+        lectureMap[key] = lecture;
+    });
+    
+    // 세션 정보를 시간-룸 키로 찾기 위한 맵
+    const sessionMap = {};
+    AppState.sessions.forEach(session => {
+        const key = `${session.time}-${session.room}`;
+        sessionMap[key] = session;
+    });
+    
+    // 강의가 속한 세션 찾기 함수
+    const findSessionForLecture = (startTime, room, duration) => {
+        // 강의 시간대에 해당하는 세션 찾기
+        const startIdx = AppState.timeSlots.indexOf(startTime);
+        if (startIdx === -1) return null;
+        
+        // 강의 시작 시간 이전의 가장 가까운 세션 찾기
+        for (let i = startIdx; i >= 0; i--) {
+            const checkTime = AppState.timeSlots[i];
+            const sessionKey = `${checkTime}-${room}`;
+            if (sessionMap[sessionKey]) {
+                return sessionMap[sessionKey];
+            }
+        }
+        return null;
+    };
+    
     let html = '<table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">';
 
-    html += '<thead style="position: sticky; top: 0; background: var(--primary); color: white;">';
+    html += '<thead style="position: sticky; top: 0; background: var(--primary); color: white; z-index: 10;">';
     html += '<tr><th style="padding: 0.5rem; border: 1px solid #ddd; min-width: 60px;">시간</th>';
     AppState.rooms.forEach((room, idx) => {
         const shortName = room.length > 20 ? room.substring(0, 20) + '...' : room;
@@ -310,33 +363,64 @@ window.generateFullScheduleHTML = function() {
     html += '</tr></thead>';
 
     html += '<tbody>';
-    AppState.timeSlots.forEach(time => {
+    
+    AppState.timeSlots.forEach((time, timeIdx) => {
         const isHourMark = time.endsWith(':00');
         html += `<tr style="background: ${isHourMark ? '#f5f5f5' : 'white'};">`;
         html += `<td style="padding: 0.4rem; border: 1px solid #ddd; font-weight: ${isHourMark ? 'bold' : 'normal'}; text-align: center;">${time}</td>`;
 
-        AppState.rooms.forEach(room => {
+        AppState.rooms.forEach((room, roomIdx) => {
+            // 이미 이전 강의로 차지된 셀이면 건너뛰기
+            if (occupiedCells[roomIdx][timeIdx]) {
+                return; // rowspan으로 이미 커버됨
+            }
+            
             const key = `${time}-${room}`;
-            const lecture = AppState.schedule[key];
-            const session = AppState.sessions.find(s => s.time === time && s.room === room);
+            const lecture = lectureMap[key];
+            const session = sessionMap[key];
 
             let cellContent = '';
             let cellStyle = 'padding: 0.3rem; border: 1px solid #ddd; vertical-align: top;';
+            let rowspan = 1;
 
+            // 세션 헤더 표시
             if (session) {
                 cellStyle += `background: ${session.color || '#9B59B6'}20;`;
                 cellContent += `<div style="font-size: 0.65rem; color: ${session.color || '#9B59B6'}; font-weight: bold;">📌 ${session.name}</div>`;
             }
 
             if (lecture) {
-                const color = AppConfig.categoryColors[lecture.category] || '#9B59B6';
-                cellContent += `<div style="background: ${color}; color: white; padding: 0.2rem 0.3rem; border-radius: 4px; font-size: 0.7rem; margin-top: ${session ? '0.2rem' : '0'};">
-                    <strong>${(lecture.titleKo || '').substring(0, 30)}${(lecture.titleKo || '').length > 30 ? '...' : ''}</strong>
-                    <div style="font-size: 0.6rem; opacity: 0.9;">${lecture.speakerKo || '미정'} · ${lecture.duration || 15}분</div>
+                const duration = lecture.duration || 15;
+                const slotsNeeded = Math.ceil(duration / timeUnit);
+                rowspan = slotsNeeded;
+                
+                // 이 강의가 차지하는 시간대 마킹
+                for (let i = 1; i < slotsNeeded; i++) {
+                    if (timeIdx + i < AppState.timeSlots.length) {
+                        occupiedCells[roomIdx][timeIdx + i] = true;
+                    }
+                }
+                
+                // 강의가 속한 세션 찾기
+                const belongsToSession = findSessionForLecture(time, room, duration);
+                const sessionColor = belongsToSession ? belongsToSession.color : null;
+                const categoryColor = AppConfig.categoryColors[lecture.category] || '#9B59B6';
+                
+                // 세션에 속한 강의는 세션 색상 배경 사용
+                if (sessionColor) {
+                    cellStyle = `padding: 0.3rem; border: 1px solid #ddd; vertical-align: top; background: ${sessionColor}30;`;
+                }
+                
+                const endTime = calculateEndTime(time, duration);
+                
+                cellContent = `<div style="background: ${categoryColor}; color: white; padding: 0.3rem 0.4rem; border-radius: 4px; font-size: 0.7rem; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center;">
+                    <strong style="display: block; line-height: 1.3; margin-bottom: 0.2rem;">${lecture.titleKo || lecture.titleEn || '제목 없음'}</strong>
+                    <div style="font-size: 0.6rem; opacity: 0.9;">👤 ${lecture.speakerKo || '미정'}</div>
+                    <div style="font-size: 0.55rem; opacity: 0.8;">⏱️ ${time}~${endTime} (${duration}분)</div>
                 </div>`;
             }
 
-            html += `<td style="${cellStyle}">${cellContent}</td>`;
+            html += `<td style="${cellStyle}"${rowspan > 1 ? ` rowspan="${rowspan}"` : ''}>${cellContent}</td>`;
         });
 
         html += '</tr>';
@@ -358,6 +442,7 @@ window.openRoomScheduleModal = function(roomIndex) {
     content.innerHTML = generateRoomScheduleHTML(room);
 
     document.getElementById('roomScheduleModal').classList.add('active');
+    document.addEventListener('keydown', handleScheduleModalEsc);
 };
 
 window.closeRoomScheduleModal = function() {
@@ -365,6 +450,21 @@ window.closeRoomScheduleModal = function() {
 };
 
 window.generateRoomScheduleHTML = function(room) {
+    const timeUnit = AppConfig.TIME_UNIT || 5;
+    const occupiedSlots = {}; // { timeIdx: true }
+    
+    // 세션 맵
+    const sessionMap = {};
+    AppState.sessions.forEach(session => {
+        if (session.room === room) {
+            const key = `${session.time}-${room}`;
+            sessionMap[session.time] = session;
+        }
+    });
+    
+    // 현재 활성 세션 추적
+    let currentSession = null;
+    
     let html = '<table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">';
 
     html += '<thead style="background: var(--primary); color: white;">';
@@ -373,11 +473,21 @@ window.generateRoomScheduleHTML = function(room) {
 
     html += '<tbody>';
 
-    AppState.timeSlots.forEach(time => {
+    AppState.timeSlots.forEach((time, timeIdx) => {
+        // 이미 이전 강의로 차지된 슬롯이면 건너뛰기
+        if (occupiedSlots[timeIdx]) {
+            return;
+        }
+        
         const key = `${time}-${room}`;
         const lecture = AppState.schedule[key];
-        const session = AppState.sessions.find(s => s.time === time && s.room === room);
+        const session = sessionMap[time];
         const isHourMark = time.endsWith(':00');
+        
+        // 세션 시작점이면 현재 세션 업데이트
+        if (session) {
+            currentSession = session;
+        }
 
         if (session) {
             html += `<tr style="background: ${session.color || '#9B59B6'}15;">
@@ -388,23 +498,37 @@ window.generateRoomScheduleHTML = function(room) {
         }
 
         if (lecture) {
-            const color = AppConfig.categoryColors[lecture.category] || '#9B59B6';
-            const endTime = calculateEndTime(time, lecture.duration || 15);
+            const categoryColor = AppConfig.categoryColors[lecture.category] || '#9B59B6';
+            const duration = lecture.duration || 15;
+            const endTime = calculateEndTime(time, duration);
+            const slotsNeeded = Math.ceil(duration / timeUnit);
+            
+            // 이 강의가 차지하는 시간대 마킹
+            for (let i = 1; i < slotsNeeded; i++) {
+                if (timeIdx + i < AppState.timeSlots.length) {
+                    occupiedSlots[timeIdx + i] = true;
+                }
+            }
+            
+            // 세션에 속한 강의는 세션 색상 배경
+            const bgColor = currentSession ? `${currentSession.color || '#9B59B6'}15` : (isHourMark ? '#f9f9f9' : 'white');
 
-            html += `<tr style="background: ${isHourMark ? '#f9f9f9' : 'white'};">
-                <td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center; font-weight: ${isHourMark ? 'bold' : 'normal'};">
+            html += `<tr style="background: ${bgColor};">
+                <td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center; font-weight: ${isHourMark ? 'bold' : 'normal'}; vertical-align: top;" rowspan="${slotsNeeded}">
                     ${time}<br><span style="font-size: 0.7rem; color: #999;">~${endTime}</span>
                 </td>
-                <td style="padding: 0.5rem; border: 1px solid #ddd;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div style="flex: 1;">
-                            <strong style="font-size: 0.95rem;">${lecture.titleKo || lecture.titleEn || '제목 없음'}</strong>
-                            <div style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">
-                                👤 ${lecture.speakerKo || '미정'} ${lecture.affiliation ? `(${lecture.affiliation})` : ''}
+                <td style="padding: 0.5rem; border: 1px solid #ddd; vertical-align: top;" rowspan="${slotsNeeded}">
+                    <div style="background: ${categoryColor}; color: white; padding: 0.5rem; border-radius: 6px; height: 100%; box-sizing: border-box;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="flex: 1;">
+                                <strong style="font-size: 0.95rem; display: block; margin-bottom: 0.3rem;">${lecture.titleKo || lecture.titleEn || '제목 없음'}</strong>
+                                <div style="font-size: 0.8rem; opacity: 0.95; margin-top: 0.25rem;">
+                                    👤 ${lecture.speakerKo || '미정'} ${lecture.affiliation ? `(${lecture.affiliation})` : ''}
+                                </div>
+                                <div style="font-size: 0.75rem; opacity: 0.85;">⏱️ ${duration}분</div>
                             </div>
-                            <div style="font-size: 0.75rem; color: #999;">⏱️ ${lecture.duration || 15}분</div>
+                            <span style="background: rgba(255,255,255,0.25); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; white-space: nowrap; margin-left: 0.5rem;">${lecture.category}</span>
                         </div>
-                        <span style="background: ${color}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; white-space: nowrap; margin-left: 0.5rem;">${lecture.category}</span>
                     </div>
                 </td>
             </tr>`;
