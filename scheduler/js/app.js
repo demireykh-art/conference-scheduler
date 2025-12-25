@@ -329,120 +329,121 @@ window.handleScheduleModalEsc = function(e) {
 
 window.generateFullScheduleHTML = function() {
     const timeUnit = AppConfig.TIME_UNIT || 5;
+    const roomCount = AppState.rooms.length;
+    const roomWidth = Math.max(200, Math.floor(800 / Math.min(roomCount, 4))); // 룸 폭 균등
     
-    // 각 룸별로 어떤 시간대가 이미 강의로 차지되어 있는지 추적
-    const occupiedCells = {}; // { roomIndex: { timeSlotIndex: true } }
-    AppState.rooms.forEach((room, idx) => {
-        occupiedCells[idx] = {};
+    // 세션 정보를 시간-룸 키로 찾기 위한 맵
+    const sessionMap = {};
+    AppState.sessions.forEach(session => {
+        sessionMap[`${session.time}-${session.room}`] = session;
     });
     
-    // 강의 정보를 시간-룸 키로 빠르게 찾기 위한 맵
+    // 강의 정보를 시간-룸 키로 찾기 위한 맵
     const lectureMap = {};
     Object.entries(AppState.schedule).forEach(([key, lecture]) => {
         lectureMap[key] = lecture;
     });
     
-    // 세션 정보를 시간-룸 키로 찾기 위한 맵
-    const sessionMap = {};
-    AppState.sessions.forEach(session => {
-        const key = `${session.time}-${session.room}`;
-        sessionMap[key] = session;
-    });
-    
-    // 강의가 속한 세션 찾기 함수
-    const findSessionForLecture = (startTime, room, duration) => {
-        // 강의 시간대에 해당하는 세션 찾기
-        const startIdx = AppState.timeSlots.indexOf(startTime);
-        if (startIdx === -1) return null;
-        
-        // 강의 시작 시간 이전의 가장 가까운 세션 찾기
-        for (let i = startIdx; i >= 0; i--) {
-            const checkTime = AppState.timeSlots[i];
-            const sessionKey = `${checkTime}-${room}`;
-            if (sessionMap[sessionKey]) {
-                return sessionMap[sessionKey];
-            }
-        }
-        return null;
-    };
-    
-    let html = '<table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">';
+    let html = `<table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; table-layout: fixed;">`;
 
+    // 헤더
     html += '<thead style="position: sticky; top: 0; background: var(--primary); color: white; z-index: 10;">';
-    html += '<tr><th style="padding: 0.5rem; border: 1px solid #ddd; min-width: 60px;">시간</th>';
+    html += `<tr><th style="padding: 0.75rem; border: 1px solid #ddd; width: 80px; min-width: 80px;">시간</th>`;
     AppState.rooms.forEach((room, idx) => {
-        const shortName = room.length > 20 ? room.substring(0, 20) + '...' : room;
-        html += `<th style="padding: 0.5rem; border: 1px solid #ddd; min-width: 150px;">
+        const shortName = room.length > 25 ? room.substring(0, 25) + '...' : room;
+        html += `<th style="padding: 0.75rem; border: 1px solid #ddd; width: ${roomWidth}px; min-width: ${roomWidth}px;">
             ${shortName}
-            <button onclick="openRoomScheduleModal(${idx})" style="margin-left: 0.25rem; padding: 0.1rem 0.3rem; font-size: 0.6rem; cursor: pointer; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.5); border-radius: 3px; color: white;">🔍</button>
+            <button onclick="openRoomScheduleModal(${idx})" style="margin-left: 0.25rem; padding: 0.15rem 0.35rem; font-size: 0.65rem; cursor: pointer; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.5); border-radius: 3px; color: white;">🔍</button>
         </th>`;
     });
     html += '</tr></thead>';
 
     html += '<tbody>';
     
-    AppState.timeSlots.forEach((time, timeIdx) => {
+    AppState.timeSlots.forEach((time) => {
         const isHourMark = time.endsWith(':00');
-        html += `<tr style="background: ${isHourMark ? '#f5f5f5' : 'white'};">`;
-        html += `<td style="padding: 0.4rem; border: 1px solid #ddd; font-weight: ${isHourMark ? 'bold' : 'normal'}; text-align: center;">${time}</td>`;
-
-        AppState.rooms.forEach((room, roomIdx) => {
-            // 이미 이전 강의로 차지된 셀이면 건너뛰기
-            if (occupiedCells[roomIdx][timeIdx]) {
-                return; // rowspan으로 이미 커버됨
-            }
+        
+        // 이 시간대에 세션이 있는지 확인
+        let hasSession = false;
+        AppState.rooms.forEach(room => {
+            if (sessionMap[`${time}-${room}`]) hasSession = true;
+        });
+        
+        // 세션 행 (세션이 있는 시간대만)
+        if (hasSession) {
+            html += '<tr style="background: #f8f4fc;">';
+            html += `<td style="padding: 0.4rem; border: 1px solid #ddd; text-align: center; font-size: 0.75rem; color: #666;"></td>`;
             
+            AppState.rooms.forEach(room => {
+                const session = sessionMap[`${time}-${room}`];
+                if (session) {
+                    html += `<td style="padding: 0.5rem; border: 1px solid #ddd; background: ${session.color || '#9B59B6'}15;">
+                        <div style="font-weight: bold; color: ${session.color || '#9B59B6'}; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            📌 ${session.name}
+                        </div>
+                        ${session.moderator ? `<div style="font-size: 0.7rem; color: #666;">좌장: ${session.moderator}</div>` : ''}
+                    </td>`;
+                } else {
+                    html += `<td style="border: 1px solid #ddd;"></td>`;
+                }
+            });
+            html += '</tr>';
+        }
+        
+        // 강의 행
+        html += `<tr style="background: ${isHourMark ? '#fafafa' : 'white'};">`;
+        
+        // 시간 셀
+        const lecture0 = lectureMap[`${time}-${AppState.rooms[0]}`];
+        let endTimeDisplay = '';
+        
+        // 해당 시간대의 강의들 중 하나라도 있으면 종료시간 표시
+        for (const room of AppState.rooms) {
+            const lec = lectureMap[`${time}-${room}`];
+            if (lec) {
+                endTimeDisplay = calculateEndTime(time, lec.duration || 15);
+                break;
+            }
+        }
+        
+        html += `<td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center; vertical-align: top; font-weight: ${isHourMark ? 'bold' : 'normal'};">
+            <div>${time}</div>
+            ${endTimeDisplay ? `<div style="font-size: 0.7rem; color: #999;">~${endTimeDisplay}</div>` : ''}
+        </td>`;
+
+        // 각 룸별 강의 셀
+        AppState.rooms.forEach(room => {
             const key = `${time}-${room}`;
             const lecture = lectureMap[key];
-            const session = sessionMap[key];
-
-            let cellContent = '';
-            let cellStyle = 'padding: 0.3rem; border: 1px solid #ddd; vertical-align: top;';
-            let rowspan = 1;
-
-            // 세션 헤더 표시
-            if (session) {
-                cellStyle += `background: ${session.color || '#9B59B6'}20;`;
-                cellContent += `<div style="font-size: 0.65rem; color: ${session.color || '#9B59B6'}; font-weight: bold; margin-bottom: 0.2rem;">📌 ${session.name}</div>`;
-            }
 
             if (lecture) {
-                const duration = lecture.duration || 15;
-                const slotsNeeded = Math.ceil(duration / timeUnit);
-                rowspan = slotsNeeded;
-                
-                // 이 강의가 차지하는 시간대 마킹
-                for (let i = 1; i < slotsNeeded; i++) {
-                    if (timeIdx + i < AppState.timeSlots.length) {
-                        occupiedCells[roomIdx][timeIdx + i] = true;
-                    }
-                }
-                
-                // 강의가 속한 세션 찾기
-                const belongsToSession = findSessionForLecture(time, room, duration);
-                const sessionColor = belongsToSession ? belongsToSession.color : null;
                 const categoryColor = AppConfig.categoryColors[lecture.category] || '#9B59B6';
-                
-                // 세션에 속한 강의는 세션 색상 배경 사용
-                if (sessionColor && !session) {
-                    cellStyle = `padding: 0.3rem; border: 1px solid #ddd; vertical-align: top; background: ${sessionColor}30;`;
-                }
-                
+                const duration = lecture.duration || 15;
                 const endTime = calculateEndTime(time, duration);
+                const title = lecture.titleKo || lecture.titleEn || '제목 없음';
+                const speaker = lecture.speakerKo || '미정';
+                const affiliation = lecture.affiliation || '';
                 
-                // 세션 제목이 있으면 유지하고 강의 블록 추가
-                cellContent += `<div style="background: ${categoryColor}; color: white; padding: 0.3rem 0.4rem; border-radius: 4px; font-size: 0.7rem; height: ${session ? 'auto' : '100%'}; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center;">
-                    <strong style="display: block; line-height: 1.3; margin-bottom: 0.2rem;">${lecture.titleKo || lecture.titleEn || '제목 없음'}</strong>
-                    <div style="font-size: 0.6rem; opacity: 0.9;">👤 ${lecture.speakerKo || '미정'}</div>
-                    <div style="font-size: 0.55rem; opacity: 0.8;">⏱️ ${time}~${endTime} (${duration}분)</div>
-                </div>`;
+                html += `<td style="padding: 0.5rem; border: 1px solid #ddd; vertical-align: top; height: 80px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.3rem;">
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight: bold; font-size: 0.85rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${title}</div>
+                            <div style="font-size: 0.75rem; color: #555; margin-top: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                👤 ${speaker}${affiliation ? ` (${affiliation})` : ''}
+                            </div>
+                            <div style="font-size: 0.7rem; color: #888;">⏱️ ${duration}분</div>
+                        </div>
+                        <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; white-space: nowrap; flex-shrink: 0;">${lecture.category || '기타'}</span>
+                    </div>
+                </td>`;
+            } else {
+                html += `<td style="padding: 0.5rem; border: 1px solid #ddd; height: 80px;"></td>`;
             }
-
-            html += `<td style="${cellStyle}"${rowspan > 1 ? ` rowspan="${rowspan}"` : ''}>${cellContent}</td>`;
         });
 
         html += '</tr>';
     });
+    
     html += '</tbody></table>';
 
     return html;

@@ -11,6 +11,7 @@ window.createScheduleTable = function() {
 
     const table = document.createElement('table');
     table.className = 'schedule-table';
+    table.style.tableLayout = 'fixed'; // 룸 폭 균등화
 
     // 헤더
     const thead = document.createElement('thead');
@@ -18,11 +19,18 @@ window.createScheduleTable = function() {
 
     const timeHeader = document.createElement('th');
     timeHeader.textContent = '시간';
+    timeHeader.style.width = '70px';
+    timeHeader.style.minWidth = '70px';
     headerRow.appendChild(timeHeader);
+
+    // 각 룸의 폭 계산 (균등)
+    const roomWidth = 180; // 고정 폭
 
     AppState.rooms.forEach((room, roomIndex) => {
         const roomHeader = document.createElement('th');
         roomHeader.style.position = 'relative';
+        roomHeader.style.width = roomWidth + 'px';
+        roomHeader.style.minWidth = roomWidth + 'px';
 
         // 크게보기 버튼
         const expandBtn = document.createElement('button');
