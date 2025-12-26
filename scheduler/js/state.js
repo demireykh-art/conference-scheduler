@@ -16,17 +16,6 @@ window.DEFAULT_BREAK_ITEMS = [
         isBreak: true
     },
     {
-        id: 'break-lunch',
-        titleKo: '🍽️ Lunch Break',
-        titleEn: 'Lunch Break',
-        speakerKo: '',
-        speakerEn: '',
-        affiliation: '',
-        category: 'Lunch Break',
-        duration: 60,
-        isBreak: true
-    },
-    {
         id: 'break-opening',
         titleKo: '🎤 Opening / Closing',
         titleEn: 'Opening / Closing',
@@ -36,6 +25,18 @@ window.DEFAULT_BREAK_ITEMS = [
         category: 'Opening/Closing',
         duration: 30,
         isBreak: true
+    },
+    {
+        id: 'break-panel',
+        titleKo: '📋 Panel Discussion',
+        titleEn: 'Panel Discussion',
+        speakerKo: '',
+        speakerEn: '',
+        affiliation: '',
+        category: 'Panel Discussion',
+        duration: 15,
+        isBreak: true,
+        isPanelDiscussion: true
     }
 ];
 

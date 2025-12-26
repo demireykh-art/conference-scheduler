@@ -1315,30 +1315,35 @@ body {
     color: #333;
 }
 
-/* Lunch Break - 세션 헤더 스타일 */
-.scheduled-lecture.lunch-break-header {
-    border-radius: 8px 8px 4px 4px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+/* Panel Discussion - 흰색 배경 스타일 */
+.scheduled-lecture.panel-discussion {
+    background: white !important;
+    border: 1px solid #ddd;
 }
 
-.scheduled-lecture.lunch-break-header .lecture-title-display {
-    color: white;
-    font-weight: bold;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}
-
-.scheduled-lecture.lunch-break-header .duration-badge {
-    background: rgba(255,255,255,0.2);
-    color: white;
+.scheduled-lecture.panel-discussion .lecture-title-display {
+    color: #333;
 }
 
 /* Luncheon Lecture - 별표 스타일 */
 .scheduled-lecture.luncheon-lecture {
+    background: white !important;
     border-left: 4px solid #FFD700 !important;
 }
 
 .scheduled-lecture.luncheon-lecture .lecture-title-display {
     color: #333;
+}
+
+/* 카테고리 뱃지 스타일 */
+.scheduled-lecture .category-badge {
+    position: absolute;
+    top: 2px;
+    right: 22px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.5rem;
+    white-space: nowrap;
 }
 
 .scheduled-lecture small {
