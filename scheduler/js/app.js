@@ -420,22 +420,71 @@ window.generateFullScheduleHTML = function() {
                 const categoryColor = AppConfig.categoryColors[lecture.category] || '#9B59B6';
                 const duration = lecture.duration || 15;
                 const endTime = calculateEndTime(time, duration);
-                const title = lecture.titleKo || lecture.titleEn || '제목 없음';
+                let title = lecture.titleKo || lecture.titleEn || '제목 없음';
                 const speaker = lecture.speakerKo || '미정';
                 const affiliation = lecture.affiliation || '';
                 
-                html += `<td style="padding: 0.5rem; border: 1px solid #ddd; vertical-align: top; height: 80px;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.3rem;">
-                        <div style="flex: 1; min-width: 0;">
-                            <div style="font-weight: bold; font-size: 0.85rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${title}</div>
-                            <div style="font-size: 0.75rem; color: #555; margin-top: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                👤 ${speaker}${affiliation ? ` (${affiliation})` : ''}
+                const isLunchBreak = lecture.category === 'Lunch Break';
+                const isLuncheonLecture = lecture.category === 'Luncheon Lecture';
+                const isBreak = lecture.isBreak || ['Coffee Break', 'Lunch Break', 'Opening/Closing'].includes(lecture.category);
+                
+                // Luncheon Lecture는 별표 표시
+                if (isLuncheonLecture) {
+                    title = `⭐ ${title}`;
+                }
+                
+                // Lunch Break는 세션 헤더 스타일
+                if (isLunchBreak) {
+                    html += `<td style="padding: 0.5rem; border: 1px solid #ddd; vertical-align: top; height: 80px; background: linear-gradient(135deg, ${categoryColor}20, ${categoryColor}10);">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.3rem;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: bold; font-size: 0.9rem; color: ${categoryColor};">🍽️ ${title}</div>
+                                <div style="font-size: 0.7rem; color: #888;">⏱️ ${duration}분</div>
                             </div>
-                            <div style="font-size: 0.7rem; color: #888;">⏱️ ${duration}분</div>
+                            <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; white-space: nowrap; flex-shrink: 0;">${lecture.category}</span>
                         </div>
-                        <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; white-space: nowrap; flex-shrink: 0;">${lecture.category || '기타'}</span>
-                    </div>
-                </td>`;
+                    </td>`;
+                } else if (isLuncheonLecture) {
+                    // Luncheon Lecture - 별표 + 스폰서 표시
+                    const sponsorInfo = lecture.companyName ? ` (스폰서: ${lecture.companyName})` : '';
+                    html += `<td style="padding: 0.5rem; border: 1px solid #ddd; vertical-align: top; height: 80px; border-left: 4px solid #FFD700;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.3rem;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: bold; font-size: 0.85rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${title}</div>
+                                <div style="font-size: 0.75rem; color: #555; margin-top: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    👤 ${speaker}${sponsorInfo}
+                                </div>
+                                <div style="font-size: 0.7rem; color: #888;">⏱️ ${duration}분</div>
+                            </div>
+                            <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; white-space: nowrap; flex-shrink: 0;">${lecture.category}</span>
+                        </div>
+                    </td>`;
+                } else if (isBreak) {
+                    // 기타 Break (Coffee Break, Opening/Closing)
+                    html += `<td style="padding: 0.5rem; border: 1px solid #ddd; vertical-align: top; height: 80px; background: ${categoryColor}10;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.3rem;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: bold; font-size: 0.85rem; color: ${categoryColor};">${title}</div>
+                                <div style="font-size: 0.7rem; color: #888;">⏱️ ${duration}분</div>
+                            </div>
+                            <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; white-space: nowrap; flex-shrink: 0;">${lecture.category}</span>
+                        </div>
+                    </td>`;
+                } else {
+                    // 일반 강의
+                    html += `<td style="padding: 0.5rem; border: 1px solid #ddd; vertical-align: top; height: 80px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.3rem;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: bold; font-size: 0.85rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${title}</div>
+                                <div style="font-size: 0.75rem; color: #555; margin-top: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    👤 ${speaker}${affiliation ? ` (${affiliation})` : ''}
+                                </div>
+                                <div style="font-size: 0.7rem; color: #888;">⏱️ ${duration}분</div>
+                            </div>
+                            <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; white-space: nowrap; flex-shrink: 0;">${lecture.category || '기타'}</span>
+                        </div>
+                    </td>`;
+                }
             } else {
                 html += `<td style="padding: 0.5rem; border: 1px solid #ddd; height: 80px;"></td>`;
             }
@@ -505,24 +554,76 @@ window.generateRoomScheduleHTML = function(room) {
             const categoryColor = AppConfig.categoryColors[lecture.category] || '#9B59B6';
             const duration = lecture.duration || 15;
             const endTime = calculateEndTime(time, duration);
-
-            html += `<tr style="background: ${isHourMark ? '#f9f9f9' : 'white'};">
-                <td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center; font-weight: ${isHourMark ? 'bold' : 'normal'};">
-                    ${time}<br><span style="font-size: 0.7rem; color: #999;">~${endTime}</span>
-                </td>
-                <td style="padding: 0.5rem; border: 1px solid #ddd;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div style="flex: 1;">
-                            <strong style="font-size: 0.95rem;">${lecture.titleKo || lecture.titleEn || '제목 없음'}</strong>
-                            <div style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">
-                                👤 ${lecture.speakerKo || '미정'} ${lecture.affiliation ? `(${lecture.affiliation})` : ''}
+            
+            const isLunchBreak = lecture.category === 'Lunch Break';
+            const isLuncheonLecture = lecture.category === 'Luncheon Lecture';
+            const isBreak = lecture.isBreak || ['Coffee Break', 'Lunch Break', 'Opening/Closing'].includes(lecture.category);
+            
+            let title = lecture.titleKo || lecture.titleEn || '제목 없음';
+            
+            // Lunch Break - 세션 헤더 스타일
+            if (isLunchBreak) {
+                html += `<tr style="background: ${categoryColor}15;">
+                    <td colspan="2" style="padding: 0.75rem; border: 1px solid #ddd; font-weight: bold; color: ${categoryColor};">
+                        🍽️ ${title} <span style="font-weight: normal; font-size: 0.8rem;">(${duration}분)</span>
+                    </td>
+                </tr>`;
+            } else if (isLuncheonLecture) {
+                // Luncheon Lecture - 별표 + 스폰서 표시
+                const sponsorInfo = lecture.companyName ? ` (스폰서: ${lecture.companyName})` : '';
+                html += `<tr style="background: ${isHourMark ? '#f9f9f9' : 'white'}; border-left: 4px solid #FFD700;">
+                    <td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center; font-weight: ${isHourMark ? 'bold' : 'normal'};">
+                        ${time}<br><span style="font-size: 0.7rem; color: #999;">~${endTime}</span>
+                    </td>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="flex: 1;">
+                                <strong style="font-size: 0.95rem;">⭐ ${title}</strong>
+                                <div style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">
+                                    👤 ${lecture.speakerKo || '미정'}${sponsorInfo}
+                                </div>
+                                <div style="font-size: 0.75rem; color: #999;">⏱️ ${duration}분</div>
                             </div>
-                            <div style="font-size: 0.75rem; color: #999;">⏱️ ${duration}분</div>
+                            <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; white-space: nowrap; margin-left: 0.5rem;">${lecture.category}</span>
                         </div>
-                        <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; white-space: nowrap; margin-left: 0.5rem;">${lecture.category}</span>
-                    </div>
-                </td>
-            </tr>`;
+                    </td>
+                </tr>`;
+            } else if (isBreak) {
+                // 기타 Break
+                html += `<tr style="background: ${categoryColor}10;">
+                    <td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center; font-weight: ${isHourMark ? 'bold' : 'normal'};">
+                        ${time}<br><span style="font-size: 0.7rem; color: #999;">~${endTime}</span>
+                    </td>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="flex: 1;">
+                                <strong style="font-size: 0.95rem; color: ${categoryColor};">${title}</strong>
+                                <div style="font-size: 0.75rem; color: #999;">⏱️ ${duration}분</div>
+                            </div>
+                            <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; white-space: nowrap; margin-left: 0.5rem;">${lecture.category}</span>
+                        </div>
+                    </td>
+                </tr>`;
+            } else {
+                // 일반 강의
+                html += `<tr style="background: ${isHourMark ? '#f9f9f9' : 'white'};">
+                    <td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center; font-weight: ${isHourMark ? 'bold' : 'normal'};">
+                        ${time}<br><span style="font-size: 0.7rem; color: #999;">~${endTime}</span>
+                    </td>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="flex: 1;">
+                                <strong style="font-size: 0.95rem;">${title}</strong>
+                                <div style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">
+                                    👤 ${lecture.speakerKo || '미정'} ${lecture.affiliation ? `(${lecture.affiliation})` : ''}
+                                </div>
+                                <div style="font-size: 0.75rem; color: #999;">⏱️ ${duration}분</div>
+                            </div>
+                            <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; white-space: nowrap; margin-left: 0.5rem;">${lecture.category}</span>
+                        </div>
+                    </td>
+                </tr>`;
+            }
         }
     });
 

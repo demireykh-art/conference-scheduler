@@ -68,12 +68,25 @@ window.updateLectureList = function() {
     // 시간표에 배치된 강의 ID 목록
     const scheduledLectureIds = Object.values(AppState.schedule).map(s => s.id);
 
-    // 카테고리 필터 적용
-    let filteredLectures = AppState.activeFilter === 'all'
-        ? AppState.lectures
-        : AppState.lectures.filter(l => l.category === AppState.activeFilter);
+    // Break 항목은 별도 처리 (항상 표시, 중복 가능)
+    const breakTypes = AppConfig.BREAK_TYPES || [];
+    
+    // 일반 강의와 Break 항목 분리
+    const regularLectures = AppState.lectures.filter(l => !l.isBreak);
+    const breakItems = DEFAULT_BREAK_ITEMS || [];
 
-    // 퀵필터 적용
+    // 카테고리 필터 적용 (일반 강의만)
+    let filteredLectures;
+    if (AppState.activeFilter === 'all') {
+        filteredLectures = regularLectures;
+    } else if (AppState.activeFilter === 'Luncheon') {
+        // 런천강의 필터: isLuncheon=true인 강의만
+        filteredLectures = regularLectures.filter(l => l.isLuncheon);
+    } else {
+        filteredLectures = regularLectures.filter(l => l.category === AppState.activeFilter);
+    }
+
+    // 퀵필터 적용 (일반 강의만)
     if (AppState.quickFilter === 'unscheduled') {
         filteredLectures = filteredLectures.filter(l => !scheduledLectureIds.includes(l.id));
     } else if (AppState.quickFilter === 'noSpeaker') {
@@ -94,7 +107,36 @@ window.updateLectureList = function() {
         });
     }
 
-    if (filteredLectures.length === 0) {
+    // Break 항목 필터 (카테고리 필터가 Break 타입이면 해당 Break만 표시)
+    let filteredBreaks = [];
+    if (AppState.activeFilter === 'all' || breakTypes.includes(AppState.activeFilter)) {
+        if (AppState.activeFilter === 'all') {
+            filteredBreaks = breakItems;
+        } else {
+            filteredBreaks = breakItems.filter(b => b.category === AppState.activeFilter);
+        }
+    }
+    
+    // 퀵필터가 있으면 Break 항목 숨김
+    if (AppState.quickFilter) {
+        filteredBreaks = [];
+    }
+
+    // Break 항목 먼저 렌더링 (검색어 없고, 퀵필터 없을 때만)
+    if (!AppState.lectureSearchTerm && filteredBreaks.length > 0) {
+        const breakSection = document.createElement('div');
+        breakSection.className = 'break-section';
+        breakSection.style.cssText = 'margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 2px dashed #ddd;';
+        
+        filteredBreaks.forEach(lecture => {
+            const item = createLectureItem(lecture, -1, false, true);
+            breakSection.appendChild(item);
+        });
+        
+        list.appendChild(breakSection);
+    }
+
+    if (filteredLectures.length === 0 && filteredBreaks.length === 0) {
         let message = '강의가 없습니다';
         if (AppState.lectureSearchTerm) {
             message = `"${AppState.lectureSearchTerm}" 검색 결과가 없습니다`;
@@ -172,43 +214,103 @@ window.updateLectureList = function() {
     }
 
     filteredLectures.forEach(lecture => {
-        const color = AppConfig.categoryColors[lecture.category] || '#9B59B6';
         const isScheduled = scheduledLectureIds.includes(lecture.id);
-        const item = document.createElement('div');
-        item.className = 'lecture-item' + (isScheduled ? ' scheduled' : '');
-        item.draggable = true;
-        item.dataset.lectureId = lecture.id;
-        item.style.borderLeft = `4px solid ${color}`;
-
-        const duration = lecture.duration || 15;
-
-        let titleDisplay = lecture.titleKo;
-        let speakerDisplay = lecture.speakerKo || '미정';
-
-        if (AppState.lectureSearchTerm) {
-            titleDisplay = highlightSearchTerm(lecture.titleKo, AppState.lectureSearchTerm);
-            speakerDisplay = highlightSearchTerm(lecture.speakerKo || '미정', AppState.lectureSearchTerm);
-        }
-
-        item.innerHTML = `
-            <div class="lecture-title">
-                <span class="category-color" style="background: ${color}"></span>
-                ${titleDisplay}
-            </div>
-            <div class="lecture-meta">
-                <span class="tag tag-speaker">${speakerDisplay}</span>
-                <span class="tag" style="background: #E3F2FD; color: #1976D2;">⏱️ ${duration}분</span>
-                ${isScheduled ? '<span class="tag" style="background: #E8F5E9; color: #4CAF50;">배치됨</span>' : ''}
-            </div>
-        `;
-
-        item.addEventListener('dragstart', handleDragStart);
-        item.addEventListener('dragend', handleDragEnd);
-        item.addEventListener('dblclick', () => openEditModal(lecture.id));
-
+        const item = createLectureItem(lecture, lecture.id, isScheduled, false);
         list.appendChild(item);
     });
 };
+
+/**
+ * 강의 아이템 DOM 요소 생성
+ */
+function createLectureItem(lecture, lectureId, isScheduled, isBreak) {
+    const color = AppConfig.categoryColors[lecture.category] || '#9B59B6';
+    const item = document.createElement('div');
+    item.className = 'lecture-item' + (isScheduled && !isBreak ? ' scheduled' : '');
+    item.draggable = true;
+    item.dataset.lectureId = lecture.id;
+    
+    const isLuncheon = lecture.isLuncheon;
+    const isPanelDiscussion = lecture.category === 'Panel Discussion';
+    
+    if (isBreak) {
+        item.dataset.isBreak = 'true';
+        // Panel Discussion은 흰색 배경
+        if (isPanelDiscussion) {
+            item.style.background = 'white';
+            item.style.border = '2px solid #424242';
+        } else {
+            item.style.background = `linear-gradient(135deg, ${color}15, ${color}05)`;
+        }
+    }
+    
+    // 런천강의는 금색 좌측 테두리
+    if (isLuncheon) {
+        item.style.borderLeft = `4px solid #FFD700`;
+    } else {
+        item.style.borderLeft = `4px solid ${color}`;
+    }
+
+    const duration = lecture.duration || 15;
+
+    let titleDisplay = lecture.titleKo;
+    let speakerDisplay = lecture.speakerKo || '';
+
+    if (AppState.lectureSearchTerm && !isBreak) {
+        titleDisplay = highlightSearchTerm(lecture.titleKo, AppState.lectureSearchTerm);
+        speakerDisplay = highlightSearchTerm(lecture.speakerKo || '미정', AppState.lectureSearchTerm);
+    }
+    
+    // 런천강의는 별표 표시
+    if (isLuncheon) {
+        titleDisplay = `⭐ ${titleDisplay}`;
+    }
+
+    // Break 항목은 연자 표시 안함
+    const speakerTag = !isBreak && speakerDisplay ? 
+        `<span class="tag tag-speaker">${speakerDisplay || '미정'}</span>` : '';
+    
+    // 런천강의 스폰서 표시
+    const sponsorTag = isLuncheon && lecture.companyName ? 
+        `<span class="tag" style="background: #FFF8E1; color: #FF8F00;">🏢 ${lecture.companyName}</span>` : '';
+    
+    // 런천강의 태그
+    const luncheonTag = isLuncheon ? 
+        '<span class="tag" style="background: #FF8F00; color: white;">런천</span>' : '';
+    
+    // Break 항목은 배치됨 표시 안함 (중복 가능하므로)
+    const scheduledTag = isScheduled && !isBreak ? 
+        '<span class="tag" style="background: #E8F5E9; color: #4CAF50;">배치됨</span>' : '';
+    
+    // Break 항목은 중복 가능 표시
+    const breakTag = isBreak ? 
+        '<span class="tag" style="background: #FFF3E0; color: #E65100;">중복가능</span>' : '';
+
+    item.innerHTML = `
+        <div class="lecture-title">
+            <span class="category-color" style="background: ${color}"></span>
+            ${titleDisplay}
+        </div>
+        <div class="lecture-meta">
+            ${speakerTag}
+            ${sponsorTag}
+            ${luncheonTag}
+            <span class="tag" style="background: #E3F2FD; color: #1976D2;">⏱️ ${duration}분</span>
+            ${scheduledTag}
+            ${breakTag}
+        </div>
+    `;
+
+    item.addEventListener('dragstart', handleDragStart);
+    item.addEventListener('dragend', handleDragEnd);
+    
+    // Break 항목은 더블클릭 시 편집 불가 (기본 항목이므로)
+    if (!isBreak) {
+        item.addEventListener('dblclick', () => openEditModal(lecture.id));
+    }
+
+    return item;
+}
 
 /**
  * 강의 추가
@@ -216,9 +318,12 @@ window.updateLectureList = function() {
 window.addLectureToList = function() {
     if (!checkEditPermission()) return;
 
+    const category = document.getElementById('category').value;
     const speakerKo = document.getElementById('speakerKo').value.trim();
     const speakerEn = document.getElementById('speakerEn').value.trim();
     const affiliation = document.getElementById('affiliation').value.trim();
+    const isLuncheonCheckbox = document.getElementById('isLuncheon');
+    const isLuncheon = isLuncheonCheckbox ? isLuncheonCheckbox.checked : false;
 
     // 연자 목록에서 해당 연자 찾기
     const existingSpeaker = AppState.speakers.find(s => s.name === speakerKo);
@@ -243,7 +348,7 @@ window.addLectureToList = function() {
 
     const lecture = {
         id: Date.now(),
-        category: document.getElementById('category').value,
+        category: category,
         titleKo: document.getElementById('titleKo').value,
         titleEn: document.getElementById('titleEn').value,
         speakerKo: speakerKo,
@@ -252,7 +357,8 @@ window.addLectureToList = function() {
         duration: parseInt(document.getElementById('lectureDuration').value) || 15,
         companyName: document.getElementById('companyName').value.trim(),
         productName: document.getElementById('productName').value.trim(),
-        productDescription: document.getElementById('productDescription').value.trim()
+        productDescription: document.getElementById('productDescription').value.trim(),
+        isLuncheon: isLuncheon
     };
 
     AppState.lectures.push(lecture);
@@ -270,6 +376,7 @@ window.addLectureToList = function() {
     document.getElementById('companyName').value = '';
     document.getElementById('productName').value = '';
     document.getElementById('productDescription').value = '';
+    if (isLuncheonCheckbox) isLuncheonCheckbox.checked = false;
 
     const autocompleteList = document.getElementById('autocompleteList');
     autocompleteList.classList.remove('active');
@@ -293,6 +400,12 @@ window.openEditModal = function(lectureId) {
     document.getElementById('editSpeakerEn').value = lecture.speakerEn || '';
     document.getElementById('editAffiliation').value = lecture.affiliation || '';
     document.getElementById('editDuration').value = lecture.duration || 15;
+
+    // 런천강의 체크박스 처리
+    const editIsLuncheonCheckbox = document.getElementById('editIsLuncheon');
+    if (editIsLuncheonCheckbox) {
+        editIsLuncheonCheckbox.checked = lecture.isLuncheon || false;
+    }
 
     document.getElementById('editModal').classList.add('active');
 };
@@ -335,17 +448,21 @@ window.deleteLectureFromModal = function() {
 window.saveEditedLecture = function() {
     const lectureId = parseInt(document.getElementById('editLectureId').value);
     const lectureIndex = AppState.lectures.findIndex(l => l.id === lectureId);
+    const category = document.getElementById('editCategory').value;
+    const editIsLuncheonCheckbox = document.getElementById('editIsLuncheon');
+    const isLuncheon = editIsLuncheonCheckbox ? editIsLuncheonCheckbox.checked : false;
 
     if (lectureIndex !== -1) {
         const updatedLecture = {
             id: lectureId,
-            category: document.getElementById('editCategory').value,
+            category: category,
             titleKo: document.getElementById('editTitleKo').value,
             titleEn: document.getElementById('editTitleEn').value,
             speakerKo: document.getElementById('editSpeakerKo').value,
             speakerEn: document.getElementById('editSpeakerEn').value,
             affiliation: document.getElementById('editAffiliation').value,
-            duration: parseInt(document.getElementById('editDuration').value) || 15
+            duration: parseInt(document.getElementById('editDuration').value) || 15,
+            isLuncheon: isLuncheon
         };
 
         AppState.lectures[lectureIndex] = updatedLecture;
