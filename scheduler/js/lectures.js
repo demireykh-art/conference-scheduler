@@ -68,12 +68,19 @@ window.updateLectureList = function() {
     // 시간표에 배치된 강의 ID 목록
     const scheduledLectureIds = Object.values(AppState.schedule).map(s => s.id);
 
-    // 카테고리 필터 적용
-    let filteredLectures = AppState.activeFilter === 'all'
-        ? AppState.lectures
-        : AppState.lectures.filter(l => l.category === AppState.activeFilter);
+    // Break 항목은 별도 처리 (항상 표시, 중복 가능)
+    const breakTypes = AppConfig.BREAK_TYPES || [];
+    
+    // 일반 강의와 Break 항목 분리
+    const regularLectures = AppState.lectures.filter(l => !l.isBreak);
+    const breakItems = DEFAULT_BREAK_ITEMS || [];
 
-    // 퀵필터 적용
+    // 카테고리 필터 적용 (일반 강의만)
+    let filteredLectures = AppState.activeFilter === 'all'
+        ? regularLectures
+        : regularLectures.filter(l => l.category === AppState.activeFilter);
+
+    // 퀵필터 적용 (일반 강의만)
     if (AppState.quickFilter === 'unscheduled') {
         filteredLectures = filteredLectures.filter(l => !scheduledLectureIds.includes(l.id));
     } else if (AppState.quickFilter === 'noSpeaker') {
@@ -94,7 +101,36 @@ window.updateLectureList = function() {
         });
     }
 
-    if (filteredLectures.length === 0) {
+    // Break 항목 필터 (카테고리 필터가 Break 타입이면 해당 Break만 표시)
+    let filteredBreaks = [];
+    if (AppState.activeFilter === 'all' || breakTypes.includes(AppState.activeFilter)) {
+        if (AppState.activeFilter === 'all') {
+            filteredBreaks = breakItems;
+        } else {
+            filteredBreaks = breakItems.filter(b => b.category === AppState.activeFilter);
+        }
+    }
+    
+    // 퀵필터가 있으면 Break 항목 숨김
+    if (AppState.quickFilter) {
+        filteredBreaks = [];
+    }
+
+    // Break 항목 먼저 렌더링 (검색어 없고, 퀵필터 없을 때만)
+    if (!AppState.lectureSearchTerm && filteredBreaks.length > 0) {
+        const breakSection = document.createElement('div');
+        breakSection.className = 'break-section';
+        breakSection.style.cssText = 'margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 2px dashed #ddd;';
+        
+        filteredBreaks.forEach(lecture => {
+            const item = createLectureItem(lecture, -1, false, true);
+            breakSection.appendChild(item);
+        });
+        
+        list.appendChild(breakSection);
+    }
+
+    if (filteredLectures.length === 0 && filteredBreaks.length === 0) {
         let message = '강의가 없습니다';
         if (AppState.lectureSearchTerm) {
             message = `"${AppState.lectureSearchTerm}" 검색 결과가 없습니다`;
@@ -172,43 +208,91 @@ window.updateLectureList = function() {
     }
 
     filteredLectures.forEach(lecture => {
-        const color = AppConfig.categoryColors[lecture.category] || '#9B59B6';
         const isScheduled = scheduledLectureIds.includes(lecture.id);
-        const item = document.createElement('div');
-        item.className = 'lecture-item' + (isScheduled ? ' scheduled' : '');
-        item.draggable = true;
-        item.dataset.lectureId = lecture.id;
-        item.style.borderLeft = `4px solid ${color}`;
-
-        const duration = lecture.duration || 15;
-
-        let titleDisplay = lecture.titleKo;
-        let speakerDisplay = lecture.speakerKo || '미정';
-
-        if (AppState.lectureSearchTerm) {
-            titleDisplay = highlightSearchTerm(lecture.titleKo, AppState.lectureSearchTerm);
-            speakerDisplay = highlightSearchTerm(lecture.speakerKo || '미정', AppState.lectureSearchTerm);
-        }
-
-        item.innerHTML = `
-            <div class="lecture-title">
-                <span class="category-color" style="background: ${color}"></span>
-                ${titleDisplay}
-            </div>
-            <div class="lecture-meta">
-                <span class="tag tag-speaker">${speakerDisplay}</span>
-                <span class="tag" style="background: #E3F2FD; color: #1976D2;">⏱️ ${duration}분</span>
-                ${isScheduled ? '<span class="tag" style="background: #E8F5E9; color: #4CAF50;">배치됨</span>' : ''}
-            </div>
-        `;
-
-        item.addEventListener('dragstart', handleDragStart);
-        item.addEventListener('dragend', handleDragEnd);
-        item.addEventListener('dblclick', () => openEditModal(lecture.id));
-
+        const item = createLectureItem(lecture, lecture.id, isScheduled, false);
         list.appendChild(item);
     });
 };
+
+/**
+ * 강의 아이템 DOM 요소 생성
+ */
+function createLectureItem(lecture, lectureId, isScheduled, isBreak) {
+    const color = AppConfig.categoryColors[lecture.category] || '#9B59B6';
+    const item = document.createElement('div');
+    item.className = 'lecture-item' + (isScheduled && !isBreak ? ' scheduled' : '');
+    item.draggable = true;
+    item.dataset.lectureId = lecture.id;
+    
+    const isLuncheonLecture = lecture.category === 'Luncheon Lecture';
+    
+    if (isBreak) {
+        item.dataset.isBreak = 'true';
+        item.style.background = `linear-gradient(135deg, ${color}15, ${color}05)`;
+    }
+    
+    // Luncheon Lecture는 금색 좌측 테두리
+    if (isLuncheonLecture) {
+        item.style.borderLeft = `4px solid #FFD700`;
+    } else {
+        item.style.borderLeft = `4px solid ${color}`;
+    }
+
+    const duration = lecture.duration || 15;
+
+    let titleDisplay = lecture.titleKo;
+    let speakerDisplay = lecture.speakerKo || '';
+
+    if (AppState.lectureSearchTerm && !isBreak) {
+        titleDisplay = highlightSearchTerm(lecture.titleKo, AppState.lectureSearchTerm);
+        speakerDisplay = highlightSearchTerm(lecture.speakerKo || '미정', AppState.lectureSearchTerm);
+    }
+    
+    // Luncheon Lecture는 별표 표시
+    if (isLuncheonLecture) {
+        titleDisplay = `⭐ ${titleDisplay}`;
+    }
+
+    // Break 항목은 연자 표시 안함
+    const speakerTag = !isBreak && speakerDisplay ? 
+        `<span class="tag tag-speaker">${speakerDisplay || '미정'}</span>` : '';
+    
+    // Luncheon Lecture 스폰서 표시
+    const sponsorTag = isLuncheonLecture && lecture.companyName ? 
+        `<span class="tag" style="background: #FFF8E1; color: #FF8F00;">🏢 ${lecture.companyName}</span>` : '';
+    
+    // Break 항목은 배치됨 표시 안함 (중복 가능하므로)
+    const scheduledTag = isScheduled && !isBreak ? 
+        '<span class="tag" style="background: #E8F5E9; color: #4CAF50;">배치됨</span>' : '';
+    
+    // Break 항목은 중복 가능 표시
+    const breakTag = isBreak ? 
+        '<span class="tag" style="background: #FFF3E0; color: #E65100;">중복가능</span>' : '';
+
+    item.innerHTML = `
+        <div class="lecture-title">
+            <span class="category-color" style="background: ${color}"></span>
+            ${titleDisplay}
+        </div>
+        <div class="lecture-meta">
+            ${speakerTag}
+            ${sponsorTag}
+            <span class="tag" style="background: #E3F2FD; color: #1976D2;">⏱️ ${duration}분</span>
+            ${scheduledTag}
+            ${breakTag}
+        </div>
+    `;
+
+    item.addEventListener('dragstart', handleDragStart);
+    item.addEventListener('dragend', handleDragEnd);
+    
+    // Break 항목은 더블클릭 시 편집 불가 (기본 항목이므로)
+    if (!isBreak) {
+        item.addEventListener('dblclick', () => openEditModal(lecture.id));
+    }
+
+    return item;
+}
 
 /**
  * 강의 추가
@@ -216,6 +300,7 @@ window.updateLectureList = function() {
 window.addLectureToList = function() {
     if (!checkEditPermission()) return;
 
+    const category = document.getElementById('category').value;
     const speakerKo = document.getElementById('speakerKo').value.trim();
     const speakerEn = document.getElementById('speakerEn').value.trim();
     const affiliation = document.getElementById('affiliation').value.trim();
@@ -243,7 +328,7 @@ window.addLectureToList = function() {
 
     const lecture = {
         id: Date.now(),
-        category: document.getElementById('category').value,
+        category: category,
         titleKo: document.getElementById('titleKo').value,
         titleEn: document.getElementById('titleEn').value,
         speakerKo: speakerKo,
@@ -254,6 +339,21 @@ window.addLectureToList = function() {
         productName: document.getElementById('productName').value.trim(),
         productDescription: document.getElementById('productDescription').value.trim()
     };
+
+    // Panel Discussion인 경우 패널리스트 추가
+    if (category === 'Panel Discussion') {
+        const panelistsInput = document.getElementById('panelistsInput');
+        if (panelistsInput) {
+            const panelistsText = panelistsInput.value.trim();
+            // 콤마 또는 줄바꿈으로 분리하고 공백 제거
+            const panelists = panelistsText
+                .split(/[,\n]/)
+                .map(p => p.trim())
+                .filter(p => p.length > 0);
+            lecture.panelists = panelists;
+            lecture.isPanelDiscussion = true;
+        }
+    }
 
     AppState.lectures.push(lecture);
     saveAndSync();
@@ -270,12 +370,38 @@ window.addLectureToList = function() {
     document.getElementById('companyName').value = '';
     document.getElementById('productName').value = '';
     document.getElementById('productDescription').value = '';
+    
+    // 패널리스트 필드 초기화 및 숨기기
+    const panelistsInput = document.getElementById('panelistsInput');
+    const panelistsGroup = document.getElementById('panelistsGroup');
+    if (panelistsInput) panelistsInput.value = '';
+    if (panelistsGroup) panelistsGroup.style.display = 'none';
 
     const autocompleteList = document.getElementById('autocompleteList');
     autocompleteList.classList.remove('active');
     autocompleteList.innerHTML = '';
 
     console.log('강의가 추가되었습니다.');
+};
+
+/**
+ * 카테고리 변경 시 Panel Discussion 필드 표시/숨기기
+ */
+window.handleCategoryChange = function() {
+    const category = document.getElementById('category').value;
+    const panelistsGroup = document.getElementById('panelistsGroup');
+    const speakerRow = document.getElementById('speakerKo').closest('.form-row');
+    
+    if (category === 'Panel Discussion') {
+        if (panelistsGroup) panelistsGroup.style.display = 'block';
+        // Panel Discussion은 연자 필수 아님
+        document.getElementById('speakerKo').required = false;
+        document.getElementById('speakerKo').placeholder = '진행자 (선택)';
+    } else {
+        if (panelistsGroup) panelistsGroup.style.display = 'none';
+        document.getElementById('speakerKo').required = true;
+        document.getElementById('speakerKo').placeholder = '';
+    }
 };
 
 /**
@@ -294,7 +420,43 @@ window.openEditModal = function(lectureId) {
     document.getElementById('editAffiliation').value = lecture.affiliation || '';
     document.getElementById('editDuration').value = lecture.duration || 15;
 
+    // Panel Discussion 패널리스트 처리
+    const editPanelistsGroup = document.getElementById('editPanelistsGroup');
+    const editPanelistsInput = document.getElementById('editPanelistsInput');
+    
+    if (lecture.category === 'Panel Discussion') {
+        if (editPanelistsGroup) editPanelistsGroup.style.display = 'block';
+        if (editPanelistsInput && lecture.panelists) {
+            editPanelistsInput.value = lecture.panelists.join(', ');
+        }
+        document.getElementById('editSpeakerKo').required = false;
+        document.getElementById('editSpeakerKo').placeholder = '진행자 (선택)';
+    } else {
+        if (editPanelistsGroup) editPanelistsGroup.style.display = 'none';
+        if (editPanelistsInput) editPanelistsInput.value = '';
+        document.getElementById('editSpeakerKo').required = true;
+        document.getElementById('editSpeakerKo').placeholder = '';
+    }
+
     document.getElementById('editModal').classList.add('active');
+};
+
+/**
+ * 수정 모달 카테고리 변경 시 Panel Discussion 필드 표시/숨기기
+ */
+window.handleEditCategoryChange = function() {
+    const category = document.getElementById('editCategory').value;
+    const editPanelistsGroup = document.getElementById('editPanelistsGroup');
+    
+    if (category === 'Panel Discussion') {
+        if (editPanelistsGroup) editPanelistsGroup.style.display = 'block';
+        document.getElementById('editSpeakerKo').required = false;
+        document.getElementById('editSpeakerKo').placeholder = '진행자 (선택)';
+    } else {
+        if (editPanelistsGroup) editPanelistsGroup.style.display = 'none';
+        document.getElementById('editSpeakerKo').required = true;
+        document.getElementById('editSpeakerKo').placeholder = '';
+    }
 };
 
 /**
@@ -335,11 +497,12 @@ window.deleteLectureFromModal = function() {
 window.saveEditedLecture = function() {
     const lectureId = parseInt(document.getElementById('editLectureId').value);
     const lectureIndex = AppState.lectures.findIndex(l => l.id === lectureId);
+    const category = document.getElementById('editCategory').value;
 
     if (lectureIndex !== -1) {
         const updatedLecture = {
             id: lectureId,
-            category: document.getElementById('editCategory').value,
+            category: category,
             titleKo: document.getElementById('editTitleKo').value,
             titleEn: document.getElementById('editTitleEn').value,
             speakerKo: document.getElementById('editSpeakerKo').value,
@@ -347,6 +510,20 @@ window.saveEditedLecture = function() {
             affiliation: document.getElementById('editAffiliation').value,
             duration: parseInt(document.getElementById('editDuration').value) || 15
         };
+
+        // Panel Discussion인 경우 패널리스트 추가
+        if (category === 'Panel Discussion') {
+            const editPanelistsInput = document.getElementById('editPanelistsInput');
+            if (editPanelistsInput) {
+                const panelistsText = editPanelistsInput.value.trim();
+                const panelists = panelistsText
+                    .split(/[,\n]/)
+                    .map(p => p.trim())
+                    .filter(p => p.length > 0);
+                updatedLecture.panelists = panelists;
+                updatedLecture.isPanelDiscussion = true;
+            }
+        }
 
         AppState.lectures[lectureIndex] = updatedLecture;
 

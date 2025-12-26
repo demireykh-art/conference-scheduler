@@ -1315,6 +1315,32 @@ body {
     color: #333;
 }
 
+/* Lunch Break - 세션 헤더 스타일 */
+.scheduled-lecture.lunch-break-header {
+    border-radius: 8px 8px 4px 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.scheduled-lecture.lunch-break-header .lecture-title-display {
+    color: white;
+    font-weight: bold;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.scheduled-lecture.lunch-break-header .duration-badge {
+    background: rgba(255,255,255,0.2);
+    color: white;
+}
+
+/* Luncheon Lecture - 별표 스타일 */
+.scheduled-lecture.luncheon-lecture {
+    border-left: 4px solid #FFD700 !important;
+}
+
+.scheduled-lecture.luncheon-lecture .lecture-title-display {
+    color: #333;
+}
+
 .scheduled-lecture small {
     color: #444;
     font-size: 0.65rem;

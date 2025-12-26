@@ -2,6 +2,43 @@
  * state.js - 앱 전역 상태 관리
  */
 
+// 기본 Break 항목 (항상 강의목록에 표시, 중복 배치 가능)
+window.DEFAULT_BREAK_ITEMS = [
+    {
+        id: 'break-coffee',
+        titleKo: '☕ Coffee Break',
+        titleEn: 'Coffee Break',
+        speakerKo: '',
+        speakerEn: '',
+        affiliation: '',
+        category: 'Coffee Break',
+        duration: 20,
+        isBreak: true
+    },
+    {
+        id: 'break-lunch',
+        titleKo: '🍽️ Lunch Break',
+        titleEn: 'Lunch Break',
+        speakerKo: '',
+        speakerEn: '',
+        affiliation: '',
+        category: 'Lunch Break',
+        duration: 60,
+        isBreak: true
+    },
+    {
+        id: 'break-opening',
+        titleKo: '🎤 Opening / Closing',
+        titleEn: 'Opening / Closing',
+        speakerKo: '',
+        speakerEn: '',
+        affiliation: '',
+        category: 'Opening/Closing',
+        duration: 30,
+        isBreak: true
+    }
+];
+
 window.AppState = {
     // 인증 상태
     currentUser: null,
@@ -56,6 +93,7 @@ window.AppState = {
     draggedLecture: null,
     draggedSession: null,
     draggedScheduleKey: null,
+    draggedIsBreak: false,
 
     // Undo 히스토리
     undoHistory: [],

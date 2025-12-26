@@ -100,7 +100,7 @@
                     <form class="lecture-form" id="lectureForm" onsubmit="return false;">
                         <div class="form-group">
                             <label>분류</label>
-                            <select id="category" required>
+                            <select id="category" required onchange="handleCategoryChange()">
                                 <option value="">선택하세요</option>
                             </select>
                         </div>
@@ -131,6 +131,13 @@
                                 <label>연자 (영문)</label>
                                 <input type="text" id="speakerEn" placeholder="Speaker name">
                             </div>
+                        </div>
+                        
+                        <!-- Panel Discussion 패널리스트 입력 (Panel Discussion 선택 시만 표시) -->
+                        <div class="form-group panel-discussion-field" id="panelistsGroup" style="display: none;">
+                            <label style="color: #00695C;">📋 패널리스트 (콤마 또는 줄바꿈으로 구분)</label>
+                            <textarea id="panelistsInput" rows="3" placeholder="예: 홍길동, 김철수, 이영희&#10;또는 한 줄에 한 명씩 입력" style="width: 100%; padding: 0.5rem; border: 2px solid #00695C; border-radius: 8px; font-size: 0.9rem;"></textarea>
+                            <small style="color: #666;">💡 세션에 배치 시 해당 세션의 모든 연자와 좌장이 자동으로 추가됩니다</small>
                         </div>
                         
                         <div class="form-row">
@@ -220,6 +227,7 @@
                 </div>
                 <button class="btn btn-small btn-secondary" onclick="openTimeSettingsModal()" style="margin-left: 0.5rem;" title="시간대 설정">⏰</button>
                 <button class="btn btn-small btn-secondary" onclick="addRoom()" style="margin-left: 0.25rem;" title="룸 추가">➕</button>
+                <button class="btn btn-small btn-primary" onclick="openScheduleUploadModal()" style="margin-left: 0.25rem;" title="배치 완료 파일 업로드">📥 배치업로드</button>
                 <button class="btn btn-small btn-secondary" onclick="openFullScheduleModal()" style="margin-left: 0.25rem;" title="전체 시간표 크게 보기">🔍 크게보기</button>
             </div>
 
@@ -392,7 +400,7 @@
                 <input type="hidden" id="editLectureId">
                 <div class="form-group">
                     <label>분류</label>
-                    <select id="editCategory" required></select>
+                    <select id="editCategory" required onchange="handleEditCategoryChange()"></select>
                 </div>
                 
                 <div class="form-group">
@@ -414,6 +422,13 @@
                         <label>연자 (영문)</label>
                         <input type="text" id="editSpeakerEn">
                     </div>
+                </div>
+                
+                <!-- Panel Discussion 패널리스트 수정 필드 -->
+                <div class="form-group panel-discussion-field" id="editPanelistsGroup" style="display: none;">
+                    <label style="color: #00695C;">📋 패널리스트 (콤마 또는 줄바꿈으로 구분)</label>
+                    <textarea id="editPanelistsInput" rows="3" placeholder="예: 홍길동, 김철수, 이영희" style="width: 100%; padding: 0.5rem; border: 2px solid #00695C; border-radius: 8px; font-size: 0.9rem;"></textarea>
+                    <small style="color: #666;">💡 세션에 배치 시 해당 세션의 모든 연자와 좌장이 자동으로 추가됩니다</small>
                 </div>
                 
                 <div class="form-group">
@@ -748,6 +763,46 @@
             </div>
 
             <div class="speaker-list" id="companyList" style="max-height: 400px; margin: 0 1rem 1rem 1rem;"></div>
+        </div>
+    </div>
+
+    <!-- 배치 완료 파일 업로드 모달 -->
+    <div class="modal" id="scheduleUploadModal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2>📥 배치 완료 파일 업로드</h2>
+                <button class="modal-close" onclick="closeScheduleUploadModal()">×</button>
+            </div>
+            
+            <div style="padding: 1rem;">
+                <div style="background: #E8F4FD; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <p style="margin-bottom: 0.5rem;"><strong>📋 세션 + 강의 배치 완료 파일</strong></p>
+                    <p style="font-size: 0.85rem; color: #666;">세션명, 시작시간, 종료시간, 강의제목, 연자명이 포함된 엑셀 파일을 업로드하면</p>
+                    <p style="font-size: 0.85rem; color: #666;">세션 생성 + 강의 등록 + 시간표 배치가 한 번에 완료됩니다.</p>
+                </div>
+                
+                <div style="background: #FFF8E1; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <p style="font-size: 0.8rem; color: #F57C00; margin: 0;">
+                        ⚠️ 파일 형식: 시간(분), 시작시간, 종료시간, 좌장, 좌장명, 세션명, 제목, 병원명, 연자명, 제품명, 업체
+                    </p>
+                </div>
+                
+                <div style="text-align: center; margin-bottom: 1rem;">
+                    <input type="file" id="scheduleUploadFileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleScheduleFileSelect(event)">
+                    <button class="btn btn-primary" onclick="document.getElementById('scheduleUploadFileInput').click()">
+                        📁 엑셀 파일 선택
+                    </button>
+                </div>
+                
+                <div id="scheduleUploadPreview" style="display: none;">
+                    <div id="schedulePreviewContent"></div>
+                    
+                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee;">
+                        <button class="btn btn-secondary" onclick="closeScheduleUploadModal()">취소</button>
+                        <button class="btn btn-primary" onclick="confirmScheduleUpload()">✅ 업로드 및 배치</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

@@ -255,11 +255,23 @@ window.updateScheduleDisplay = function() {
 
         const session = AppState.sessions.find(s => s.time === startTime && s.room === room);
         const isInSession = lecture.sessionId || session;
-        lectureDiv.className = 'scheduled-lecture' + (isInSession ? ' in-session' : '');
+        const isBreak = lecture.isBreak || (AppConfig.BREAK_TYPES || []).includes(lecture.category);
+        const isLunchBreak = lecture.category === 'Lunch Break';
+        const isLuncheonLecture = lecture.category === 'Luncheon Lecture';
+        const isPanelDiscussion = lecture.category === 'Panel Discussion' || lecture.isPanelDiscussion;
+        
+        lectureDiv.className = 'scheduled-lecture' + (isInSession ? ' in-session' : '') + (isBreak ? ' break-item' : '') + (isPanelDiscussion ? ' panel-discussion' : '') + (isLunchBreak ? ' lunch-break-header' : '') + (isLuncheonLecture ? ' luncheon-lecture' : '');
         lectureDiv.draggable = true;
         lectureDiv.dataset.scheduleKey = key;
         lectureDiv.tabIndex = 0;
-        lectureDiv.style.background = `linear-gradient(135deg, ${lightColor} 0%, ${color} 100%)`;
+        
+        // Lunch Break는 세션 헤더 스타일
+        if (isLunchBreak) {
+            lectureDiv.style.background = `linear-gradient(135deg, ${color} 0%, ${adjustColor(color, -20)} 100%)`;
+            lectureDiv.style.borderLeft = `4px solid ${adjustColor(color, -30)}`;
+        } else {
+            lectureDiv.style.background = `linear-gradient(135deg, ${lightColor} 0%, ${color} 100%)`;
+        }
 
         const cellHeight = 20;
         const totalHeight = slotsSpan * cellHeight;
@@ -273,12 +285,47 @@ window.updateScheduleDisplay = function() {
         const fullTooltip = `${title}\n👤 ${speaker || '미정'} | ⏱️ ${duration}분`;
         lectureDiv.dataset.fullTitle = fullTooltip;
 
+        // 메타 정보 생성
+        let metaDisplay = '';
+        let titleDisplay = title;
+        
+        if (isPanelDiscussion) {
+            // 세션의 연자들과 좌장 가져오기
+            const sessionInfo = getSessionPanelInfo(startTime, room);
+            const panelists = lecture.panelists || [];
+            
+            // 기존 패널리스트 + 세션 연자 합치기 (중복 제거)
+            const allPanelists = [...new Set([...panelists, ...sessionInfo.speakers])];
+            const moderator = sessionInfo.moderator;
+            
+            const panelistsStr = allPanelists.length > 0 ? allPanelists.join(', ') : '(없음)';
+            const moderatorStr = moderator || '(없음)';
+            
+            metaDisplay = `
+                <span class="panel-info" style="font-size: 0.6rem; line-height: 1.2;">
+                    패널: ${panelistsStr.length > 30 ? panelistsStr.substring(0, 30) + '...' : panelistsStr}
+                </span>
+                <span class="moderator-info" style="font-size: 0.6rem;">좌장: ${moderatorStr}</span>
+            `;
+        } else if (isLunchBreak) {
+            // Lunch Break - 세션 헤더 스타일
+            metaDisplay = `<span class="duration-badge" style="color: rgba(255,255,255,0.9);">⏱️ ${duration}분</span>`;
+        } else if (isLuncheonLecture) {
+            // Luncheon Lecture - 별표 + 스폰서 표시
+            titleDisplay = `⭐ ${title}`;
+            const sponsorInfo = lecture.companyName ? ` (스폰서: ${lecture.companyName})` : '';
+            metaDisplay = `<span class="speaker-name">${speaker || '미정'}${sponsorInfo}</span><span class="duration-badge">⏱️ ${duration}분</span>`;
+        } else if (isBreak) {
+            metaDisplay = `<span class="duration-badge">⏱️ ${duration}분</span>`;
+        } else {
+            metaDisplay = `<span class="speaker-name">${speaker || '미정'}</span><span class="duration-badge">⏱️ ${duration}분</span>`;
+        }
+
         lectureDiv.innerHTML = `
             <button class="remove-btn" onclick="event.stopPropagation(); removeLecture('${key}')">×</button>
-            <div class="lecture-title-display">${title}</div>
+            <div class="lecture-title-display">${titleDisplay}</div>
             <div class="lecture-meta-display">
-                <span class="speaker-name">${speaker || '미정'}</span>
-                <span class="duration-badge">⏱️ ${duration}분</span>
+                ${metaDisplay}
             </div>
         `;
 
@@ -286,7 +333,11 @@ window.updateScheduleDisplay = function() {
         lectureDiv.addEventListener('dragend', handleScheduleDragEnd);
         lectureDiv.addEventListener('dblclick', (e) => {
             e.stopPropagation();
-            openEditModal(lecture.id);
+            if (isBreak) {
+                openBreakDurationModal(key, lecture);
+            } else {
+                openEditModal(lecture.id);
+            }
         });
         lectureDiv.addEventListener('keydown', (e) => {
             if (e.key === 'Tab') {
@@ -300,13 +351,67 @@ window.updateScheduleDisplay = function() {
 };
 
 /**
+ * 세션의 패널 정보 가져오기 (연자들 + 좌장)
+ */
+function getSessionPanelInfo(time, room) {
+    // 해당 시간 이전의 세션 찾기
+    const timeIndex = AppState.timeSlots.indexOf(time);
+    let sessionModerator = '';
+    let sessionSpeakers = [];
+    
+    // 해당 시간 이전의 가장 가까운 세션 찾기
+    for (let i = timeIndex; i >= 0; i--) {
+        const checkTime = AppState.timeSlots[i];
+        const session = AppState.sessions.find(s => s.time === checkTime && s.room === room);
+        if (session) {
+            sessionModerator = session.moderator || '';
+            break;
+        }
+    }
+    
+    // 같은 룸, 같은 세션에 속한 강의들의 연자 수집
+    Object.entries(AppState.schedule).forEach(([key, lecture]) => {
+        if (key.endsWith(`-${room}`) && !lecture.isBreak && lecture.category !== 'Panel Discussion') {
+            const lectureTime = key.substring(0, 5);
+            const lectureTimeIndex = AppState.timeSlots.indexOf(lectureTime);
+            
+            // 같은 세션에 속하는지 확인 (Panel Discussion 이전 시간대)
+            if (lectureTimeIndex < timeIndex && lectureTimeIndex >= 0) {
+                if (lecture.speakerKo && lecture.speakerKo.trim() && lecture.speakerKo !== '미정') {
+                    sessionSpeakers.push(lecture.speakerKo);
+                }
+            }
+        }
+    });
+    
+    // 중복 제거
+    sessionSpeakers = [...new Set(sessionSpeakers)];
+    
+    return {
+        moderator: sessionModerator,
+        speakers: sessionSpeakers
+    };
+}
+
+/**
  * 드래그 시작 (강의 목록에서)
  */
 window.handleDragStart = function(e) {
-    AppState.draggedLecture = AppState.lectures.find(l => l.id == this.dataset.lectureId);
+    const lectureId = this.dataset.lectureId;
+    const isBreak = this.dataset.isBreak === 'true';
+    
+    // Break 항목이면 DEFAULT_BREAK_ITEMS에서 찾기
+    if (isBreak) {
+        AppState.draggedLecture = DEFAULT_BREAK_ITEMS.find(l => l.id === lectureId);
+        AppState.draggedIsBreak = true;
+    } else {
+        AppState.draggedLecture = AppState.lectures.find(l => l.id == lectureId);
+        AppState.draggedIsBreak = false;
+    }
+    
     this.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', this.dataset.lectureId);
+    e.dataTransfer.setData('text/plain', lectureId);
 
     document.querySelector('.schedule-grid').classList.add('dragging');
 
@@ -333,6 +438,8 @@ window.handleDragEnd = function(e) {
         cell.classList.remove('drag-target');
         cell.classList.remove('drag-over');
     });
+    
+    AppState.draggedIsBreak = false;
 };
 
 /**
@@ -446,6 +553,7 @@ window.handleDrop = function(e) {
     if (!checkEditPermission()) {
         AppState.draggedLecture = null;
         AppState.draggedScheduleKey = null;
+        AppState.draggedIsBreak = false;
         return;
     }
 
@@ -453,9 +561,10 @@ window.handleDrop = function(e) {
         const time = this.dataset.time;
         const room = this.dataset.room;
         const key = `${time}-${room}`;
+        const isBreak = AppState.draggedIsBreak || AppState.draggedLecture.isBreak;
 
-        // 이미 배치된 강의인지 확인
-        if (!AppState.draggedScheduleKey) {
+        // Break가 아닌 경우만 이미 배치된 강의인지 확인
+        if (!isBreak && !AppState.draggedScheduleKey) {
             const existingPlacement = Object.entries(AppState.schedule).find(([k, v]) => v.id === AppState.draggedLecture.id);
             if (existingPlacement) {
                 const [existingKey] = existingPlacement;
@@ -481,16 +590,20 @@ window.handleDrop = function(e) {
             alert(`⚠️ 시간이 겹칩니다!\n\n배치하려는 강의: ${time} ~ ${overlapCheck.newEndTime} (${AppState.draggedLecture.duration || 15}분)\n\n겹치는 강의: "${overlapCheck.conflictLecture.titleKo}"\n시간: ${overlapCheck.conflictTime} ~ ${overlapCheck.conflictEndTime}\n\n다른 시간대를 선택해주세요.`);
             AppState.draggedScheduleKey = null;
             AppState.draggedLecture = null;
+            AppState.draggedIsBreak = false;
             return;
         }
 
-        // 연자 중복 체크
-        const speakerConflict = checkSpeakerConflict(time, room, AppState.draggedLecture, AppState.draggedScheduleKey);
-        if (speakerConflict.hasConflict) {
-            alert(`⚠️ 연자 시간 충돌!\n\n연자: ${speakerConflict.speakerName}\n\n기존 강의: "${speakerConflict.conflictLecture.titleKo}"\n룸: ${speakerConflict.conflictRoom}\n시간: ${speakerConflict.conflictTime} ~ ${speakerConflict.conflictEndTime}\n\n배치하려는 시간: ${time} ~ ${speakerConflict.targetEndTime}\n룸: ${room}\n\n⏱️ 다른 룸 간 이동시간 최소 ${AppConfig.SPEAKER_TRANSFER_TIME}분 필요\n\n다른 시간대를 선택해주세요.`);
-            AppState.draggedScheduleKey = null;
-            AppState.draggedLecture = null;
-            return;
+        // Break가 아닌 경우만 연자 중복 체크
+        if (!isBreak) {
+            const speakerConflict = checkSpeakerConflict(time, room, AppState.draggedLecture, AppState.draggedScheduleKey);
+            if (speakerConflict.hasConflict) {
+                alert(`⚠️ 연자 시간 충돌!\n\n연자: ${speakerConflict.speakerName}\n\n기존 강의: "${speakerConflict.conflictLecture.titleKo}"\n룸: ${speakerConflict.conflictRoom}\n시간: ${speakerConflict.conflictTime} ~ ${speakerConflict.conflictEndTime}\n\n배치하려는 시간: ${time} ~ ${speakerConflict.targetEndTime}\n룸: ${room}\n\n⏱️ 다른 룸 간 이동시간 최소 ${AppConfig.SPEAKER_TRANSFER_TIME}분 필요\n\n다른 시간대를 선택해주세요.`);
+                AppState.draggedScheduleKey = null;
+                AppState.draggedLecture = null;
+                AppState.draggedIsBreak = false;
+                return;
+            }
         }
 
         saveStateForUndo();
@@ -502,6 +615,11 @@ window.handleDrop = function(e) {
 
         // 강의 배치
         const newLecture = { ...AppState.draggedLecture };
+        
+        // Break 항목은 새 ID 생성 (중복 배치 가능)
+        if (isBreak && !AppState.draggedScheduleKey) {
+            newLecture.id = `break-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        }
 
         // 세션 자동 할당
         const sessionAtCell = AppState.sessions.find(s => s.time === time && s.room === room);
@@ -524,6 +642,7 @@ window.handleDrop = function(e) {
 
         AppState.draggedScheduleKey = null;
         AppState.draggedLecture = null;
+        AppState.draggedIsBreak = false;
     }
 
     // 세션 드롭 처리
