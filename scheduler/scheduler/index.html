@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학술대회 스케줄러</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <!-- SheetJS for Excel parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- 드래그 툴팁 -->
+    <div class="drag-tooltip" id="dragTooltip">
+        <div class="tooltip-title" id="tooltipTitle"></div>
+        <div class="tooltip-time" id="tooltipTime"></div>
+        <div class="tooltip-duration" id="tooltipDuration"></div>
+    </div>
+
+    <!-- 로그인 오버레이 -->
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-box">
+            <h2>📅 학술대회 스케줄러</h2>
+            <p>편집하려면 Google 계정으로 로그인하세요.<br>승인된 사용자만 수정할 수 있습니다.</p>
+            <button class="google-login-btn" onclick="signInWithGoogle()">
+                <img src="https://www.google.com/favicon.ico" alt="Google">
+                Google 계정으로 로그인
+            </button>
+        </div>
+    </div>
+
+    <div class="header">
+        <div>
+            <h1>📅 학술대회 스케줄러</h1>
+        </div>
+        <div class="header-actions">
+            <!-- 동기화 상태 -->
+            <div class="sync-status synced" id="syncStatus">
+                <span class="sync-dot"></span>
+                <span id="syncText">동기화됨</span>
+            </div>
+            
+            <!-- 백업 상태 -->
+            <div class="backup-status" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: rgba(255,255,255,0.8);">
+                <button class="btn btn-small" onclick="createManualBackup()" title="수동 백업" style="background: rgba(255,255,255,0.2); color: white; padding: 0.25rem 0.5rem; font-size: 0.7rem;">💾</button>
+                <button class="btn btn-small" onclick="openBackupModal()" title="백업 관리" style="background: rgba(255,255,255,0.2); color: white; padding: 0.25rem 0.5rem; font-size: 0.7rem;">📋</button>
+                <span style="font-size: 0.65rem;">마지막: <span id="lastBackupTime">-</span></span>
+            </div>
+            
+            <!-- 온라인 사용자 -->
+            <div class="online-users" id="onlineUsers">
+                <span>👥</span>
+                <div class="user-avatars" id="userAvatars"></div>
+                <span id="onlineCount">0명 접속</span>
+            </div>
+            
+            <!-- 한글/영문 전환 버튼 -->
+            <div style="display: flex; border-radius: 6px; overflow: hidden;">
+                <button class="btn btn-small" id="langKoBtn" onclick="setLanguage('ko')" style="background: var(--accent); color: white; border-radius: 6px 0 0 6px;">한글</button>
+                <button class="btn btn-small" id="langEnBtn" onclick="setLanguage('en')" style="background: rgba(255,255,255,0.2); color: white; border-radius: 0 6px 6px 0;">English</button>
+            </div>
+            
+            <!-- 로그인 상태 -->
+            <div class="auth-status" id="authStatus">
+                <span id="authText">로그인 필요</span>
+            </div>
+            
+            <!-- 사용자 관리 버튼 (관리자만 보임) -->
+            <button class="btn btn-secondary btn-small user-mgmt-btn" onclick="openUserManagementModal()">
+                👥사용자
+                <span class="pending-badge" id="pendingBadge" style="display:none;">0</span>
+            </button>
+            
+            <button class="btn btn-secondary btn-small" id="undoBtn" onclick="performUndo()" disabled>↩(0)</button>
+            <button class="btn btn-secondary btn-small" onclick="openSessionModal()">📋세션</button>
+            <button class="btn btn-secondary btn-small" onclick="openHelpModal()">❓</button>
+            <button class="btn btn-secondary btn-small" onclick="openSpeakerModal()">👤연자</button>
+            <button class="btn btn-secondary btn-small" onclick="openTypoCheckModal()" title="맞춤법 검사">✏️오타</button>
+            <button class="btn btn-primary btn-small" onclick="openUploadModal()">📤업로드</button>
+            <button class="btn btn-secondary btn-small" onclick="openBackupModal()">💾백업</button>
+            <button class="btn btn-secondary btn-small admin-only-btn" onclick="resetAllData()" style="color:#e74c3c; display:none;">🔄초기화</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="card" id="addLectureCard">
+                <div class="card-title" onclick="toggleCard('addLectureCard')">
+                    ➕ 강의 추가
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="card-content">
+                    <form class="lecture-form" id="lectureForm" onsubmit="return false;">
+                        <div class="form-group">
+                            <label>분류</label>
+                            <select id="category" required>
+                                <option value="">선택하세요</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>제목 (한글)</label>
+                            <input type="text" id="titleKo" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>제목 (영문)</label>
+                            <input type="text" id="titleEn" placeholder="English title">
+                            <div class="translation-help">
+                                💡 번역: 
+                                <a href="https://translate.google.com/?sl=ko&tl=en" target="_blank">Google</a> | 
+                                <a href="https://papago.naver.com/" target="_blank">Papago</a> | 
+                                <a href="https://www.deepl.com/translator#ko/en/" target="_blank">DeepL</a>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group autocomplete-container">
+                                <label>연자 (한글)</label>
+                                <input type="text" id="speakerKo" autocomplete="off" required>
+                                <div class="autocomplete-list" id="autocompleteList"></div>
+                            </div>
+                            <div class="form-group">
+                                <label>연자 (영문)</label>
+                                <input type="text" id="speakerEn" placeholder="Speaker name">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>소속</label>
+                                <input type="text" id="affiliation">
+                            </div>
+                            <div class="form-group">
+                                <label>강의 시간</label>
+                                <select id="lectureDuration" required>
+                                    <option value="10">10분</option>
+                                    <option value="15" selected>15분</option>
+                                    <option value="20">20분</option>
+                                    <option value="30">30분</option>
+                                    <option value="40">40분</option>
+                                    <option value="50">50분</option>
+                                    <option value="60">60분</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group" style="border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-top: 0.5rem;">
+                            <label style="color: var(--accent);">🏢 스폰서/제품 정보 (선택)</label>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group" style="position: relative;">
+                                <label>회사명</label>
+                                <input type="text" id="companyName" placeholder="예: 대웅제약" autocomplete="off">
+                                <div id="companyAutocomplete" class="autocomplete-dropdown"></div>
+                            </div>
+                            <div class="form-group">
+                                <label>제품명</label>
+                                <input type="text" id="productName" placeholder="예: 나보타">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>제품 설명</label>
+                            <input type="text" id="productDescription" placeholder="예: 보툴리눔 톡신">
+                        </div>
+                        
+                        <button type="button" class="btn btn-primary" id="addLectureBtn">강의 추가</button>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                            <button type="button" class="btn btn-secondary" onclick="openCategoryModal()" style="flex: 1;">📂 분류 관리</button>
+                            <button type="button" class="btn btn-secondary" onclick="openCompanyModal()" style="flex: 1;">🏢 업체 관리</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card" id="lectureListCard">
+                <div class="card-title" style="font-size: 0.9rem;">
+                    📚 강의 목록
+                    <div style="display: flex; gap: 0.2rem; margin-left: auto;">
+                        <button class="btn btn-small filter-quick-btn" id="filterUnscheduledBtn" onclick="toggleQuickFilter('unscheduled')" title="미배치 강의만 보기" style="padding: 0.15rem 0.35rem; font-size: 0.6rem;">
+                            📌미배치
+                        </button>
+                        <button class="btn btn-small filter-quick-btn" id="filterNoSpeakerBtn" onclick="toggleQuickFilter('noSpeaker')" title="연자 미정 강의만 보기" style="padding: 0.15rem 0.35rem; font-size: 0.6rem;">
+                            ❓미정
+                        </button>
+                        <button class="btn btn-small" id="toggleFiltersBtn" onclick="toggleCategoryFilters()" style="padding: 0.15rem 0.35rem; font-size: 0.6rem;">
+                            📂분류
+                        </button>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <!-- 검색창 -->
+                    <div class="lecture-search-box">
+                        <input type="text" id="lectureSearchInput" placeholder="🔍 강의 제목, 연자명, 회사명 검색..." oninput="filterLecturesBySearch()">
+                        <button class="search-clear-btn" onclick="clearLectureSearch()" title="검색 초기화">✕</button>
+                    </div>
+                    <div class="category-filters-wrapper" id="categoryFiltersWrapper">
+                        <div class="category-filters" id="categoryFilters"></div>
+                    </div>
+                    <div class="lecture-list" id="lectureList"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="schedule-grid">
+            <div class="grid-header">
+                <h2>시간표</h2>
+                <div class="date-selector-btns" id="dateSelectorBtns">
+                    <button class="date-btn active" data-date="2026-04-11" onclick="switchDate('2026-04-11')">📅 토요일 (4/11)</button>
+                    <button class="date-btn" data-date="2026-04-12" onclick="switchDate('2026-04-12')">📅 일요일 (4/12)</button>
+                </div>
+                <button class="btn btn-small btn-secondary" onclick="openTimeSettingsModal()" style="margin-left: 0.5rem;" title="시간대 설정">⏰</button>
+                <button class="btn btn-small btn-secondary" onclick="addRoom()" style="margin-left: 0.25rem;" title="룸 추가">➕</button>
+                <button class="btn btn-small btn-primary" onclick="openScheduleUploadModal()" style="margin-left: 0.25rem;" title="배치 완료 파일 업로드">📥 배치업로드</button>
+                <button class="btn btn-small btn-secondary" onclick="openFullScheduleModal()" style="margin-left: 0.25rem;" title="전체 시간표 크게 보기">🔍 크게보기</button>
+            </div>
+
+            <div class="schedule-table-wrapper">
+                <table class="schedule-table" id="scheduleTable"></table>
+            </div>
+
+            <div class="export-section" style="flex-shrink: 0;">
+                <button class="btn btn-secondary" onclick="exportToExcel()">📊 엑셀로 내보내기</button>
+                <button class="btn btn-secondary" onclick="printSchedule()">🖨️ 인쇄/PDF</button>
+            </div>
+            
+            <!-- Firebase 실시간 동기화 안내 -->
+            <div style="margin-top: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 8px; background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%); display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                <span>🔄</span>
+                <span style="font-size: 0.8rem;">실시간 자동 저장 · 모든 변경사항은 즉시 동기화됩니다</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- 모달들 -->
+    <!-- ============================================ -->
+
+    <!-- 전체 시간표 크게 보기 모달 -->
+    <div class="modal" id="fullScheduleModal">
+        <div class="modal-content" style="max-width: 95vw; max-height: 95vh; width: 95vw;">
+            <div class="modal-header">
+                <h2>🔍 전체 시간표</h2>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <span id="fullScheduleDateLabel" style="font-size: 0.9rem; color: #666;"></span>
+                    <button class="modal-close" onclick="closeFullScheduleModal()">×</button>
+                </div>
+            </div>
+            <div id="fullScheduleContent" style="overflow: auto; max-height: calc(95vh - 100px); padding: 1rem;"></div>
+        </div>
+    </div>
+    
+    <!-- 룸별 시간표 모달 -->
+    <div class="modal" id="roomScheduleModal">
+        <div class="modal-content" style="max-width: 600px; max-height: 90vh;">
+            <div class="modal-header">
+                <h2 id="roomScheduleTitle">🏠 룸 시간표</h2>
+                <button class="modal-close" onclick="closeRoomScheduleModal()">×</button>
+            </div>
+            <div id="roomScheduleContent" style="overflow: auto; max-height: calc(90vh - 100px); padding: 1rem;"></div>
+        </div>
+    </div>
+
+    <!-- 오타 검증 모달 -->
+    <div class="modal" id="typoCheckModal">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh;">
+            <div class="modal-header">
+                <h2>✏️ 오타 검증</h2>
+                <button class="modal-close" onclick="closeTypoCheckModal()">×</button>
+            </div>
+            <div style="padding: 1rem;">
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                    <button class="btn btn-primary" onclick="runTypoCheck()">🔍 검사 시작</button>
+                    <span style="font-size: 0.85rem; color: #666; align-self: center;">
+                        전체 강의의 제목과 연자명을 검사합니다
+                    </span>
+                </div>
+                
+                <div id="typoCheckProgress" style="display: none; margin-bottom: 1rem;">
+                    <div style="background: #e0e0e0; border-radius: 8px; height: 8px; overflow: hidden;">
+                        <div id="typoProgressBar" style="background: var(--primary); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                    </div>
+                    <p style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;" id="typoProgressText">검사 중...</p>
+                </div>
+                
+                <div id="typoResults" style="max-height: calc(90vh - 250px); overflow-y: auto;">
+                    <p style="text-align: center; color: #999; padding: 2rem;">🔍 검사 시작 버튼을 눌러주세요</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 분류 관리 모달 -->
+    <div class="modal" id="categoryModal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2>📂 분류 관리</h2>
+                <button class="modal-close" onclick="closeCategoryModal()">×</button>
+            </div>
+            
+            <div class="form-group">
+                <label>새 분류 추가</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="newCategoryName" placeholder="분류명 (영문)" style="flex: 1;">
+                    <input type="color" id="newCategoryColor" value="#9B59B6" style="width: 60px; height: 42px; border: none; cursor: pointer;">
+                    <button class="btn btn-primary" onclick="addCategory()">추가</button>
+                </div>
+            </div>
+
+            <div style="margin: 1rem 0; padding: 0.75rem; background: #FFF3CD; border-radius: 8px; border-left: 4px solid #FFC107;">
+                <small>⚠️ 분류를 삭제하면 해당 분류의 강의는 "Others"로 변경됩니다.</small>
+            </div>
+
+            <div class="speaker-list" id="categoryList" style="max-height: 400px;"></div>
+        </div>
+    </div>
+
+    <!-- 세션 관리 모달 -->
+    <div class="modal" id="sessionModal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2>📋 세션 관리</h2>
+                <button class="modal-close" onclick="closeSessionModal()">×</button>
+            </div>
+            
+            <div style="background: #E3F2FD; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #2196F3;">
+                <p style="margin: 0; font-size: 0.9rem;">💡 <strong>시간표에서 셀 위에 마우스를 올리면 "+ 세션" 버튼이 나타납니다.</strong></p>
+                <p style="margin: 0.5rem 0 0 0; font-size: 0.85rem; color: #666;">버튼을 클릭하여 해당 시간/룸에 세션을 추가하세요. 세션 헤더를 클릭하면 수정할 수 있습니다.</p>
+            </div>
+
+            <div class="form-group">
+                <label><strong>현재 세션 목록</strong></label>
+                <div id="sessionList" style="max-height: 400px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 연자 관리 모달 -->
+    <div class="modal" id="speakerModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>👥 연자 관리</h2>
+                <button class="modal-close" onclick="closeSpeakerModal()">×</button>
+            </div>
+            
+            <div class="form-group">
+                <label>새 연자 추가</label>
+                <div class="form-grid-4">
+                    <input type="text" id="newSpeakerName" placeholder="연자명 (한글)">
+                    <input type="text" id="newSpeakerNameEn" placeholder="연자명 (영문)">
+                    <input type="text" id="newSpeakerAffiliation" placeholder="소속 (한글)">
+                    <input type="text" id="newSpeakerAffiliationEn" placeholder="소속 (영문)">
+                </div>
+                <button class="btn btn-primary" onclick="addSpeaker()" style="margin-top: 0.5rem; width: 100%;">추가</button>
+            </div>
+
+            <div style="margin: 1.5rem 0;">
+                <div class="search-sort-container">
+                    <input type="text" id="speakerSearch" class="search-input" 
+                           placeholder="🔍 연자명 또는 소속으로 검색..." 
+                           oninput="searchSpeakers()">
+                    <select id="speakerSort" class="sort-select" onchange="updateSpeakerList()">
+                        <option value="name-ko">가나다순 (한글)</option>
+                        <option value="name-en">ABC순 (영문)</option>
+                        <option value="affiliation">소속순</option>
+                        <option value="recent">최근 추가순</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="speaker-list" id="speakerList"></div>
+        </div>
+    </div>
+
+    <!-- 강의 수정 모달 -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ 강의 수정</h2>
+                <button class="modal-close" onclick="closeEditModal()">×</button>
+            </div>
+            
+            <form class="lecture-form" id="editForm" onsubmit="return false;">
+                <input type="hidden" id="editLectureId">
+                <div class="form-group">
+                    <label>분류</label>
+                    <select id="editCategory" required></select>
+                </div>
+                
+                <div class="form-group">
+                    <label>제목 (한글)</label>
+                    <input type="text" id="editTitleKo" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>제목 (영문)</label>
+                    <input type="text" id="editTitleEn">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>연자 (한글)</label>
+                        <input type="text" id="editSpeakerKo" required>
+                    </div>
+                    <div class="form-group">
+                        <label>연자 (영문)</label>
+                        <input type="text" id="editSpeakerEn">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>소속</label>
+                    <input type="text" id="editAffiliation">
+                </div>
+                
+                <div class="form-group">
+                    <label>강의 시간</label>
+                    <select id="editDuration">
+                        <option value="10">10분</option>
+                        <option value="15">15분</option>
+                        <option value="20">20분</option>
+                        <option value="30">30분</option>
+                        <option value="40">40분</option>
+                        <option value="50">50분</option>
+                        <option value="60">60분</option>
+                    </select>
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem;">
+                    <button type="button" class="btn btn-primary" id="saveEditBtn" style="flex: 1;">수정 완료</button>
+                    <button type="button" class="btn btn-secondary" id="deleteEditBtn" style="background: #E74C3C; color: white;" onclick="deleteLectureFromModal()">🗑️ 삭제</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 연자 추가 확인 다이얼로그 -->
+    <div class="modal" id="confirmAddSpeakerModal">
+        <div class="confirm-dialog">
+            <h3>📝 새로운 연자 추가</h3>
+            <p id="confirmMessage"></p>
+            <div class="confirm-actions">
+                <button class="btn btn-secondary btn-small" onclick="closeConfirmAddSpeaker()">아니오</button>
+                <button class="btn btn-primary btn-small" onclick="confirmAddNewSpeaker()">예</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 세션 추가/수정 모달 -->
+    <div class="modal" id="cellSessionModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2 id="cellSessionModalTitle">📋 세션 추가</h2>
+                <button class="modal-close" onclick="closeCellSessionModal()">×</button>
+            </div>
+            
+            <form class="lecture-form" onsubmit="return false;">
+                <input type="hidden" id="cellSessionTime">
+                <input type="hidden" id="cellSessionRoom">
+                <input type="hidden" id="cellSessionId">
+                
+                <div class="form-group">
+                    <label>세션명 (한글) <span style="color: #E74C3C;">*</span></label>
+                    <input type="text" id="cellSessionName" required placeholder="예: 레이저 치료의 최신 동향">
+                </div>
+                
+                <div class="form-group">
+                    <label>세션명 (영문)</label>
+                    <input type="text" id="cellSessionNameEn" placeholder="예: Latest Trends in Laser Treatment">
+                </div>
+                
+                <div class="form-group">
+                    <label>좌장 (한글)</label>
+                    <input type="text" id="cellSessionModerator" placeholder="연자명 입력" list="moderatorSuggestions">
+                    <datalist id="moderatorSuggestions"></datalist>
+                </div>
+                
+                <div class="form-group">
+                    <label>좌장 (영문)</label>
+                    <input type="text" id="cellSessionModeratorEn" placeholder="Chair name in English">
+                </div>
+                
+                <div class="form-group">
+                    <label>세션 색상</label>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;" id="sessionColorPicker">
+                        <button type="button" class="color-btn" data-color="#3498DB" style="background: #3498DB;"></button>
+                        <button type="button" class="color-btn" data-color="#E74C3C" style="background: #E74C3C;"></button>
+                        <button type="button" class="color-btn" data-color="#2ECC71" style="background: #2ECC71;"></button>
+                        <button type="button" class="color-btn" data-color="#9B59B6" style="background: #9B59B6;"></button>
+                        <button type="button" class="color-btn" data-color="#F39C12" style="background: #F39C12;"></button>
+                        <button type="button" class="color-btn" data-color="#1ABC9C" style="background: #1ABC9C;"></button>
+                        <button type="button" class="color-btn" data-color="#E91E63" style="background: #E91E63;"></button>
+                        <button type="button" class="color-btn" data-color="#00BCD4" style="background: #00BCD4;"></button>
+                    </div>
+                    <input type="hidden" id="cellSessionColor" value="#3498DB">
+                </div>
+                
+                <button type="button" class="btn btn-primary" onclick="saveCellSession()" style="width: 100%;">저장</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 연자 수정 모달 -->
+    <div class="modal" id="editSpeakerModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✏️ 연자 정보 수정</h2>
+                <button class="modal-close" onclick="closeEditSpeakerModal()">×</button>
+            </div>
+            
+            <form class="lecture-form" onsubmit="return false;">
+                <input type="hidden" id="editSpeakerIndex">
+                <div class="form-group">
+                    <label>연자명 (한글)</label>
+                    <input type="text" id="editSpeakerNameField" required>
+                </div>
+                <div class="form-group">
+                    <label>연자명 (영문)</label>
+                    <input type="text" id="editSpeakerNameEnField">
+                </div>
+                <div class="form-group">
+                    <label>소속 (한글)</label>
+                    <input type="text" id="editSpeakerAffiliationField" required>
+                </div>
+                <div class="form-group">
+                    <label>소속 (영문)</label>
+                    <input type="text" id="editSpeakerAffiliationEnField">
+                </div>
+                <button type="button" class="btn btn-primary" onclick="saveEditedSpeaker()">저장</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 도움말 모달 -->
+    <div class="modal" id="helpModal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2>❓ 사용 도움말</h2>
+                <button class="modal-close" onclick="closeHelpModal()">×</button>
+            </div>
+            
+            <div style="max-height: 70vh; overflow-y: auto; padding: 1rem;">
+                <h3 style="color: var(--primary); margin-top: 1rem; margin-bottom: 0.5rem;">🔄 실시간 동기화</h3>
+                <div style="background: #E8F5E9; padding: 1rem; border-radius: 8px; border-left: 4px solid #4CAF50; margin-bottom: 1rem;">
+                    <p>✅ 모든 변경사항은 <strong>Firebase에 자동 저장</strong>됩니다.</p>
+                    <p>✅ 여러 사용자가 동시에 작업해도 충돌 없이 동기화됩니다.</p>
+                </div>
+
+                <h3 style="color: var(--primary); margin-top: 1.5rem; margin-bottom: 0.5rem;">📝 강의 추가</h3>
+                <div style="background: var(--bg); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <p>① 분류 선택 (25개 카테고리)</p>
+                    <p>② 제목 입력 (한글/영문)</p>
+                    <p>③ 연자 입력 - 자동완성 활용</p>
+                    <p>④ "강의 추가" 버튼 클릭</p>
+                </div>
+
+                <h3 style="color: var(--primary); margin-top: 1.5rem; margin-bottom: 0.5rem;">🗓️ 시간표 배치</h3>
+                <div style="background: var(--bg); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <p>① 강의 목록에서 강의를 <strong>드래그</strong></p>
+                    <p>② 원하는 시간/룸에 <strong>드롭</strong></p>
+                    <p>③ 배치된 강의를 더블클릭하여 수정</p>
+                    <p>④ × 버튼으로 시간표에서 제거</p>
+                </div>
+
+                <h3 style="color: var(--primary); margin-top: 1.5rem; margin-bottom: 0.5rem;">⚠️ 충돌 감지</h3>
+                <div style="background: #FFF3CD; padding: 1rem; border-radius: 8px; border-left: 4px solid #FFC107;">
+                    <p><strong>시간 겹침:</strong> 같은 룸에서 시간이 겹치면 경고</p>
+                    <p><strong>연자 충돌:</strong> 다른 룸 간 이동시간 20분 필요</p>
+                </div>
+
+                <h3 style="color: var(--primary); margin-top: 1.5rem; margin-bottom: 0.5rem;">⌨️ 단축키</h3>
+                <div style="background: var(--bg); padding: 1rem; border-radius: 8px;">
+                    <p><strong>Ctrl+Z:</strong> 되돌리기 (최대 5단계)</p>
+                    <p><strong>Tab:</strong> 배치된 강의 선택 후 세션 소속 토글</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 사용자 관리 모달 -->
+    <div class="modal" id="userManagementModal">
+        <div class="modal-content" style="max-width: 550px;">
+            <div class="modal-header">
+                <h2>👥 사용자 관리</h2>
+                <button class="modal-close" onclick="closeUserManagementModal()">×</button>
+            </div>
+            
+            <div style="padding: 1rem;">
+                <div class="user-section">
+                    <div class="user-section-title">
+                        🔔 승인 대기
+                        <span class="count" id="pendingCount">0명</span>
+                    </div>
+                    <div class="user-list" id="pendingUsersList">
+                        <p style="color:#999; text-align:center; padding:1rem;">로딩 중...</p>
+                    </div>
+                </div>
+                
+                <div class="user-section">
+                    <div class="user-section-title">
+                        ✅ 승인된 사용자
+                        <span class="count" id="approvedCount">0명</span>
+                    </div>
+                    <div class="user-list" id="approvedUsersList">
+                        <p style="color:#999; text-align:center; padding:1rem;">로딩 중...</p>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1rem; padding: 1rem; background: #f0f7ff; border-radius: 8px; font-size: 0.85rem;">
+                    <strong>💡 권한 안내</strong><br>
+                    <span style="color:#f39c12;">👑 관리자</span>: 모든 기능 + 사용자 관리<br>
+                    <span style="color:#27ae60;">✏️ 편집자</span>: 강의/시간표 편집 가능<br>
+                    <span style="color:#e74c3c;">⏳ 대기중</span>: 보기만 가능 (승인 필요)
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 백업 관리 모달 -->
+    <div class="modal" id="backupModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>💾 백업 관리</h2>
+                <button class="modal-close" onclick="closeBackupModal()">×</button>
+            </div>
+            
+            <div style="padding: 1rem;">
+                <div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
+                    <button class="btn btn-primary" onclick="createBackup()" style="flex:1;">➕ 새 백업 생성</button>
+                </div>
+                
+                <div class="backup-list-container">
+                    <h4 style="margin-bottom:0.5rem; color:var(--primary);">📁 저장된 백업</h4>
+                    <div id="backupList" style="max-height:300px; overflow-y:auto;">
+                        <p style="text-align:center; color:#999;">로딩 중...</p>
+                    </div>
+                </div>
+                
+                <div style="margin-top:1rem; padding:0.75rem; background:#fff3cd; border-radius:8px; font-size:0.8rem;">
+                    ⚠️ 복원 시 현재 데이터가 자동으로 백업됩니다.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 시간 설정 모달 -->
+    <div class="modal" id="timeSettingsModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>⏰ 시간대 설정</h2>
+                <button class="modal-close" onclick="closeTimeSettingsModal()">×</button>
+            </div>
+            
+            <div style="padding: 1rem;">
+                <p style="margin-bottom: 1rem; color: #666; font-size: 0.9rem;">
+                    현재 선택된 날짜: <strong id="timeSettingsDateLabel">토요일 (4/11)</strong>
+                </p>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="form-group">
+                        <label>시작 시간</label>
+                        <select id="startTimeSelect" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem;"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>종료 시간</label>
+                        <select id="endTimeSelect" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem;"></select>
+                    </div>
+                </div>
+                
+                <div style="background: #FFF3E0; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <p style="font-size: 0.85rem; color: #E65100;">
+                        ⚠️ 시간대를 줄이면 해당 시간의 배치된 강의가 삭제될 수 있습니다.
+                    </p>
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                    <button class="btn btn-secondary" onclick="closeTimeSettingsModal()">취소</button>
+                    <button class="btn btn-primary" onclick="applyTimeSettings()">✅ 적용</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 백업 관리 모달 -->
+    <div class="modal" id="backupModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>💾 백업 관리</h2>
+                <button class="modal-close" onclick="closeBackupModal()">×</button>
+            </div>
+            
+            <div style="padding: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <div style="font-size: 0.85rem; color: #666;">
+                        🔄 자동 백업: 5분마다 · 최대 10개 유지
+                    </div>
+                    <button class="btn btn-primary btn-small" onclick="createManualBackup()">
+                        💾 지금 백업
+                    </button>
+                </div>
+                
+                <div style="background: #f5f5f5; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <p style="font-size: 0.8rem; color: #666; margin: 0;">
+                        ℹ️ 복원 시 현재 데이터가 선택한 시점으로 대체됩니다.<br>
+                        복원 전 자동으로 현재 상태가 백업됩니다.
+                    </p>
+                </div>
+                
+                <div id="backupList" style="max-height: 400px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px;">
+                    <p style="text-align: center; padding: 2rem; color: #999;">로딩 중...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 업체 관리 모달 -->
+    <div class="modal" id="companyModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>🏢 업체 관리</h2>
+                <button class="modal-close" onclick="closeCompanyModal()">×</button>
+            </div>
+            
+            <div class="form-group" style="padding: 1rem 1rem 0 1rem;">
+                <label>새 업체 추가</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="newCompanyName" placeholder="업체명 입력" style="flex: 1;">
+                    <button class="btn btn-primary" onclick="addCompany()">추가</button>
+                </div>
+            </div>
+            
+            <div style="padding: 0 1rem;">
+                <div style="margin: 0.75rem 0; padding: 0.5rem; background: #E8F4FD; border-radius: 8px;">
+                    <small>📊 총 <strong id="companyCount">0</strong>개 업체 등록됨</small>
+                </div>
+                
+                <div style="margin-bottom: 0.75rem;">
+                    <input type="text" id="companySearchInput" placeholder="🔍 업체 검색..." oninput="filterCompanyList()" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 8px;">
+                </div>
+            </div>
+
+            <div class="speaker-list" id="companyList" style="max-height: 400px; margin: 0 1rem 1rem 1rem;"></div>
+        </div>
+    </div>
+
+    <!-- 배치 완료 파일 업로드 모달 -->
+    <div class="modal" id="scheduleUploadModal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2>📥 배치 완료 파일 업로드</h2>
+                <button class="modal-close" onclick="closeScheduleUploadModal()">×</button>
+            </div>
+            
+            <div style="padding: 1rem;">
+                <div style="background: #E8F4FD; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <p style="margin-bottom: 0.5rem;"><strong>📋 세션 + 강의 배치 완료 파일</strong></p>
+                    <p style="font-size: 0.85rem; color: #666;">세션명, 시작시간, 종료시간, 강의제목, 연자명이 포함된 엑셀 파일을 업로드하면</p>
+                    <p style="font-size: 0.85rem; color: #666;">세션 생성 + 강의 등록 + 시간표 배치가 한 번에 완료됩니다.</p>
+                </div>
+                
+                <div style="background: #FFF8E1; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <p style="font-size: 0.8rem; color: #F57C00; margin: 0;">
+                        ⚠️ 파일 형식: 시간(분), 시작시간, 종료시간, 좌장, 좌장명, 세션명, 제목, 병원명, 연자명, 제품명, 업체
+                    </p>
+                </div>
+                
+                <div style="text-align: center; margin-bottom: 1rem;">
+                    <input type="file" id="scheduleUploadFileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleScheduleFileSelect(event)">
+                    <button class="btn btn-primary" onclick="document.getElementById('scheduleUploadFileInput').click()">
+                        📁 엑셀 파일 선택
+                    </button>
+                </div>
+                
+                <div id="scheduleUploadPreview" style="display: none;">
+                    <div id="schedulePreviewContent"></div>
+                    
+                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee;">
+                        <button class="btn btn-secondary" onclick="closeScheduleUploadModal()">취소</button>
+                        <button class="btn btn-primary" onclick="confirmScheduleUpload()">✅ 업로드 및 배치</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 강의 일괄 업로드 모달 -->
+    <div class="modal" id="uploadModal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2>📤 강의 일괄 업로드</h2>
+                <button class="modal-close" onclick="closeUploadModal()">×</button>
+            </div>
+            
+            <div style="padding: 1rem;">
+                <div style="background: #E8F4FD; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <p style="margin-bottom: 0.5rem;"><strong>📋 강의 목록 파일 업로드</strong></p>
+                    <p style="font-size: 0.85rem; color: #666;">지원 형식: Excel (.xlsx, .xls), CSV (.csv)</p>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 0.25rem;">필수 컬럼: 제목(국문) 또는 제목, 연자명 또는 연자</p>
+                </div>
+                
+                <div style="border: 2px dashed var(--border); border-radius: 12px; padding: 2rem; text-align: center; margin-bottom: 1rem; background: var(--bg);" id="dropZone">
+                    <div style="font-size: 3rem; margin-bottom: 0.5rem;">📁</div>
+                    <p style="margin-bottom: 1rem;">파일을 여기에 드래그하거나 클릭하여 선택</p>
+                    <input type="file" id="uploadFileInput" accept=".xlsx,.xls,.csv" style="display: none;" onchange="handleFileSelect(event)">
+                    <button class="btn btn-primary" id="selectFileBtn" onclick="document.getElementById('uploadFileInput').click()">파일 선택</button>
+                </div>
+                
+                <div id="uploadPreview" style="display: none;">
+                    <div id="duplicateWarning" style="display: none; background: #FFF3E0; border: 1px solid #FFB74D; border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem;">
+                        <span style="color: #E65100; font-weight: 600;">⚠️ <span id="duplicateCount">0</span>개 중복 발견</span>
+                    </div>
+                    
+                    <h4 style="margin-bottom: 0.5rem;">📊 미리보기 (<span id="previewCount">0</span>개 강의)</h4>
+                    <div style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+                            <thead style="background: var(--primary); color: white; position: sticky; top: 0;">
+                                <tr id="previewTableHeader">
+                                    <th style="padding: 0.5rem; text-align: left; width: 30px;"></th>
+                                    <th style="padding: 0.5rem; text-align: left;">분류</th>
+                                    <th style="padding: 0.5rem; text-align: left;">제목</th>
+                                    <th style="padding: 0.5rem; text-align: left;">연자</th>
+                                    <th style="padding: 0.5rem; text-align: left;">시간</th>
+                                </tr>
+                            </thead>
+                            <tbody id="previewTableBody"></tbody>
+                        </table>
+                    </div>
+                    
+                    <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="checkbox" id="appendMode" checked>
+                            <span>기존 강의에 추가 (체크 해제 시 전체 교체)</span>
+                        </label>
+                        <label id="skipDuplicatesLabel" style="display: none; align-items: center; gap: 0.5rem;">
+                            <input type="checkbox" id="skipDuplicates" checked>
+                            <span>🔄 중복 강의 건너뛰기 (<span id="skipDuplicateCount">0</span>개)</span>
+                        </label>
+                    </div>
+                    
+                    <div style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
+                        <button class="btn btn-secondary" onclick="clearUploadPreview()">취소</button>
+                        <button class="btn btn-primary" onclick="confirmUpload()">✅ 업로드 확정</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- JavaScript 모듈 로드 (순서 중요!) -->
+    <!-- ============================================ -->
+    <script src="js/config.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/lectures.js"></script>
+    <script src="js/sessions.js"></script>
+    <script src="js/schedule.js"></script>
+    <script src="js/chairs.js"></script>
+    <script src="js/upload.js"></script>
+    <script src="js/typo-check.js"></script>
+    <script src="js/modals.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
