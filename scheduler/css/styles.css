@@ -1439,6 +1439,15 @@ body {
    드래그 중 눈금 표시
    ============================================ */
 
+/* 드래그 중 강의 요소들이 마우스 이벤트를 가로채지 않도록 */
+.schedule-grid.dragging .scheduled-lecture {
+    pointer-events: none;
+}
+
+.schedule-grid.dragging .session-header-cell {
+    pointer-events: none;
+}
+
 .schedule-grid.dragging .schedule-cell::before {
     content: '';
     position: absolute;

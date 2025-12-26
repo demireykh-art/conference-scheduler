@@ -259,6 +259,10 @@ window.updateScheduleDisplay = function() {
         const isLuncheon = lecture.isLuncheon;
         const isPanelDiscussion = lecture.category === 'Panel Discussion' || lecture.isPanelDiscussion;
         
+        // 같은 시간에 세션이 시작하는지 확인
+        const sessionAtSameTime = AppState.sessions.find(s => s.time === startTime && s.room === room);
+        const sessionHeaderHeight = sessionAtSameTime ? 25 : 0; // 세션 헤더 높이
+        
         lectureDiv.className = 'scheduled-lecture' + (isInSession ? ' in-session' : '') + (isBreak ? ' break-item' : '') + (isPanelDiscussion ? ' panel-discussion' : '') + (isLuncheon ? ' luncheon-lecture' : '');
         lectureDiv.draggable = true;
         lectureDiv.dataset.scheduleKey = key;
@@ -278,8 +282,9 @@ window.updateScheduleDisplay = function() {
 
         const cellHeight = 20;
         const totalHeight = slotsSpan * cellHeight;
-        lectureDiv.style.height = `${totalHeight}px`;
-        lectureDiv.style.top = '0px';
+        // 세션 헤더가 있으면 강의를 아래로 내리고 높이 조정
+        lectureDiv.style.height = `${totalHeight - sessionHeaderHeight}px`;
+        lectureDiv.style.top = `${sessionHeaderHeight}px`;
 
         const title = AppState.currentLanguage === 'en' && lecture.titleEn ? lecture.titleEn : lecture.titleKo;
         const speaker = AppState.currentLanguage === 'en' && lecture.speakerEn ? lecture.speakerEn : lecture.speakerKo;
