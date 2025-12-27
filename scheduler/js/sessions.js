@@ -23,7 +23,7 @@ window.closeSessionModal = function() {
 window.openCellSessionModal = function(time, room) {
     const existingSession = AppState.sessions.find(s => s.time === time && s.room === room);
 
-    document.getElementById('cellSessionModalTitle').textContent = existingSession ? '📋 세션/런치 수정' : '📋 세션/런치 추가';
+    document.getElementById('cellSessionModalTitle').textContent = existingSession ? '📋 세션 수정' : '📋 세션 추가';
 
     document.getElementById('cellSessionTime').value = time;
     document.getElementById('cellSessionRoom').value = room;
@@ -32,15 +32,9 @@ window.openCellSessionModal = function(time, room) {
     document.getElementById('cellSessionNameEn').value = existingSession ? existingSession.nameEn : '';
     document.getElementById('cellSessionModerator').value = existingSession ? existingSession.moderator : '';
     document.getElementById('cellSessionModeratorEn').value = existingSession ? existingSession.moderatorEn : '';
-    
-    // 세션 시간 초기화
-    const durationSelect = document.getElementById('cellSessionDuration');
-    if (durationSelect) {
-        durationSelect.value = existingSession && existingSession.duration ? existingSession.duration : '0';
-    }
 
     // 색상 선택
-    const colors = ['#3498DB', '#E74C3C', '#2ECC71', '#9B59B6', '#F39C12', '#1ABC9C', '#E91E63', '#5D4037'];
+    const colors = ['#3498DB', '#E74C3C', '#2ECC71', '#9B59B6', '#F39C12', '#1ABC9C', '#E91E63', '#00BCD4'];
     const defaultColor = existingSession ? existingSession.color : colors[AppState.sessions.length % colors.length];
     document.getElementById('cellSessionColor').value = defaultColor;
 
@@ -55,28 +49,6 @@ window.openCellSessionModal = function(time, room) {
 
     document.getElementById('cellSessionModal').classList.add('active');
     document.getElementById('cellSessionName').focus();
-};
-
-/**
- * 런치 세션 빠른 입력
- */
-window.fillLunchSession = function() {
-    document.getElementById('cellSessionName').value = 'Lunch';
-    document.getElementById('cellSessionNameEn').value = 'Lunch';
-    document.getElementById('cellSessionModerator').value = '';
-    document.getElementById('cellSessionModeratorEn').value = '';
-    document.getElementById('cellSessionColor').value = '#5D4037';
-    
-    // 세션 시간 60분으로 설정
-    const durationSelect = document.getElementById('cellSessionDuration');
-    if (durationSelect) {
-        durationSelect.value = '60';
-    }
-    
-    // 색상 버튼 상태 업데이트
-    document.querySelectorAll('#sessionColorPicker .color-btn').forEach(btn => {
-        btn.classList.toggle('selected', btn.dataset.color === '#5D4037');
-    });
 };
 
 /**
@@ -98,8 +70,6 @@ window.saveCellSession = function() {
     const moderator = document.getElementById('cellSessionModerator').value.trim();
     const moderatorEn = document.getElementById('cellSessionModeratorEn').value.trim();
     const color = document.getElementById('cellSessionColor').value;
-    const durationSelect = document.getElementById('cellSessionDuration');
-    const duration = durationSelect ? parseInt(durationSelect.value) || 0 : 0;
 
     if (!name) {
         alert('세션명을 입력해주세요.');
@@ -126,7 +96,6 @@ window.saveCellSession = function() {
         existingSession.moderator = moderator;
         existingSession.moderatorEn = finalModeratorEn;
         existingSession.color = color;
-        existingSession.duration = duration;
     } else {
         const newSession = {
             id: Date.now(),
@@ -136,8 +105,7 @@ window.saveCellSession = function() {
             moderatorEn: finalModeratorEn,
             time: time,
             room: room,
-            color: color,
-            duration: duration
+            color: color
         };
         AppState.sessions.push(newSession);
     }

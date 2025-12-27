@@ -70,8 +70,6 @@ window.AppConfig = {
     // 카테고리 색상
     // 카테고리 그룹 (3개씩 행 배열용)
     categoryGroups: [
-        // 0행: Break/특수 (특수)
-        ['Coffee Break', 'Opening/Closing', 'Luncheon'],
         // 1행: 주요 카테고리
         ['Injectables', 'Laser & EBDs', 'Bio-Stimulators'],
         // 2행: 디바이스
@@ -93,10 +91,6 @@ window.AppConfig = {
     ],
 
     categoryColors: {
-        'Coffee Break': '#795548',
-        'Opening/Closing': '#37474F',
-        'Panel Discussion': '#424242',
-        'Luncheon': '#FF8F00',
         'Injectables': '#E65100',
         'Laser & EBDs': '#1565C0',
         'Bio-Stimulators': '#EF6C00',
@@ -123,9 +117,6 @@ window.AppConfig = {
         'Others': '#757575',
         'Other Solutions': '#9E9E9E'
     },
-
-    // Break 타입 정의 (중복 배치 가능)
-    BREAK_TYPES: ['Coffee Break', 'Opening/Closing', 'Panel Discussion'],
 
     // 초기 업체 목록
     INITIAL_COMPANIES: [
