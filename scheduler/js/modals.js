@@ -742,6 +742,91 @@ window.showAlreadyPlacedDialog = function(existingKey, existingTime, existingRoo
     dialog.querySelector('.swap-option[autofocus]').focus();
 };
 
+// ============================================
+// Break 시간 수정 모달
+// ============================================
+
+window.openBreakDurationModal = function(scheduleKey, lecture) {
+    const currentDuration = lecture.duration || 20;
+    
+    const dialog = document.createElement('div');
+    dialog.className = 'break-duration-dialog-overlay';
+    dialog.innerHTML = `
+        <div class="break-duration-dialog" style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); max-width: 350px; width: 90%;">
+            <h3 style="margin: 0 0 1rem 0; color: var(--primary);">⏱️ ${lecture.titleKo} 시간 수정</h3>
+            
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">시간 (분)</label>
+                <input type="number" id="breakDurationInput" value="${currentDuration}" min="5" max="120" step="5" 
+                    style="width: 100%; padding: 0.75rem; border: 2px solid var(--border); border-radius: 8px; font-size: 1.1rem; text-align: center;">
+            </div>
+            
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                <button type="button" class="duration-preset" data-duration="10" style="flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px; background: #f5f5f5; cursor: pointer;">10분</button>
+                <button type="button" class="duration-preset" data-duration="15" style="flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px; background: #f5f5f5; cursor: pointer;">15분</button>
+                <button type="button" class="duration-preset" data-duration="20" style="flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px; background: #f5f5f5; cursor: pointer;">20분</button>
+                <button type="button" class="duration-preset" data-duration="30" style="flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px; background: #f5f5f5; cursor: pointer;">30분</button>
+                <button type="button" class="duration-preset" data-duration="60" style="flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px; background: #f5f5f5; cursor: pointer;">60분</button>
+            </div>
+            
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                <button class="btn btn-secondary" id="breakDurationCancel">취소</button>
+                <button class="btn btn-primary" id="breakDurationSave">✅ 저장</button>
+            </div>
+        </div>
+    `;
+    
+    dialog.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+    
+    document.body.appendChild(dialog);
+    
+    const input = dialog.querySelector('#breakDurationInput');
+    input.focus();
+    input.select();
+    
+    // 프리셋 버튼 클릭
+    dialog.querySelectorAll('.duration-preset').forEach(btn => {
+        btn.addEventListener('click', () => {
+            input.value = btn.dataset.duration;
+        });
+    });
+    
+    // 저장
+    dialog.querySelector('#breakDurationSave').addEventListener('click', () => {
+        const newDuration = parseInt(input.value);
+        if (newDuration >= 5 && newDuration <= 120) {
+            saveStateForUndo();
+            AppState.schedule[scheduleKey].duration = newDuration;
+            saveAndSync();
+            updateScheduleDisplay();
+            dialog.remove();
+        } else {
+            alert('시간은 5분에서 120분 사이여야 합니다.');
+        }
+    });
+    
+    // 취소
+    dialog.querySelector('#breakDurationCancel').addEventListener('click', () => {
+        dialog.remove();
+    });
+    
+    // ESC 키
+    dialog.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            dialog.remove();
+        } else if (e.key === 'Enter') {
+            dialog.querySelector('#breakDurationSave').click();
+        }
+    });
+    
+    // 외부 클릭
+    dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) {
+            dialog.remove();
+        }
+    });
+};
+
 // 모달 외부 클릭 시 닫기
 window.onclick = function(event) {
     if (event.target.className === 'modal active') {
