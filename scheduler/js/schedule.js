@@ -621,7 +621,15 @@ window.handleDrop = function(e) {
         if (!isBreak) {
             const speakerConflict = checkSpeakerConflict(time, room, AppState.draggedLecture, AppState.draggedScheduleKey);
             if (speakerConflict.hasConflict) {
-                alert(`⚠️ 연자 시간 충돌!\n\n연자: ${speakerConflict.speakerName}\n\n기존 강의: "${speakerConflict.conflictLecture.titleKo}"\n룸: ${speakerConflict.conflictRoom}\n시간: ${speakerConflict.conflictTime} ~ ${speakerConflict.conflictEndTime}\n\n배치하려는 시간: ${time} ~ ${speakerConflict.targetEndTime}\n룸: ${room}\n\n⏱️ 다른 룸 간 이동시간 최소 ${AppConfig.SPEAKER_TRANSFER_TIME}분 필요\n\n다른 시간대를 선택해주세요.`);
+                let alertMessage;
+                if (speakerConflict.isPanelConflict) {
+                    // Panel Discussion 세션 충돌
+                    alertMessage = `⚠️ Panel Discussion 세션 참여자 충돌!\n\n연자: ${speakerConflict.speakerName}\n\n이 연자는 "${speakerConflict.sessionName}" 세션의 패널리스트입니다.\n\n📋 세션 정보:\n룸: ${speakerConflict.conflictRoom}\n시간: ${speakerConflict.conflictTime} ~ ${speakerConflict.conflictEndTime}\n\n❌ 배치하려는 시간: ${time} ~ ${speakerConflict.targetEndTime}\n룸: ${room}\n\n💡 패널리스트는 해당 세션 전체 시간 동안 다른 룸에서 강의할 수 없습니다.\n\n다른 시간대를 선택해주세요.`;
+                } else {
+                    // 일반 연자 충돌
+                    alertMessage = `⚠️ 연자 시간 충돌!\n\n연자: ${speakerConflict.speakerName}\n\n기존 강의: "${speakerConflict.conflictLecture.titleKo}"\n룸: ${speakerConflict.conflictRoom}\n시간: ${speakerConflict.conflictTime} ~ ${speakerConflict.conflictEndTime}\n\n배치하려는 시간: ${time} ~ ${speakerConflict.targetEndTime}\n룸: ${room}\n\n⏱️ 다른 룸 간 이동시간 최소 ${AppConfig.SPEAKER_TRANSFER_TIME}분 필요\n\n다른 시간대를 선택해주세요.`;
+                }
+                alert(alertMessage);
                 AppState.draggedScheduleKey = null;
                 AppState.draggedLecture = null;
                 AppState.draggedIsBreak = false;
@@ -747,6 +755,7 @@ window.checkSpeakerConflict = function(targetTime, targetRoom, lecture, excludeK
     const targetStartMin = timeToMinutes(targetTime);
     const targetEndMin = targetStartMin + targetDuration;
 
+    // 1. 기존 강의와의 충돌 체크
     for (const [scheduleKey, existingLecture] of Object.entries(AppState.schedule)) {
         if (excludeKey && scheduleKey === excludeKey) continue;
 
@@ -784,8 +793,141 @@ window.checkSpeakerConflict = function(targetTime, targetRoom, lecture, excludeK
         }
     }
 
+    // 2. Panel Discussion 세션과의 충돌 체크
+    const panelConflict = checkPanelSessionConflict(targetTime, targetRoom, targetDuration, speakerName, excludeKey);
+    if (panelConflict.hasConflict) {
+        return panelConflict;
+    }
+
     return { hasConflict: false };
 };
+
+/**
+ * Panel Discussion 세션과의 충돌 체크
+ * 패널리스트는 세션 전체 시간 동안 다른 룸에서 강의 불가
+ */
+window.checkPanelSessionConflict = function(targetTime, targetRoom, targetDuration, speakerName, excludeKey = null) {
+    const targetStartMin = timeToMinutes(targetTime);
+    const targetEndMin = targetStartMin + targetDuration;
+    
+    // Panel Discussion이 배치된 모든 항목 찾기
+    for (const [scheduleKey, existingLecture] of Object.entries(AppState.schedule)) {
+        if (existingLecture.category !== 'Panel Discussion' && !existingLecture.isPanelDiscussion) continue;
+        
+        const [panelTime, panelRoom] = [scheduleKey.substring(0, 5), scheduleKey.substring(6)];
+        
+        // 같은 룸이면 체크 불필요
+        if (panelRoom === targetRoom) continue;
+        
+        // 해당 Panel Discussion이 속한 세션 찾기
+        const session = findBelongingSessionForConflict(panelTime, panelRoom);
+        if (!session) continue;
+        
+        // 세션 시간 범위 계산
+        const sessionStartMin = timeToMinutes(session.time);
+        let sessionEndMin;
+        
+        if (session.duration) {
+            sessionEndMin = sessionStartMin + session.duration;
+        } else {
+            // duration이 없으면 Panel Discussion 끝 시간까지
+            sessionEndMin = timeToMinutes(panelTime) + (existingLecture.duration || 15);
+        }
+        
+        // 세션의 패널리스트(연자들 + 좌장) 가져오기
+        const panelInfo = getSessionPanelInfoForConflict(panelTime, panelRoom, session);
+        const allPanelists = [...panelInfo.speakers];
+        if (panelInfo.moderator) {
+            allPanelists.push(panelInfo.moderator);
+        }
+        
+        // 배치하려는 강의의 연자가 패널리스트인지 확인
+        if (!allPanelists.includes(speakerName)) continue;
+        
+        // 시간 충돌 체크 (세션 전체 시간 동안)
+        // 이동 시간 포함
+        const gapAfterSession = targetStartMin - sessionEndMin;
+        const gapBeforeSession = sessionStartMin - targetEndMin;
+        
+        if (gapAfterSession < AppConfig.SPEAKER_TRANSFER_TIME && gapBeforeSession < AppConfig.SPEAKER_TRANSFER_TIME) {
+            const sessionEndTime = `${Math.floor(sessionEndMin / 60).toString().padStart(2, '0')}:${(sessionEndMin % 60).toString().padStart(2, '0')}`;
+            const targetEndTime = `${Math.floor(targetEndMin / 60).toString().padStart(2, '0')}:${(targetEndMin % 60).toString().padStart(2, '0')}`;
+            
+            return {
+                hasConflict: true,
+                conflictLecture: { titleKo: `Panel Discussion (${session.name || '세션'})` },
+                conflictRoom: panelRoom,
+                conflictTime: session.time,
+                conflictEndTime: sessionEndTime,
+                targetEndTime: targetEndTime,
+                speakerName: speakerName,
+                isPanelConflict: true,
+                sessionName: session.name || '세션'
+            };
+        }
+    }
+    
+    return { hasConflict: false };
+};
+
+/**
+ * 충돌 체크용 세션 찾기 (내부 함수와 중복 방지)
+ */
+function findBelongingSessionForConflict(time, room) {
+    const timeIndex = AppState.timeSlots.indexOf(time);
+    
+    for (let i = timeIndex; i >= 0; i--) {
+        const checkTime = AppState.timeSlots[i];
+        const session = AppState.sessions.find(s => s.time === checkTime && s.room === room);
+        if (session) {
+            if (session.duration) {
+                const sessionEndIndex = i + Math.ceil(session.duration / AppConfig.TIME_UNIT);
+                if (timeIndex < sessionEndIndex) {
+                    return session;
+                }
+            } else {
+                return session;
+            }
+        }
+    }
+    return null;
+}
+
+/**
+ * 충돌 체크용 패널 정보 가져오기
+ */
+function getSessionPanelInfoForConflict(panelTime, room, session) {
+    let sessionModerator = '';
+    let sessionSpeakers = [];
+    
+    if (session) {
+        sessionModerator = session.moderator || '';
+        
+        const sessionTimeIndex = AppState.timeSlots.indexOf(session.time);
+        const panelTimeIndex = AppState.timeSlots.indexOf(panelTime);
+        
+        // 세션 시작부터 Panel Discussion 시작 전까지의 강의 연자 수집
+        Object.entries(AppState.schedule).forEach(([key, lecture]) => {
+            if (key.endsWith(`-${room}`) && !lecture.isBreak && lecture.category !== 'Panel Discussion') {
+                const lectureTime = key.substring(0, 5);
+                const lectureTimeIndex = AppState.timeSlots.indexOf(lectureTime);
+                
+                if (lectureTimeIndex >= sessionTimeIndex && lectureTimeIndex < panelTimeIndex) {
+                    if (lecture.speakerKo && lecture.speakerKo.trim() && lecture.speakerKo !== '미정') {
+                        sessionSpeakers.push(lecture.speakerKo);
+                    }
+                }
+            }
+        });
+    }
+    
+    sessionSpeakers = [...new Set(sessionSpeakers)];
+    
+    return {
+        moderator: sessionModerator,
+        speakers: sessionSpeakers
+    };
+}
 
 // 다이얼로그 함수들은 modals.js에서 정의됨
 
