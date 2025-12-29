@@ -85,6 +85,16 @@
             <button class="btn btn-secondary btn-small" onclick="openTypoCheckModal()" title="맞춤법 검사">✏️오타</button>
             <button class="btn btn-primary btn-small" onclick="openUploadModal()">📤업로드</button>
             <button class="btn btn-secondary btn-small" onclick="openBackupModal()">💾백업</button>
+            
+            <!-- 인쇄/내보내기 드롭다운 -->
+            <div class="dropdown" style="position: relative;">
+                <button class="btn btn-secondary btn-small" onclick="toggleExportDropdown()">🖨️출력 ▼</button>
+                <div class="dropdown-menu" id="exportDropdown" style="display: none; position: absolute; top: 100%; right: 0; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 180px; z-index: 1000;">
+                    <button class="dropdown-item" onclick="openPrintModal()">🖨️ 인쇄/PDF</button>
+                    <button class="dropdown-item" onclick="exportToExcel()">📊 엑셀로 내보내기</button>
+                </div>
+            </div>
+            
             <button class="btn btn-secondary btn-small admin-only-btn" onclick="resetAllData()" style="color:#e74c3c; display:none;">🔄초기화</button>
         </div>
     </div>
@@ -173,6 +183,15 @@
                             <input type="text" id="productDescription" placeholder="예: 보툴리눔 톡신">
                         </div>
                         
+                        <!-- 런천강의 체크박스 -->
+                        <div class="form-group" style="border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-top: 0.5rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" id="isLuncheon" style="width: 18px; height: 18px; accent-color: #FF8F00;">
+                                <span style="color: #FF8F00; font-weight: bold;">⭐ 런천강의 (Luncheon Lecture)</span>
+                            </label>
+                            <small style="color: #666; margin-left: 1.5rem;">런치 시간 내 스폰서 강의인 경우 체크</small>
+                        </div>
+                        
                         <button type="button" class="btn btn-primary" id="addLectureBtn">강의 추가</button>
                         <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
                             <button type="button" class="btn btn-secondary" onclick="openCategoryModal()" style="flex: 1;">📂 분류 관리</button>
@@ -227,17 +246,6 @@
             <div class="schedule-table-wrapper">
                 <table class="schedule-table" id="scheduleTable"></table>
             </div>
-
-            <div class="export-section" style="flex-shrink: 0;">
-                <button class="btn btn-secondary" onclick="exportToExcel()">📊 엑셀로 내보내기</button>
-                <button class="btn btn-secondary" onclick="printSchedule()">🖨️ 인쇄/PDF</button>
-            </div>
-            
-            <!-- Firebase 실시간 동기화 안내 -->
-            <div style="margin-top: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 8px; background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%); display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
-                <span>🔄</span>
-                <span style="font-size: 0.8rem;">실시간 자동 저장 · 모든 변경사항은 즉시 동기화됩니다</span>
-            </div>
         </div>
     </div>
 
@@ -267,6 +275,28 @@
                 <button class="modal-close" onclick="closeRoomScheduleModal()">×</button>
             </div>
             <div id="roomScheduleContent" style="overflow: auto; max-height: calc(90vh - 100px); padding: 1rem;"></div>
+        </div>
+    </div>
+
+    <!-- 인쇄 설정 모달 -->
+    <div class="modal" id="printModal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h2>🖨️ 인쇄 설정</h2>
+                <button class="modal-close" onclick="closePrintModal()">×</button>
+            </div>
+            <div style="padding: 1rem;">
+                <div class="form-group">
+                    <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">출력할 룸 선택</label>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;" id="printRoomCheckboxes">
+                        <!-- 동적으로 생성됨 -->
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                    <button class="btn btn-primary" onclick="executePrint()" style="flex: 1;">🖨️ 인쇄/PDF</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -435,6 +465,14 @@
                     </select>
                 </div>
                 
+                <!-- 런천강의 체크박스 -->
+                <div class="form-group" style="border-top: 1px dashed var(--border); padding-top: 0.5rem; margin-top: 0.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="editIsLuncheon" style="width: 18px; height: 18px; accent-color: #FF8F00;">
+                        <span style="color: #FF8F00; font-weight: bold;">⭐ 런천강의 (Luncheon Lecture)</span>
+                    </label>
+                </div>
+                
                 <div style="display: flex; gap: 0.5rem;">
                     <button type="button" class="btn btn-primary" id="saveEditBtn" style="flex: 1;">수정 완료</button>
                     <button type="button" class="btn btn-secondary" id="deleteEditBtn" style="background: #E74C3C; color: white;" onclick="deleteLectureFromModal()">🗑️ 삭제</button>
@@ -459,7 +497,7 @@
     <div class="modal" id="cellSessionModal">
         <div class="modal-content" style="max-width: 500px;">
             <div class="modal-header">
-                <h2 id="cellSessionModalTitle">📋 세션 추가</h2>
+                <h2 id="cellSessionModalTitle">📋 세션/런치 추가</h2>
                 <button class="modal-close" onclick="closeCellSessionModal()">×</button>
             </div>
             
@@ -467,6 +505,16 @@
                 <input type="hidden" id="cellSessionTime">
                 <input type="hidden" id="cellSessionRoom">
                 <input type="hidden" id="cellSessionId">
+                
+                <!-- 빠른 입력 버튼 -->
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="margin-bottom: 0.5rem;">빠른 입력</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn-secondary" onclick="fillLunchSession()" style="background: #5D4037; color: white; flex: 1;">
+                            🍽️ 런치 (60분)
+                        </button>
+                    </div>
+                </div>
                 
                 <div class="form-group">
                     <label>세션명 (한글) <span style="color: #E74C3C;">*</span></label>
@@ -489,19 +537,32 @@
                     <input type="text" id="cellSessionModeratorEn" placeholder="Chair name in English">
                 </div>
                 
-                <div class="form-group">
-                    <label>세션 색상</label>
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;" id="sessionColorPicker">
-                        <button type="button" class="color-btn" data-color="#3498DB" style="background: #3498DB;"></button>
-                        <button type="button" class="color-btn" data-color="#E74C3C" style="background: #E74C3C;"></button>
-                        <button type="button" class="color-btn" data-color="#2ECC71" style="background: #2ECC71;"></button>
-                        <button type="button" class="color-btn" data-color="#9B59B6" style="background: #9B59B6;"></button>
-                        <button type="button" class="color-btn" data-color="#F39C12" style="background: #F39C12;"></button>
-                        <button type="button" class="color-btn" data-color="#1ABC9C" style="background: #1ABC9C;"></button>
-                        <button type="button" class="color-btn" data-color="#E91E63" style="background: #E91E63;"></button>
-                        <button type="button" class="color-btn" data-color="#00BCD4" style="background: #00BCD4;"></button>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>세션 시간 (분)</label>
+                        <select id="cellSessionDuration">
+                            <option value="0">설정 안 함</option>
+                            <option value="30">30분</option>
+                            <option value="45">45분</option>
+                            <option value="60">60분</option>
+                            <option value="90">90분</option>
+                            <option value="120">120분</option>
+                        </select>
                     </div>
-                    <input type="hidden" id="cellSessionColor" value="#3498DB">
+                    <div class="form-group">
+                        <label>세션 색상</label>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;" id="sessionColorPicker">
+                            <button type="button" class="color-btn" data-color="#3498DB" style="background: #3498DB;"></button>
+                            <button type="button" class="color-btn" data-color="#E74C3C" style="background: #E74C3C;"></button>
+                            <button type="button" class="color-btn" data-color="#2ECC71" style="background: #2ECC71;"></button>
+                            <button type="button" class="color-btn" data-color="#9B59B6" style="background: #9B59B6;"></button>
+                            <button type="button" class="color-btn" data-color="#F39C12" style="background: #F39C12;"></button>
+                            <button type="button" class="color-btn" data-color="#1ABC9C" style="background: #1ABC9C;"></button>
+                            <button type="button" class="color-btn" data-color="#E91E63" style="background: #E91E63;"></button>
+                            <button type="button" class="color-btn" data-color="#5D4037" style="background: #5D4037;" title="런치"></button>
+                        </div>
+                        <input type="hidden" id="cellSessionColor" value="#3498DB">
+                    </div>
                 </div>
                 
                 <button type="button" class="btn btn-primary" onclick="saveCellSession()" style="width: 100%;">저장</button>
@@ -773,7 +834,19 @@
                     </p>
                 </div>
                 
-                <div style="text-align: center; margin-bottom: 1rem;">
+                <!-- 덮어쓰기 옵션 -->
+                <div style="background: #FFEBEE; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="scheduleOverwriteCheckbox" checked>
+                        <span style="font-size: 0.85rem; color: #C62828;">
+                            <strong>🔄 기존 강의 덮어쓰기</strong> - 같은 시간대에 기존 강의가 있으면 교체
+                        </span>
+                    </label>
+                </div>
+                
+                <div style="border: 2px dashed var(--border); border-radius: 12px; padding: 2rem; text-align: center; margin-bottom: 1rem; background: var(--bg);" id="scheduleDropZone">
+                    <div style="font-size: 3rem; margin-bottom: 0.5rem;">📁</div>
+                    <p style="margin-bottom: 1rem;">파일을 여기에 드래그하거나 클릭하여 선택</p>
                     <input type="file" id="scheduleUploadFileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleScheduleFileSelect(event)">
                     <button class="btn btn-primary" onclick="document.getElementById('scheduleUploadFileInput').click()">
                         📁 엑셀 파일 선택

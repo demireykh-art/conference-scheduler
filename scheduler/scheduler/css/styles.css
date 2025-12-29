@@ -934,7 +934,7 @@ body {
     border-collapse: separate;
     border-spacing: 1px;
     background: var(--border);
-    min-width: max-content;
+    table-layout: fixed;
 }
 
 .schedule-table thead {
@@ -950,7 +950,9 @@ body {
     font-weight: 700;
     text-align: center;
     font-size: 0.8rem;
-    min-width: 130px;
+    width: 150px;
+    min-width: 150px;
+    max-width: 150px;
     position: sticky;
     top: 0;
 }
@@ -996,6 +998,9 @@ body {
     position: relative;
     padding: 0;
     vertical-align: top;
+    width: 150px;
+    min-width: 150px;
+    max-width: 150px;
 }
 
 .schedule-table tbody td.hour-mark {
@@ -1095,6 +1100,9 @@ body {
     position: relative;
     transition: all 0.2s;
     padding: 0;
+    width: 150px;
+    min-width: 150px;
+    max-width: 150px;
 }
 
 .schedule-cell.hour-mark {
@@ -1315,6 +1323,26 @@ body {
     color: #333;
 }
 
+/* Panel Discussion - 흰색 배경 스타일 */
+.scheduled-lecture.panel-discussion {
+    background: white !important;
+    border: 1px solid #ddd;
+}
+
+.scheduled-lecture.panel-discussion .lecture-title-display {
+    color: #333;
+}
+
+/* Luncheon Lecture - 별표 스타일 */
+.scheduled-lecture.luncheon-lecture {
+    background: white !important;
+    border-left: 4px solid #FFD700 !important;
+}
+
+.scheduled-lecture.luncheon-lecture .lecture-title-display {
+    color: #333;
+}
+
 .scheduled-lecture small {
     color: #444;
     font-size: 0.65rem;
@@ -1407,6 +1435,16 @@ body {
 /* ============================================
    드래그 중 눈금 표시
    ============================================ */
+
+/* 드래그 중 다른 강의 요소들이 마우스 이벤트를 가로채지 않도록 */
+/* 단, 드래그 중인 요소(.is-dragging)는 제외 */
+.schedule-grid.dragging .scheduled-lecture:not(.is-dragging) {
+    pointer-events: none;
+}
+
+.schedule-grid.dragging .session-header-cell:not(.is-dragging) {
+    pointer-events: none;
+}
 
 .schedule-grid.dragging .schedule-cell::before {
     content: '';
@@ -1903,4 +1941,47 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--primary);
+}
+
+/* ============================================
+   드롭다운 메뉴
+   ============================================ */
+
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    min-width: 180px;
+    z-index: 1000;
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: none;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #333;
+    transition: background 0.2s;
+}
+
+.dropdown-item:hover {
+    background: #f5f5f5;
+}
+
+.dropdown-item:not(:last-child) {
+    border-bottom: 1px solid #eee;
 }

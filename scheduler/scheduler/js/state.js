@@ -2,6 +2,56 @@
  * state.js - 앱 전역 상태 관리
  */
 
+// 기본 Break 항목 (항상 강의목록에 표시, 중복 배치 가능)
+window.DEFAULT_BREAK_ITEMS = [
+    {
+        id: 'break-coffee',
+        titleKo: '☕ Coffee Break',
+        titleEn: 'Coffee Break',
+        speakerKo: '',
+        speakerEn: '',
+        affiliation: '',
+        category: 'Coffee Break',
+        duration: 20,
+        isBreak: true
+    },
+    {
+        id: 'break-lunch',
+        titleKo: '🍽️ Lunch',
+        titleEn: 'Lunch',
+        speakerKo: '',
+        speakerEn: '',
+        affiliation: '',
+        category: 'Lunch',
+        duration: 60,
+        isBreak: true,
+        isLunchSession: true
+    },
+    {
+        id: 'break-opening',
+        titleKo: '🎤 Opening / Closing',
+        titleEn: 'Opening / Closing',
+        speakerKo: '',
+        speakerEn: '',
+        affiliation: '',
+        category: 'Opening/Closing',
+        duration: 30,
+        isBreak: true
+    },
+    {
+        id: 'break-panel',
+        titleKo: '📋 Panel Discussion',
+        titleEn: 'Panel Discussion',
+        speakerKo: '',
+        speakerEn: '',
+        affiliation: '',
+        category: 'Panel Discussion',
+        duration: 15,
+        isBreak: true,
+        isPanelDiscussion: true
+    }
+];
+
 window.AppState = {
     // 인증 상태
     currentUser: null,
@@ -56,6 +106,7 @@ window.AppState = {
     draggedLecture: null,
     draggedSession: null,
     draggedScheduleKey: null,
+    draggedIsBreak: false,
 
     // Undo 히스토리
     undoHistory: [],
@@ -160,6 +211,7 @@ window.performUndo = function() {
     AppState.lectures = previousState.lectures;
 
     saveAndSync();
+    createScheduleTable(); // 세션 변경 시 테이블 재생성 필요
     updateScheduleDisplay();
     updateLectureList();
     updateUndoButton();

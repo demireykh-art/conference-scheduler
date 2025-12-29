@@ -228,6 +228,24 @@ window.deleteRoom = function(roomIndex) {
     createScheduleTable();
 };
 
+window.moveRoom = function(roomIndex, direction) {
+    const newIndex = direction === 'left' ? roomIndex - 1 : roomIndex + 1;
+    
+    // 범위 체크
+    if (newIndex < 0 || newIndex >= AppState.rooms.length) return;
+    
+    // 룸 순서 변경
+    const temp = AppState.rooms[roomIndex];
+    AppState.rooms[roomIndex] = AppState.rooms[newIndex];
+    AppState.rooms[newIndex] = temp;
+    
+    // 저장 및 UI 업데이트
+    saveRoomsToStorage();
+    saveAndSync();
+    createScheduleTable();
+    updateScheduleDisplay();
+};
+
 window.updateRoomNameInData = function(oldName, newName) {
     const newSchedule = {};
     Object.entries(AppState.schedule).forEach(([key, value]) => {
@@ -420,22 +438,71 @@ window.generateFullScheduleHTML = function() {
                 const categoryColor = AppConfig.categoryColors[lecture.category] || '#9B59B6';
                 const duration = lecture.duration || 15;
                 const endTime = calculateEndTime(time, duration);
-                const title = lecture.titleKo || lecture.titleEn || '제목 없음';
+                let title = lecture.titleKo || lecture.titleEn || '제목 없음';
                 const speaker = lecture.speakerKo || '미정';
                 const affiliation = lecture.affiliation || '';
                 
-                html += `<td style="padding: 0.5rem; border: 1px solid #ddd; vertical-align: top; height: 80px;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.3rem;">
-                        <div style="flex: 1; min-width: 0;">
-                            <div style="font-weight: bold; font-size: 0.85rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${title}</div>
-                            <div style="font-size: 0.75rem; color: #555; margin-top: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                👤 ${speaker}${affiliation ? ` (${affiliation})` : ''}
+                const isLunchBreak = lecture.category === 'Lunch Break';
+                const isLuncheonLecture = lecture.category === 'Luncheon Lecture';
+                const isBreak = lecture.isBreak || ['Coffee Break', 'Lunch Break', 'Opening/Closing'].includes(lecture.category);
+                
+                // Luncheon Lecture는 별표 표시
+                if (isLuncheonLecture) {
+                    title = `⭐ ${title}`;
+                }
+                
+                // Lunch Break는 세션 헤더 스타일
+                if (isLunchBreak) {
+                    html += `<td style="padding: 0.5rem; border: 1px solid #ddd; vertical-align: top; height: 80px; background: linear-gradient(135deg, ${categoryColor}20, ${categoryColor}10);">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.3rem;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: bold; font-size: 0.9rem; color: ${categoryColor};">🍽️ ${title}</div>
+                                <div style="font-size: 0.7rem; color: #888;">⏱️ ${duration}분</div>
                             </div>
-                            <div style="font-size: 0.7rem; color: #888;">⏱️ ${duration}분</div>
+                            <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; white-space: nowrap; flex-shrink: 0;">${lecture.category}</span>
                         </div>
-                        <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; white-space: nowrap; flex-shrink: 0;">${lecture.category || '기타'}</span>
-                    </div>
-                </td>`;
+                    </td>`;
+                } else if (isLuncheonLecture) {
+                    // Luncheon Lecture - 별표 + 스폰서 표시
+                    const sponsorInfo = lecture.companyName ? ` (스폰서: ${lecture.companyName})` : '';
+                    html += `<td style="padding: 0.5rem; border: 1px solid #ddd; vertical-align: top; height: 80px; border-left: 4px solid #FFD700;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.3rem;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: bold; font-size: 0.85rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${title}</div>
+                                <div style="font-size: 0.75rem; color: #555; margin-top: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    👤 ${speaker}${sponsorInfo}
+                                </div>
+                                <div style="font-size: 0.7rem; color: #888;">⏱️ ${duration}분</div>
+                            </div>
+                            <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; white-space: nowrap; flex-shrink: 0;">${lecture.category}</span>
+                        </div>
+                    </td>`;
+                } else if (isBreak) {
+                    // 기타 Break (Coffee Break, Opening/Closing)
+                    html += `<td style="padding: 0.5rem; border: 1px solid #ddd; vertical-align: top; height: 80px; background: ${categoryColor}10;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.3rem;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: bold; font-size: 0.85rem; color: ${categoryColor};">${title}</div>
+                                <div style="font-size: 0.7rem; color: #888;">⏱️ ${duration}분</div>
+                            </div>
+                            <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; white-space: nowrap; flex-shrink: 0;">${lecture.category}</span>
+                        </div>
+                    </td>`;
+                } else {
+                    // 일반 강의
+                    html += `<td style="padding: 0.5rem; border: 1px solid #ddd; vertical-align: top; height: 80px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.3rem;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: bold; font-size: 0.85rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${title}</div>
+                                <div style="font-size: 0.75rem; color: #555; margin-top: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    👤 ${speaker}${affiliation ? ` (${affiliation})` : ''}
+                                </div>
+                                <div style="font-size: 0.7rem; color: #888;">⏱️ ${duration}분</div>
+                            </div>
+                            <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; white-space: nowrap; flex-shrink: 0;">${lecture.category || '기타'}</span>
+                        </div>
+                    </td>`;
+                }
             } else {
                 html += `<td style="padding: 0.5rem; border: 1px solid #ddd; height: 80px;"></td>`;
             }
@@ -505,24 +572,76 @@ window.generateRoomScheduleHTML = function(room) {
             const categoryColor = AppConfig.categoryColors[lecture.category] || '#9B59B6';
             const duration = lecture.duration || 15;
             const endTime = calculateEndTime(time, duration);
-
-            html += `<tr style="background: ${isHourMark ? '#f9f9f9' : 'white'};">
-                <td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center; font-weight: ${isHourMark ? 'bold' : 'normal'};">
-                    ${time}<br><span style="font-size: 0.7rem; color: #999;">~${endTime}</span>
-                </td>
-                <td style="padding: 0.5rem; border: 1px solid #ddd;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div style="flex: 1;">
-                            <strong style="font-size: 0.95rem;">${lecture.titleKo || lecture.titleEn || '제목 없음'}</strong>
-                            <div style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">
-                                👤 ${lecture.speakerKo || '미정'} ${lecture.affiliation ? `(${lecture.affiliation})` : ''}
+            
+            const isLunchBreak = lecture.category === 'Lunch Break';
+            const isLuncheonLecture = lecture.category === 'Luncheon Lecture';
+            const isBreak = lecture.isBreak || ['Coffee Break', 'Lunch Break', 'Opening/Closing'].includes(lecture.category);
+            
+            let title = lecture.titleKo || lecture.titleEn || '제목 없음';
+            
+            // Lunch Break - 세션 헤더 스타일
+            if (isLunchBreak) {
+                html += `<tr style="background: ${categoryColor}15;">
+                    <td colspan="2" style="padding: 0.75rem; border: 1px solid #ddd; font-weight: bold; color: ${categoryColor};">
+                        🍽️ ${title} <span style="font-weight: normal; font-size: 0.8rem;">(${duration}분)</span>
+                    </td>
+                </tr>`;
+            } else if (isLuncheonLecture) {
+                // Luncheon Lecture - 별표 + 스폰서 표시
+                const sponsorInfo = lecture.companyName ? ` (스폰서: ${lecture.companyName})` : '';
+                html += `<tr style="background: ${isHourMark ? '#f9f9f9' : 'white'}; border-left: 4px solid #FFD700;">
+                    <td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center; font-weight: ${isHourMark ? 'bold' : 'normal'};">
+                        ${time}<br><span style="font-size: 0.7rem; color: #999;">~${endTime}</span>
+                    </td>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="flex: 1;">
+                                <strong style="font-size: 0.95rem;">⭐ ${title}</strong>
+                                <div style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">
+                                    👤 ${lecture.speakerKo || '미정'}${sponsorInfo}
+                                </div>
+                                <div style="font-size: 0.75rem; color: #999;">⏱️ ${duration}분</div>
                             </div>
-                            <div style="font-size: 0.75rem; color: #999;">⏱️ ${duration}분</div>
+                            <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; white-space: nowrap; margin-left: 0.5rem;">${lecture.category}</span>
                         </div>
-                        <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; white-space: nowrap; margin-left: 0.5rem;">${lecture.category}</span>
-                    </div>
-                </td>
-            </tr>`;
+                    </td>
+                </tr>`;
+            } else if (isBreak) {
+                // 기타 Break
+                html += `<tr style="background: ${categoryColor}10;">
+                    <td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center; font-weight: ${isHourMark ? 'bold' : 'normal'};">
+                        ${time}<br><span style="font-size: 0.7rem; color: #999;">~${endTime}</span>
+                    </td>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="flex: 1;">
+                                <strong style="font-size: 0.95rem; color: ${categoryColor};">${title}</strong>
+                                <div style="font-size: 0.75rem; color: #999;">⏱️ ${duration}분</div>
+                            </div>
+                            <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; white-space: nowrap; margin-left: 0.5rem;">${lecture.category}</span>
+                        </div>
+                    </td>
+                </tr>`;
+            } else {
+                // 일반 강의
+                html += `<tr style="background: ${isHourMark ? '#f9f9f9' : 'white'};">
+                    <td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center; font-weight: ${isHourMark ? 'bold' : 'normal'};">
+                        ${time}<br><span style="font-size: 0.7rem; color: #999;">~${endTime}</span>
+                    </td>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="flex: 1;">
+                                <strong style="font-size: 0.95rem;">${title}</strong>
+                                <div style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">
+                                    👤 ${lecture.speakerKo || '미정'} ${lecture.affiliation ? `(${lecture.affiliation})` : ''}
+                                </div>
+                                <div style="font-size: 0.75rem; color: #999;">⏱️ ${duration}분</div>
+                            </div>
+                            <span style="background: ${categoryColor}; color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; white-space: nowrap; margin-left: 0.5rem;">${lecture.category}</span>
+                        </div>
+                    </td>
+                </tr>`;
+            }
         }
     });
 
@@ -568,6 +687,214 @@ window.exportToExcel = function() {
 window.printSchedule = function() {
     window.print();
 };
+
+// ============================================
+// 인쇄 모달 관련
+// ============================================
+
+window.toggleExportDropdown = function() {
+    const dropdown = document.getElementById('exportDropdown');
+    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    
+    // 다른 곳 클릭하면 닫기
+    setTimeout(() => {
+        document.addEventListener('click', closeExportDropdown);
+    }, 10);
+};
+
+function closeExportDropdown(e) {
+    const dropdown = document.getElementById('exportDropdown');
+    if (!e.target.closest('.dropdown')) {
+        dropdown.style.display = 'none';
+        document.removeEventListener('click', closeExportDropdown);
+    }
+}
+
+window.openPrintModal = function() {
+    document.getElementById('exportDropdown').style.display = 'none';
+    
+    const container = document.getElementById('printRoomCheckboxes');
+    container.innerHTML = '';
+    
+    // 전체 선택 체크박스
+    const allLabel = document.createElement('label');
+    allLabel.style.cssText = 'display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #f5f5f5; border-radius: 6px; cursor: pointer;';
+    allLabel.innerHTML = `
+        <input type="checkbox" id="printAllRooms" checked onchange="toggleAllPrintRooms(this.checked)">
+        <strong>전체 룸 선택</strong>
+    `;
+    container.appendChild(allLabel);
+    
+    // 각 룸별 체크박스
+    AppState.rooms.forEach((room, index) => {
+        const label = document.createElement('label');
+        label.style.cssText = 'display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.5rem; cursor: pointer;';
+        label.innerHTML = `
+            <input type="checkbox" class="print-room-checkbox" value="${index}" checked>
+            ${room}
+        `;
+        container.appendChild(label);
+    });
+    
+    document.getElementById('printModal').classList.add('active');
+};
+
+window.closePrintModal = function() {
+    document.getElementById('printModal').classList.remove('active');
+};
+
+window.toggleAllPrintRooms = function(checked) {
+    document.querySelectorAll('.print-room-checkbox').forEach(cb => {
+        cb.checked = checked;
+    });
+};
+
+window.executePrint = function() {
+    const selectedRooms = [];
+    document.querySelectorAll('.print-room-checkbox:checked').forEach(cb => {
+        selectedRooms.push(parseInt(cb.value));
+    });
+    
+    if (selectedRooms.length === 0) {
+        alert('출력할 룸을 선택해주세요.');
+        return;
+    }
+    
+    closePrintModal();
+    
+    // 선택된 룸들의 시간표를 생성하여 인쇄
+    printSelectedRooms(selectedRooms);
+};
+
+window.printSelectedRooms = function(roomIndices) {
+    // 룸별 상세 보기 포맷으로 인쇄용 HTML 생성
+    let printContent = `
+        <html>
+        <head>
+            <title>${AppState.currentDate} 시간표</title>
+            <style>
+                @page { margin: 1cm; }
+                body { font-family: 'Malgun Gothic', sans-serif; font-size: 11pt; }
+                .room-section { page-break-after: always; margin-bottom: 2rem; }
+                .room-section:last-child { page-break-after: avoid; }
+                .room-title { font-size: 16pt; font-weight: bold; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #333; }
+                table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
+                th { background: #663399; color: white; }
+                .session-row { background: #f0e6ff; font-weight: bold; }
+                .session-row td { border-left: 4px solid #663399; }
+                .time-cell { width: 80px; text-align: center; font-weight: 500; }
+                .category-badge { display: inline-block; background: #9c27b0; color: white; padding: 2px 8px; border-radius: 12px; font-size: 9pt; float: right; }
+                .lecture-title { font-weight: 600; margin-bottom: 4px; }
+                .lecture-meta { font-size: 10pt; color: #666; }
+                .coffee-break { background: #fff3e0; }
+                .lunch-break { background: #ffebee; }
+            </style>
+        </head>
+        <body>
+    `;
+    
+    roomIndices.forEach((roomIndex, idx) => {
+        const room = AppState.rooms[roomIndex];
+        printContent += generateRoomPrintContent(room, roomIndex);
+    });
+    
+    printContent += '</body></html>';
+    
+    // 새 창에서 인쇄
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        printWindow.print();
+    }, 500);
+};
+
+function generateRoomPrintContent(room, roomIndex) {
+    const dateLabel = AppState.currentDate === '2026-04-11' ? '토요일' : '일요일';
+    
+    let html = `
+        <div class="room-section">
+            <div class="room-title">🏠 (${dateLabel})${room}</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th class="time-cell">시간</th>
+                        <th>강의 정보</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    // 해당 룸의 세션들
+    const roomSessions = AppState.sessions
+        .filter(s => s.room === room)
+        .sort((a, b) => a.time.localeCompare(b.time));
+    
+    // 해당 룸의 강의들
+    const roomLectures = Object.entries(AppState.schedule)
+        .filter(([key, lecture]) => key.substring(6) === room)
+        .map(([key, lecture]) => ({
+            time: key.substring(0, 5),
+            ...lecture
+        }))
+        .sort((a, b) => a.time.localeCompare(b.time));
+    
+    // 시간순 정렬하여 출력
+    const allItems = [];
+    
+    roomSessions.forEach(session => {
+        allItems.push({ type: 'session', time: session.time, data: session });
+    });
+    
+    roomLectures.forEach(lecture => {
+        allItems.push({ type: 'lecture', time: lecture.time, data: lecture });
+    });
+    
+    allItems.sort((a, b) => a.time.localeCompare(b.time));
+    
+    allItems.forEach(item => {
+        if (item.type === 'session') {
+            const session = item.data;
+            const sessionName = session.name || '';
+            const moderator = session.moderator ? `좌장: ${session.moderator}` : '';
+            html += `
+                <tr class="session-row">
+                    <td class="time-cell"></td>
+                    <td>📌 ${sessionName} ${moderator ? `<span style="font-weight:normal; font-size:10pt;">(${moderator})</span>` : ''}</td>
+                </tr>
+            `;
+        } else {
+            const lecture = item.data;
+            const duration = lecture.duration || 15;
+            const endTime = addMinutesToTime(item.time, duration);
+            const category = lecture.category || '';
+            const title = lecture.titleKo || '';
+            const speaker = lecture.speakerKo || '미정';
+            const affiliation = lecture.affiliation || '';
+            
+            const isBreak = lecture.isBreak || (AppConfig.BREAK_TYPES || []).includes(category);
+            const rowClass = category === 'Coffee Break' ? 'coffee-break' : (category === 'Lunch' ? 'lunch-break' : '');
+            
+            const categoryColor = AppConfig.categoryColors[category] || '#9c27b0';
+            
+            html += `
+                <tr class="${rowClass}">
+                    <td class="time-cell">${item.time}<br><span style="font-size:9pt;color:#999;">~${endTime}</span></td>
+                    <td>
+                        <span class="category-badge" style="background:${categoryColor};">${category}</span>
+                        <div class="lecture-title">${title}</div>
+                        <div class="lecture-meta">👤 ${speaker}${affiliation ? ` (${affiliation})` : ''} | ⏱️ ${duration}분</div>
+                    </td>
+                </tr>
+            `;
+        }
+    });
+    
+    html += '</tbody></table></div>';
+    return html;
+}
 
 // ============================================
 // 초기화
