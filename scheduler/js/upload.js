@@ -375,6 +375,7 @@
         }
         document.getElementById('scheduleUploadModal').classList.add('active');
         clearScheduleUploadPreview();
+        setupScheduleDropZone();
     }
     
     function closeScheduleUploadModal() {
@@ -388,10 +389,47 @@
         document.getElementById('scheduleUploadFileInput').value = '';
     }
     
-    function handleScheduleFileSelect(event) {
-        const file = event.target.files[0];
-        if (!file) return;
+    // 배치 파일 드롭존 설정
+    function setupScheduleDropZone() {
+        const dropZone = document.getElementById('scheduleDropZone');
+        if (!dropZone) return;
         
+        // 기존 이벤트 리스너 제거 후 재설정
+        const newDropZone = dropZone.cloneNode(true);
+        dropZone.parentNode.replaceChild(newDropZone, dropZone);
+        
+        newDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            newDropZone.style.borderColor = 'var(--accent)';
+            newDropZone.style.background = 'rgba(255, 107, 157, 0.1)';
+        });
+        
+        newDropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            newDropZone.style.borderColor = 'var(--border)';
+            newDropZone.style.background = 'var(--bg)';
+        });
+        
+        newDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            newDropZone.style.borderColor = 'var(--border)';
+            newDropZone.style.background = 'var(--bg)';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                processScheduleFile(files[0]);
+            }
+        });
+        
+        // 파일 선택 버튼 재연결
+        const selectBtn = newDropZone.querySelector('button');
+        if (selectBtn) {
+            selectBtn.onclick = () => document.getElementById('scheduleUploadFileInput').click();
+        }
+    }
+    
+    // 배치 파일 처리
+    function processScheduleFile(file) {
         const ext = file.name.split('.').pop().toLowerCase();
         if (!['xlsx', 'xls'].includes(ext)) {
             alert('Excel 파일(.xlsx, .xls)만 지원됩니다.');
@@ -415,6 +453,12 @@
             }
         };
         reader.readAsArrayBuffer(file);
+    }
+    
+    function handleScheduleFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        processScheduleFile(file);
     }
     
     let pendingScheduleData = { room: '', sessions: [], lectures: [] };
@@ -536,24 +580,100 @@
         return 'Others';
     }
     
+    // 유사 강의 찾기
+    function findSimilarLectures(newLecture) {
+        const similar = [];
+        const newTitle = (newLecture.titleKo || '').toLowerCase().trim();
+        const newSpeaker = (newLecture.speakerKo || '').trim();
+        
+        if (!newTitle && !newSpeaker) return similar;
+        
+        AppState.lectures.forEach(existing => {
+            const existingTitle = (existing.titleKo || '').toLowerCase().trim();
+            const existingSpeaker = (existing.speakerKo || '').trim();
+            
+            let similarity = 0;
+            let reason = [];
+            
+            // 1. 완전 일치 체크
+            if (newTitle === existingTitle && newSpeaker === existingSpeaker) {
+                similarity = 100;
+                reason.push('완전 일치');
+            } else {
+                // 2. 제목 유사도 체크
+                if (newTitle && existingTitle) {
+                    if (newTitle === existingTitle) {
+                        similarity += 60;
+                        reason.push('제목 일치');
+                    } else if (newTitle.includes(existingTitle) || existingTitle.includes(newTitle)) {
+                        similarity += 40;
+                        reason.push('제목 유사');
+                    } else {
+                        // 단어 기반 유사도
+                        const newWords = newTitle.split(/\s+/).filter(w => w.length > 1);
+                        const existingWords = existingTitle.split(/\s+/).filter(w => w.length > 1);
+                        const commonWords = newWords.filter(w => existingWords.some(ew => ew.includes(w) || w.includes(ew)));
+                        if (commonWords.length >= 2) {
+                            similarity += 30;
+                            reason.push('키워드 유사');
+                        }
+                    }
+                }
+                
+                // 3. 연자 유사도 체크
+                if (newSpeaker && existingSpeaker && newSpeaker !== '미정' && existingSpeaker !== '미정') {
+                    if (newSpeaker === existingSpeaker) {
+                        similarity += 40;
+                        reason.push('연자 일치');
+                    } else if (newSpeaker.includes(existingSpeaker) || existingSpeaker.includes(newSpeaker)) {
+                        similarity += 25;
+                        reason.push('연자 유사');
+                    }
+                }
+            }
+            
+            if (similarity >= 40) {
+                similar.push({
+                    lecture: existing,
+                    similarity: similarity,
+                    reason: reason.join(', ')
+                });
+            }
+        });
+        
+        // 유사도 높은 순으로 정렬
+        similar.sort((a, b) => b.similarity - a.similarity);
+        return similar.slice(0, 3); // 최대 3개만 반환
+    }
+    
     function showSchedulePreview() {
         const preview = document.getElementById('scheduleUploadPreview');
         const content = document.getElementById('schedulePreviewContent');
         
         const { room, sessions, lectures } = pendingScheduleData;
         
+        // 각 강의에 대해 유사 강의 찾기
+        let similarCount = 0;
+        lectures.forEach((lecture, idx) => {
+            lecture._similar = findSimilarLectures(lecture);
+            lecture._index = idx;
+            lecture._useExisting = null; // null: 새로 추가, id: 기존 강의 사용
+            if (lecture._similar.length > 0) similarCount++;
+        });
+        
         let html = `
             <div style="margin-bottom: 1rem; padding: 0.75rem; background: #E8F4FD; border-radius: 8px;">
                 <strong>📍 강의룸:</strong> ${room}<br>
                 <strong>📌 세션:</strong> ${sessions.length}개<br>
                 <strong>📚 강의:</strong> ${lectures.length}개
+                ${similarCount > 0 ? `<br><span style="color: #F57C00;">⚠️ 유사 강의 ${similarCount}개 발견</span>` : ''}
             </div>
         `;
         
         // 세션 목록
         if (sessions.length > 0) {
             html += '<div style="margin-bottom: 1rem;"><strong>세션 목록:</strong></div>';
-            html += '<div style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; margin-bottom: 1rem;">';
+            html += '<div style="max-height: 120px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; margin-bottom: 1rem;">';
             sessions.forEach((session, idx) => {
                 const color = getSessionColor(idx);
                 html += `<div style="padding: 0.5rem; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 0.5rem;">
@@ -564,26 +684,362 @@
             html += '</div>';
         }
         
-        // 강의 목록
+        // 강의 목록 (유사 강의 선택 포함)
         html += '<div style="margin-bottom: 0.5rem;"><strong>강의 목록:</strong></div>';
-        html += '<div style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px;">';
-        html += '<table style="width: 100%; font-size: 0.8rem; border-collapse: collapse;">';
-        html += '<thead style="background: #f5f5f5; position: sticky; top: 0;"><tr><th style="padding: 0.5rem; text-align: left;">시간</th><th style="padding: 0.5rem; text-align: left;">제목</th><th style="padding: 0.5rem; text-align: left;">연자</th><th style="padding: 0.5rem; text-align: left;">분류</th></tr></thead>';
-        html += '<tbody>';
-        lectures.forEach(lecture => {
+        html += '<div style="max-height: 300px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px;">';
+        
+        lectures.forEach((lecture, idx) => {
             const categoryColor = AppConfig.categoryColors[lecture.category] || '#9B59B6';
-            html += `<tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 0.4rem;">${lecture.startTime}</td>
-                <td style="padding: 0.4rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${lecture.titleKo}</td>
-                <td style="padding: 0.4rem;">${lecture.speakerKo}</td>
-                <td style="padding: 0.4rem;"><span style="background: ${categoryColor}; color: white; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem;">${lecture.category}</span></td>
-            </tr>`;
+            const hasSimilar = lecture._similar && lecture._similar.length > 0;
+            const bgColor = hasSimilar ? '#FFF8E1' : 'white';
+            
+            html += `<div style="padding: 0.75rem; border-bottom: 1px solid #eee; background: ${bgColor};">`;
+            html += `<div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: ${hasSimilar ? '0.5rem' : '0'};">`;
+            html += `<span style="font-size: 0.75rem; color: #666; min-width: 45px;">${lecture.startTime}</span>`;
+            html += `<span style="flex: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${lecture.titleKo}">${lecture.titleKo}</span>`;
+            html += `<span style="font-size: 0.8rem; color: #666; min-width: 60px;">${lecture.speakerKo}</span>`;
+            html += `<span style="background: ${categoryColor}; color: white; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.65rem;">${lecture.category}</span>`;
+            html += `</div>`;
+            
+            // 유사 강의가 있으면 선택 옵션 표시
+            if (hasSimilar) {
+                html += `<div style="margin-left: 50px; padding: 0.5rem; background: #fff; border: 1px solid #FFB74D; border-radius: 6px;">`;
+                html += `<div style="font-size: 0.75rem; color: #E65100; margin-bottom: 0.5rem;">⚠️ 유사한 기존 강의 발견:</div>`;
+                
+                // 새로 추가 옵션
+                html += `<label style="display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.4rem; cursor: pointer; padding: 0.25rem;">`;
+                html += `<input type="radio" name="similar_${idx}" value="new" checked onchange="window.setLectureChoice(${idx}, null)" style="margin-top: 3px;">`;
+                html += `<span style="font-size: 0.8rem;"><strong>새로 추가</strong> - "${lecture.titleKo}"</span>`;
+                html += `</label>`;
+                
+                // 기존 강의 옵션들
+                lecture._similar.forEach((sim, simIdx) => {
+                    html += `<label style="display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.4rem; cursor: pointer; padding: 0.25rem; background: #f9f9f9; border-radius: 4px;">`;
+                    html += `<input type="radio" name="similar_${idx}" value="${sim.lecture.id}" onchange="window.setLectureChoice(${idx}, '${sim.lecture.id}')" style="margin-top: 3px;">`;
+                    html += `<span style="font-size: 0.8rem;">`;
+                    html += `<strong>기존 사용</strong> - "${sim.lecture.titleKo}"`;
+                    html += `<br><span style="font-size: 0.7rem; color: #666;">연자: ${sim.lecture.speakerKo || '미정'} | ${sim.reason} (${sim.similarity}%)</span>`;
+                    html += `</span>`;
+                    html += `</label>`;
+                });
+                
+                html += `</div>`;
+            }
+            
+            html += `</div>`;
         });
-        html += '</tbody></table></div>';
+        
+        html += '</div>';
+        
+        // 중복 체크 버튼 추가
+        html += `
+            <div style="margin-top: 1rem; padding: 0.75rem; background: #E3F2FD; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-size: 0.85rem; color: #1565C0;">
+                    🔍 업로드 전 연자 시간 충돌을 미리 확인할 수 있습니다.
+                </span>
+                <button class="btn btn-secondary" onclick="window.checkScheduleConflicts()" style="white-space: nowrap;">
+                    🔍 중복 체크
+                </button>
+            </div>
+        `;
         
         content.innerHTML = html;
         preview.style.display = 'block';
     }
+    
+    // 연자 시간 충돌 체크
+    window.checkScheduleConflicts = function() {
+        const { room, lectures } = pendingScheduleData;
+        const conflicts = [];
+        
+        // Panel Discussion 세션의 패널리스트 정보 수집
+        const panelSessions = getPanelSessionsInfo();
+        
+        // 업로드할 강의들과 기존 시간표 전체 비교
+        lectures.forEach((newLecture, idx) => {
+            const speakerName = (newLecture.speakerKo || '').trim();
+            if (!speakerName || speakerName === '미정' || speakerName === '') return;
+            
+            const newStartMin = timeToMinutes(newLecture.startTime);
+            const newDuration = newLecture.duration || 15;
+            const newEndMin = newStartMin + newDuration;
+            
+            // 1. 기존 시간표와 비교
+            Object.entries(AppState.schedule).forEach(([scheduleKey, existingLecture]) => {
+                const existingSpeaker = (existingLecture.speakerKo || '').trim();
+                if (!existingSpeaker || existingSpeaker === '미정') return;
+                if (existingSpeaker !== speakerName) return;
+                
+                const [existingTime, existingRoom] = [scheduleKey.substring(0, 5), scheduleKey.substring(6)];
+                
+                // 같은 룸이면 체크 불필요
+                if (existingRoom === room) return;
+                
+                const existingStartMin = timeToMinutes(existingTime);
+                const existingDuration = existingLecture.duration || 15;
+                const existingEndMin = existingStartMin + existingDuration;
+                
+                // 시간 겹침 체크 (이동 시간 포함)
+                const transferTime = AppConfig.SPEAKER_TRANSFER_TIME || 20;
+                const gapAfterExisting = newStartMin - existingEndMin;
+                const gapBeforeExisting = existingStartMin - newEndMin;
+                
+                if (gapAfterExisting < transferTime && gapBeforeExisting < transferTime) {
+                    conflicts.push({
+                        type: 'existing',
+                        newLecture: newLecture,
+                        newRoom: room,
+                        existingLecture: existingLecture,
+                        existingRoom: existingRoom,
+                        existingTime: existingTime,
+                        speaker: speakerName
+                    });
+                }
+            });
+            
+            // 2. Panel Discussion 세션과 충돌 체크
+            panelSessions.forEach(panelInfo => {
+                // 같은 룸이면 체크 불필요
+                if (panelInfo.room === room) return;
+                
+                // 패널리스트인지 확인
+                if (!panelInfo.panelists.includes(speakerName)) return;
+                
+                const sessionStartMin = timeToMinutes(panelInfo.sessionTime);
+                const sessionEndMin = sessionStartMin + (panelInfo.sessionDuration || 60);
+                
+                // 시간 겹침 체크 (이동 시간 포함)
+                const transferTime = AppConfig.SPEAKER_TRANSFER_TIME || 20;
+                const gapAfterSession = newStartMin - sessionEndMin;
+                const gapBeforeSession = sessionStartMin - newEndMin;
+                
+                if (gapAfterSession < transferTime && gapBeforeSession < transferTime) {
+                    conflicts.push({
+                        type: 'panel',
+                        newLecture: newLecture,
+                        newRoom: room,
+                        sessionName: panelInfo.sessionName,
+                        sessionRoom: panelInfo.room,
+                        sessionTime: panelInfo.sessionTime,
+                        sessionEndTime: minutesToTime(sessionEndMin),
+                        speaker: speakerName
+                    });
+                }
+            });
+            
+            // 3. 업로드할 강의들 간 비교 (같은 연자가 다른 시간대에 여러 번 있을 수 있음)
+            lectures.forEach((otherLecture, otherIdx) => {
+                if (idx >= otherIdx) return; // 중복 체크 방지
+                
+                const otherSpeaker = (otherLecture.speakerKo || '').trim();
+                if (otherSpeaker !== speakerName) return;
+                
+                const otherStartMin = timeToMinutes(otherLecture.startTime);
+                const otherDuration = otherLecture.duration || 15;
+                const otherEndMin = otherStartMin + otherDuration;
+                
+                // 같은 룸 내에서 시간 겹침 체크
+                if (!(newEndMin <= otherStartMin || otherEndMin <= newStartMin)) {
+                    conflicts.push({
+                        type: 'internal',
+                        newLecture: newLecture,
+                        otherLecture: otherLecture,
+                        room: room,
+                        speaker: speakerName
+                    });
+                }
+            });
+        });
+        
+        // 결과 표시
+        showConflictResults(conflicts);
+    };
+    
+    function timeToMinutes(time) {
+        if (!time) return 0;
+        const [h, m] = time.split(':').map(Number);
+        return h * 60 + m;
+    }
+    
+    function minutesToTime(minutes) {
+        const h = Math.floor(minutes / 60);
+        const m = minutes % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+    
+    // Panel Discussion 세션 정보 수집
+    function getPanelSessionsInfo() {
+        const panelSessions = [];
+        
+        // Panel Discussion이 배치된 모든 항목 찾기
+        Object.entries(AppState.schedule).forEach(([scheduleKey, lecture]) => {
+            if (lecture.category !== 'Panel Discussion' && !lecture.isPanelDiscussion) return;
+            
+            const [panelTime, panelRoom] = [scheduleKey.substring(0, 5), scheduleKey.substring(6)];
+            
+            // 해당 Panel Discussion이 속한 세션 찾기
+            const session = findSessionForPanel(panelTime, panelRoom);
+            if (!session) return;
+            
+            // 세션의 패널리스트 수집
+            const panelists = getSessionPanelists(session, panelTime, panelRoom);
+            
+            panelSessions.push({
+                sessionName: session.name || '세션',
+                sessionTime: session.time,
+                sessionDuration: session.duration || 60,
+                room: panelRoom,
+                panelists: panelists,
+                moderator: session.moderator || ''
+            });
+        });
+        
+        return panelSessions;
+    }
+    
+    function findSessionForPanel(time, room) {
+        const timeIndex = AppState.timeSlots.indexOf(time);
+        
+        for (let i = timeIndex; i >= 0; i--) {
+            const checkTime = AppState.timeSlots[i];
+            const session = AppState.sessions.find(s => s.time === checkTime && s.room === room);
+            if (session) {
+                if (session.duration) {
+                    const sessionEndIndex = i + Math.ceil(session.duration / (AppConfig.TIME_UNIT || 5));
+                    if (timeIndex < sessionEndIndex) {
+                        return session;
+                    }
+                } else {
+                    return session;
+                }
+            }
+        }
+        return null;
+    }
+    
+    function getSessionPanelists(session, panelTime, room) {
+        const panelists = [];
+        
+        if (session.moderator) {
+            panelists.push(session.moderator);
+        }
+        
+        const sessionTimeIndex = AppState.timeSlots.indexOf(session.time);
+        const panelTimeIndex = AppState.timeSlots.indexOf(panelTime);
+        
+        // 세션 시작부터 Panel Discussion 시작 전까지의 강의 연자 수집
+        Object.entries(AppState.schedule).forEach(([key, lecture]) => {
+            if (!key.endsWith(`-${room}`)) return;
+            if (lecture.isBreak || lecture.category === 'Panel Discussion') return;
+            
+            const lectureTime = key.substring(0, 5);
+            const lectureTimeIndex = AppState.timeSlots.indexOf(lectureTime);
+            
+            if (lectureTimeIndex >= sessionTimeIndex && lectureTimeIndex < panelTimeIndex) {
+                if (lecture.speakerKo && lecture.speakerKo.trim() && lecture.speakerKo !== '미정') {
+                    panelists.push(lecture.speakerKo);
+                }
+            }
+        });
+        
+        // 중복 제거
+        return [...new Set(panelists)];
+    }
+    
+    function showConflictResults(conflicts) {
+        if (conflicts.length === 0) {
+            alert('✅ 충돌이 발견되지 않았습니다!\n\n모든 강의를 안전하게 배치할 수 있습니다.');
+            return;
+        }
+        
+        // 충돌 모달 표시
+        let modalHtml = `
+            <div class="modal active" id="conflictModal" style="z-index: 2000;">
+                <div class="modal-content" style="max-width: 700px; max-height: 80vh;">
+                    <div class="modal-header" style="background: #FFEBEE;">
+                        <h2 style="color: #C62828;">⚠️ 연자 시간 충돌 발견 (${conflicts.length}건)</h2>
+                        <button class="modal-close" onclick="document.getElementById('conflictModal').remove()">×</button>
+                    </div>
+                    <div style="padding: 1rem; overflow-y: auto; max-height: calc(80vh - 120px);">
+                        <p style="margin-bottom: 1rem; color: #666;">
+                            아래 강의들은 연자 시간이 충돌합니다. 업로드 전에 시간을 조정하거나, 충돌을 인지한 상태로 진행할 수 있습니다.
+                        </p>
+        `;
+        
+        conflicts.forEach((conflict, idx) => {
+            if (conflict.type === 'existing') {
+                modalHtml += `
+                    <div style="background: #FFF8E1; border-left: 4px solid #F57C00; padding: 0.75rem; margin-bottom: 0.75rem; border-radius: 0 8px 8px 0;">
+                        <div style="font-weight: bold; color: #E65100; margin-bottom: 0.5rem;">
+                            #${idx + 1} 기존 시간표와 충돌
+                        </div>
+                        <div style="font-size: 0.85rem;">
+                            <strong>연자:</strong> ${conflict.speaker}<br>
+                            <strong>업로드 강의:</strong> ${conflict.newLecture.titleKo}<br>
+                            <span style="color: #666;">룸: ${conflict.newRoom} | 시간: ${conflict.newLecture.startTime} (${conflict.newLecture.duration}분)</span><br>
+                            <strong>기존 강의:</strong> ${conflict.existingLecture.titleKo}<br>
+                            <span style="color: #666;">룸: ${conflict.existingRoom} | 시간: ${conflict.existingTime} (${conflict.existingLecture.duration || 15}분)</span>
+                        </div>
+                    </div>
+                `;
+            } else if (conflict.type === 'panel') {
+                modalHtml += `
+                    <div style="background: #F3E5F5; border-left: 4px solid #7B1FA2; padding: 0.75rem; margin-bottom: 0.75rem; border-radius: 0 8px 8px 0;">
+                        <div style="font-weight: bold; color: #7B1FA2; margin-bottom: 0.5rem;">
+                            #${idx + 1} 📋 Panel Discussion 세션 참여자 충돌
+                        </div>
+                        <div style="font-size: 0.85rem;">
+                            <strong>연자:</strong> ${conflict.speaker}<br>
+                            <strong>업로드 강의:</strong> ${conflict.newLecture.titleKo}<br>
+                            <span style="color: #666;">룸: ${conflict.newRoom} | 시간: ${conflict.newLecture.startTime} (${conflict.newLecture.duration}분)</span><br>
+                            <strong>패널 세션:</strong> ${conflict.sessionName}<br>
+                            <span style="color: #666;">룸: ${conflict.sessionRoom} | 시간: ${conflict.sessionTime} ~ ${conflict.sessionEndTime}</span><br>
+                            <span style="color: #7B1FA2; font-size: 0.8rem;">※ 패널리스트는 세션 전체 시간 동안 참석 필요</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                modalHtml += `
+                    <div style="background: #FFEBEE; border-left: 4px solid #C62828; padding: 0.75rem; margin-bottom: 0.75rem; border-radius: 0 8px 8px 0;">
+                        <div style="font-weight: bold; color: #C62828; margin-bottom: 0.5rem;">
+                            #${idx + 1} 업로드 파일 내 충돌
+                        </div>
+                        <div style="font-size: 0.85rem;">
+                            <strong>연자:</strong> ${conflict.speaker}<br>
+                            <strong>강의 1:</strong> ${conflict.newLecture.titleKo} (${conflict.newLecture.startTime})<br>
+                            <strong>강의 2:</strong> ${conflict.otherLecture.titleKo} (${conflict.otherLecture.startTime})<br>
+                            <span style="color: #666;">같은 연자가 같은 시간대에 두 강의에 배정됨</span>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        
+        modalHtml += `
+                        <div style="margin-top: 1rem; padding: 0.75rem; background: #E8F4FD; border-radius: 8px; font-size: 0.85rem;">
+                            💡 <strong>참고:</strong> 이동 시간 ${AppConfig.SPEAKER_TRANSFER_TIME || 20}분이 고려됩니다. 충돌이 있어도 업로드는 가능하지만, 실제 학회 진행 시 문제가 될 수 있습니다.
+                        </div>
+                    </div>
+                    <div style="padding: 1rem; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                        <button class="btn btn-secondary" onclick="document.getElementById('conflictModal').remove()">닫기</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 기존 모달 제거 후 새로 추가
+        const existingModal = document.getElementById('conflictModal');
+        if (existingModal) existingModal.remove();
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+    
+    // 강의 선택 처리
+    window.setLectureChoice = function(lectureIndex, existingId) {
+        if (pendingScheduleData.lectures[lectureIndex]) {
+            pendingScheduleData.lectures[lectureIndex]._useExisting = existingId;
+        }
+    };
     
     function getSessionColor(index) {
         const colors = ['#9B59B6', '#3498DB', '#E74C3C', '#2ECC71', '#F39C12', '#1ABC9C', '#E91E63', '#00BCD4'];
@@ -629,39 +1085,74 @@
             }
         });
         
+        // 덮어쓰기 옵션 확인
+        const overwriteCheckbox = document.getElementById('scheduleOverwriteCheckbox');
+        const shouldOverwrite = overwriteCheckbox ? overwriteCheckbox.checked : true;
+        
         // 강의 추가 및 배치
         let lectureCount = 0;
         let scheduleCount = 0;
+        let overwriteCount = 0;
+        let reusedCount = 0;
         
         lectures.forEach(lecture => {
-            // 강의 목록에 추가
-            const newLecture = {
-                id: Date.now() + Math.random(),
-                titleKo: lecture.titleKo,
-                titleEn: '',
-                speakerKo: lecture.speakerKo,
-                speakerEn: '',
-                affiliation: lecture.affiliation,
-                company: lecture.company,
-                duration: lecture.duration,
-                category: lecture.category
-            };
+            let lectureToPlace;
             
-            // 중복 체크
-            const exists = AppState.lectures.some(l => 
-                l.titleKo === newLecture.titleKo && l.speakerKo === newLecture.speakerKo
-            );
-            
-            if (!exists) {
-                AppState.lectures.push(newLecture);
-                lectureCount++;
+            // 유사 강의 선택 여부 확인
+            if (lecture._useExisting) {
+                // 기존 강의 사용
+                const existingLecture = AppState.lectures.find(l => String(l.id) === String(lecture._useExisting));
+                if (existingLecture) {
+                    lectureToPlace = { ...existingLecture };
+                    reusedCount++;
+                } else {
+                    // 기존 강의를 찾지 못한 경우 새로 추가
+                    lectureToPlace = createNewLecture(lecture);
+                    AppState.lectures.push(lectureToPlace);
+                    lectureCount++;
+                }
+            } else {
+                // 새 강의 추가
+                lectureToPlace = createNewLecture(lecture);
+                
+                // 중복 체크 (제목+연자)
+                const exists = AppState.lectures.some(l => 
+                    l.titleKo === lectureToPlace.titleKo && l.speakerKo === lectureToPlace.speakerKo
+                );
+                
+                if (!exists) {
+                    AppState.lectures.push(lectureToPlace);
+                    lectureCount++;
+                } else {
+                    // 이미 있는 강의 찾아서 사용
+                    const existingLecture = AppState.lectures.find(l => 
+                        l.titleKo === lectureToPlace.titleKo && l.speakerKo === lectureToPlace.speakerKo
+                    );
+                    if (existingLecture) {
+                        lectureToPlace = { ...existingLecture };
+                    }
+                }
             }
             
             // 시간표에 배치
             const scheduleKey = `${lecture.startTime}-${room}`;
-            if (!AppState.schedule[scheduleKey]) {
+            
+            if (AppState.schedule[scheduleKey]) {
+                // 이미 강의가 있는 경우
+                if (shouldOverwrite) {
+                    // 덮어쓰기
+                    AppState.schedule[scheduleKey] = {
+                        ...lectureToPlace,
+                        time: lecture.startTime,
+                        room: room
+                    };
+                    overwriteCount++;
+                }
+                // 덮어쓰기 옵션이 꺼져있으면 스킵
+            } else {
+                // 새로 배치
                 AppState.schedule[scheduleKey] = {
-                    ...newLecture,
+                    ...lectureToPlace,
                     time: lecture.startTime,
                     room: room
                 };
@@ -675,9 +1166,32 @@
         window.updateScheduleDisplay();
         window.updateLectureList();
         
-        alert(`✅ 업로드 완료!\n\n📌 세션 ${sessionCount}개 추가\n📚 강의 ${lectureCount}개 추가\n📅 시간표 ${scheduleCount}개 배치`);
+        let resultMsg = `✅ 업로드 완료!\n\n📌 세션 ${sessionCount}개 추가\n📚 강의 ${lectureCount}개 새로 추가`;
+        if (reusedCount > 0) {
+            resultMsg += `\n🔗 ${reusedCount}개 기존 강의 재사용`;
+        }
+        resultMsg += `\n📅 시간표 ${scheduleCount}개 배치`;
+        if (overwriteCount > 0) {
+            resultMsg += `\n🔄 ${overwriteCount}개 덮어쓰기`;
+        }
+        alert(resultMsg);
         
         closeScheduleUploadModal();
+    }
+    
+    // 새 강의 객체 생성 헬퍼 함수
+    function createNewLecture(lecture) {
+        return {
+            id: Date.now() + Math.random(),
+            titleKo: lecture.titleKo,
+            titleEn: '',
+            speakerKo: lecture.speakerKo,
+            speakerEn: '',
+            affiliation: lecture.affiliation,
+            company: lecture.company,
+            duration: lecture.duration,
+            category: lecture.category
+        };
     }
     
     // ============================================

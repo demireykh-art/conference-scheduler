@@ -211,6 +211,7 @@ window.performUndo = function() {
     AppState.lectures = previousState.lectures;
 
     saveAndSync();
+    createScheduleTable(); // 세션 변경 시 테이블 재생성 필요
     updateScheduleDisplay();
     updateLectureList();
     updateUndoButton();

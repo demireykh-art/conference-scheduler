@@ -934,7 +934,7 @@ body {
     border-collapse: separate;
     border-spacing: 1px;
     background: var(--border);
-    min-width: max-content;
+    table-layout: fixed;
 }
 
 .schedule-table thead {
@@ -950,7 +950,9 @@ body {
     font-weight: 700;
     text-align: center;
     font-size: 0.8rem;
-    min-width: 130px;
+    width: 150px;
+    min-width: 150px;
+    max-width: 150px;
     position: sticky;
     top: 0;
 }
@@ -996,6 +998,9 @@ body {
     position: relative;
     padding: 0;
     vertical-align: top;
+    width: 150px;
+    min-width: 150px;
+    max-width: 150px;
 }
 
 .schedule-table tbody td.hour-mark {
@@ -1095,6 +1100,9 @@ body {
     position: relative;
     transition: all 0.2s;
     padding: 0;
+    width: 150px;
+    min-width: 150px;
+    max-width: 150px;
 }
 
 .schedule-cell.hour-mark {
