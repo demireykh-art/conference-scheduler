@@ -223,14 +223,19 @@ window.updateScheduleDisplay = function() {
             sessionHeader.className = 'session-header-cell';
             sessionHeader.draggable = true;
             sessionHeader.dataset.sessionId = session.id;
+            sessionHeader.dataset.sessionTime = time;
+            sessionHeader.dataset.sessionRoom = room;
             sessionHeader.style.background = `linear-gradient(135deg, ${session.color} 0%, ${adjustColor(session.color, -20)} 100%)`;
+            sessionHeader.style.userSelect = 'none'; // 텍스트 선택 방지
+            sessionHeader.style.cursor = 'grab';
             sessionHeader.innerHTML = `
-                <span class="session-name" title="${sessionName}">${sessionName}</span>
-                ${moderatorName ? `<span class="session-moderator">${moderatorLabel}${moderatorName}</span>` : ''}
-                <button class="session-remove" onclick="event.stopPropagation(); removeSession('${time}', '${room}')">×</button>
+                <span class="session-name" title="${sessionName}" style="pointer-events: none;">${sessionName}</span>
+                ${moderatorName ? `<span class="session-moderator" style="pointer-events: none;">${moderatorLabel}${moderatorName}</span>` : ''}
+                <button class="session-remove" onclick="event.stopPropagation(); removeSession('${time}', '${room}')" style="pointer-events: auto;">×</button>
             `;
 
-            sessionHeader.addEventListener('dblclick', (e) => {
+            // 클릭으로 수정 (더블클릭 대신 클릭으로 변경)
+            sessionHeader.addEventListener('click', (e) => {
                 if (!e.target.classList.contains('session-remove')) {
                     editCellSession(time, room);
                 }
@@ -240,12 +245,34 @@ window.updateScheduleDisplay = function() {
                 e.stopPropagation();
                 AppState.draggedSession = session;
                 sessionHeader.style.opacity = '0.5';
+                sessionHeader.style.cursor = 'grabbing';
                 e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', session.id); // 데이터 설정 필수
             });
 
-            sessionHeader.addEventListener('dragend', () => {
+            sessionHeader.addEventListener('dragend', (e) => {
+                e.stopPropagation();
                 sessionHeader.style.opacity = '1';
+                sessionHeader.style.cursor = 'grab';
                 AppState.draggedSession = null;
+            });
+            
+            // 마우스 다운 시 커서 변경
+            sessionHeader.addEventListener('mousedown', (e) => {
+                if (!e.target.classList.contains('session-remove')) {
+                    sessionHeader.style.cursor = 'grabbing';
+                }
+            });
+            
+            sessionHeader.addEventListener('mouseup', () => {
+                sessionHeader.style.cursor = 'grab';
+            });
+            
+            // 마우스가 요소를 벗어나도 드래그 유지
+            sessionHeader.addEventListener('mouseleave', () => {
+                if (!AppState.draggedSession) {
+                    sessionHeader.style.cursor = 'grab';
+                }
             });
 
             cell.appendChild(sessionHeader);

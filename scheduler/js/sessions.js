@@ -107,6 +107,28 @@ window.saveCellSession = function() {
         return;
     }
 
+    // 좌장 충돌 체크 - 좌장이 해당 시간에 다른 룸에서 강의가 있는지 확인
+    if (moderator) {
+        const moderatorConflict = checkModeratorHasLecture(moderator, time, room, duration);
+        if (moderatorConflict.hasConflict) {
+            const proceed = confirm(
+                `⚠️ 좌장 시간 충돌!\n\n` +
+                `좌장: ${moderator}\n\n` +
+                `이 좌장은 다른 룸에서 강의가 배치되어 있습니다.\n\n` +
+                `📋 강의 정보:\n` +
+                `제목: "${moderatorConflict.lecture.titleKo}"\n` +
+                `룸: ${moderatorConflict.room}\n` +
+                `시간: ${moderatorConflict.time} ~ ${moderatorConflict.endTime}\n\n` +
+                `⏱️ 다른 룸 간 이동시간 최소 ${AppConfig.SPEAKER_TRANSFER_TIME}분 필요\n\n` +
+                `그래도 이 좌장을 지정하시겠습니까?`
+            );
+            if (!proceed) {
+                document.getElementById('cellSessionModerator').focus();
+                return;
+            }
+        }
+    }
+
     // 좌장이 입력된 경우 연자 목록에서 영문명 찾기
     let finalModeratorEn = moderatorEn;
     if (moderator && !moderatorEn) {
@@ -145,6 +167,49 @@ window.saveCellSession = function() {
     saveAndSync();
     updateScheduleDisplay();
     closeCellSessionModal();
+};
+
+/**
+ * 좌장이 해당 시간에 다른 룸에서 강의가 있는지 체크
+ */
+window.checkModeratorHasLecture = function(moderatorName, sessionTime, sessionRoom, sessionDuration) {
+    if (!moderatorName) return { hasConflict: false };
+    
+    const sessionStartMin = timeToMinutes(sessionTime);
+    const sessionEndMin = sessionDuration > 0 ? sessionStartMin + sessionDuration : sessionStartMin + 60; // 기본 60분
+    
+    // 모든 배치된 강의 확인
+    for (const [scheduleKey, lecture] of Object.entries(AppState.schedule)) {
+        const speakerName = (lecture.speakerKo || '').trim();
+        if (!speakerName || speakerName !== moderatorName) continue;
+        
+        const [lectureTime, lectureRoom] = [scheduleKey.substring(0, 5), scheduleKey.substring(6)];
+        
+        // 같은 룸이면 스킵 (같은 룸에서는 좌장이 강의 가능)
+        if (lectureRoom === sessionRoom) continue;
+        
+        const lectureDuration = lecture.duration || 15;
+        const lectureStartMin = timeToMinutes(lectureTime);
+        const lectureEndMin = lectureStartMin + lectureDuration;
+        
+        // 이동 시간 포함 충돌 체크
+        const gapAfterLecture = sessionStartMin - lectureEndMin;
+        const gapBeforeLecture = lectureStartMin - sessionEndMin;
+        
+        if (gapAfterLecture < AppConfig.SPEAKER_TRANSFER_TIME && gapBeforeLecture < AppConfig.SPEAKER_TRANSFER_TIME) {
+            const lectureEndTime = `${Math.floor(lectureEndMin / 60).toString().padStart(2, '0')}:${(lectureEndMin % 60).toString().padStart(2, '0')}`;
+            
+            return {
+                hasConflict: true,
+                lecture: lecture,
+                room: lectureRoom,
+                time: lectureTime,
+                endTime: lectureEndTime
+            };
+        }
+    }
+    
+    return { hasConflict: false };
 };
 
 /**
