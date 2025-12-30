@@ -53,7 +53,6 @@ window.calculateSpeakerExpertise = function(speakerName) {
             }
         });
     });
-    });
     
     // 빈도순으로 정렬하여 반환
     return Object.entries(tagCounts)
