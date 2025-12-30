@@ -349,8 +349,13 @@ window.deleteSpeaker = function(event, index) {
  * 연자 수정
  */
 window.editSpeaker = function(event, index) {
-    event.stopPropagation();
+    if (event) event.stopPropagation();
+    
     const speaker = AppState.speakers[index];
+    if (!speaker) {
+        console.error('연자를 찾을 수 없습니다:', index);
+        return;
+    }
 
     document.getElementById('editSpeakerIndex').value = index;
     document.getElementById('editSpeakerNameField').value = speaker.name;
@@ -365,8 +370,14 @@ window.editSpeaker = function(event, index) {
     }
     
     // 전문 분야 태그 (자동 계산된 것 또는 저장된 것)
-    const expertiseTags = speaker.expertiseTags || calculateSpeakerExpertise(speaker.name);
-    updateExpertiseTagsDisplay(expertiseTags);
+    try {
+        const expertiseTags = speaker.expertiseTags || calculateSpeakerExpertise(speaker.name);
+        updateExpertiseTagsDisplay(expertiseTags);
+    } catch (e) {
+        console.error('전문 분야 태그 로드 오류:', e);
+        const container = document.getElementById('expertiseTagsContainer');
+        if (container) container.innerHTML = '';
+    }
 
     document.getElementById('editSpeakerModal').classList.add('active');
 };
@@ -378,7 +389,14 @@ window.updateExpertiseTagsDisplay = function(selectedTags = []) {
     const container = document.getElementById('expertiseTagsContainer');
     if (!container) return;
     
-    container.innerHTML = EXPERTISE_TAGS.map(tag => {
+    const tags = getExpertiseTags();
+    
+    if (!tags || tags.length === 0) {
+        container.innerHTML = '<span style="color: #999; font-size: 0.75rem;">분류가 없습니다. 분류 관리에서 추가하세요.</span>';
+        return;
+    }
+    
+    container.innerHTML = tags.map(tag => {
         const isSelected = selectedTags.includes(tag);
         const color = AppConfig.categoryColors[tag] || '#757575';
         return `
