@@ -353,7 +353,7 @@ window.updateScheduleDisplay = function() {
             lectureDiv.style.borderLeft = `4px solid ${color}`;
         }
 
-        const cellHeight = 20;
+        const cellHeight = 30;
         const totalHeight = slotsSpan * cellHeight;
         // 세션 헤더가 있으면 강의를 아래로 내리고 높이 조정
         lectureDiv.style.height = `${totalHeight - sessionHeaderHeight}px`;
