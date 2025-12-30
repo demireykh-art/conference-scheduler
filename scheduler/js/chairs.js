@@ -3,38 +3,49 @@
  */
 
 /**
- * 전문 분야 태그 목록 (카테고리 기반)
+ * 전문 분야 태그 목록 가져오기 (분류 관리와 연동)
+ * Break 타입 제외한 모든 카테고리 반환
  */
-window.EXPERTISE_TAGS = [
-    'Injectables',
-    'Laser & EBDs',
-    'Bio-Stimulators',
-    'Aesthetic Devices',
-    'Lifting Devices',
-    'Body Contouring',
-    'Regeneratives',
-    'Threads',
-    'Dermatology',
-    'Hair',
-    'Stem Cell & Functional',
-    'Anatomy',
-    'International Faculty & Global Trends',
-    'ASLS',
-    'Management & Marketing'
-];
+window.getExpertiseTags = function() {
+    // Break 타입 (전문분야에서 제외)
+    const excludeTypes = AppConfig.BREAK_TYPES || ['Coffee Break', 'Lunch', 'Opening/Closing', 'Panel Discussion'];
+    // 추가로 제외할 타입
+    const additionalExclude = ['Luncheon', 'Others', 'Other Solutions'];
+    const allExclude = [...excludeTypes, ...additionalExclude];
+    
+    // AppState.categories에서 Break 타입 제외
+    if (AppState.categories && AppState.categories.length > 0) {
+        return AppState.categories.filter(cat => !allExclude.includes(cat));
+    }
+    
+    // fallback: AppConfig.categoryColors의 키에서 가져오기
+    if (AppConfig.categoryColors) {
+        return Object.keys(AppConfig.categoryColors).filter(cat => !allExclude.includes(cat));
+    }
+    
+    return [];
+};
+
+// 하위 호환성을 위한 getter (기존 코드에서 EXPERTISE_TAGS 사용 시)
+Object.defineProperty(window, 'EXPERTISE_TAGS', {
+    get: function() {
+        return getExpertiseTags();
+    }
+});
 
 /**
  * 연자의 전문 분야 태그 자동 계산 (기존 강의 기반)
  */
 window.calculateSpeakerExpertise = function(speakerName) {
     const tagCounts = {};
+    const validTags = getExpertiseTags();
     
     // 모든 날짜의 강의에서 해당 연자의 카테고리 집계
     Object.values(AppState.dataByDate || {}).forEach(dateData => {
         (dateData.lectures || []).forEach(lecture => {
             if ((lecture.speakerKo || '') === speakerName && lecture.category) {
                 const cat = lecture.category;
-                if (EXPERTISE_TAGS.includes(cat)) {
+                if (validTags.includes(cat)) {
                     tagCounts[cat] = (tagCounts[cat] || 0) + 1;
                 }
             }
@@ -43,11 +54,12 @@ window.calculateSpeakerExpertise = function(speakerName) {
         Object.values(dateData.schedule || {}).forEach(lecture => {
             if ((lecture.speakerKo || '') === speakerName && lecture.category) {
                 const cat = lecture.category;
-                if (EXPERTISE_TAGS.includes(cat)) {
+                if (validTags.includes(cat)) {
                     tagCounts[cat] = (tagCounts[cat] || 0) + 1;
                 }
             }
         });
+    });
     });
     
     // 빈도순으로 정렬하여 반환
