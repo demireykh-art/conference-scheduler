@@ -390,6 +390,12 @@
                     <input type="text" id="newSpeakerAffiliation" placeholder="소속 (한글)">
                     <input type="text" id="newSpeakerAffiliationEn" placeholder="소속 (영문)">
                 </div>
+                <div style="margin-top: 0.5rem;">
+                    <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="newSpeakerASLS" style="width: 18px; height: 18px; accent-color: #8E24AA;">
+                        <span style="color: #8E24AA; font-weight: bold; font-size: 0.85rem;">🏅 ASLS 학회 멤버</span>
+                    </label>
+                </div>
                 <button class="btn btn-primary" onclick="addSpeaker()" style="margin-top: 0.5rem; width: 100%;">추가</button>
             </div>
 
@@ -495,7 +501,7 @@
 
     <!-- 세션 추가/수정 모달 -->
     <div class="modal" id="cellSessionModal">
-        <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-content" style="max-width: 550px;">
             <div class="modal-header">
                 <h2 id="cellSessionModalTitle">📋 세션/런치 추가</h2>
                 <button class="modal-close" onclick="closeCellSessionModal()">×</button>
@@ -526,15 +532,36 @@
                     <input type="text" id="cellSessionNameEn" placeholder="예: Latest Trends in Laser Treatment">
                 </div>
                 
-                <div class="form-group">
-                    <label>좌장 (한글)</label>
-                    <input type="text" id="cellSessionModerator" placeholder="연자명 입력" list="moderatorSuggestions">
-                    <datalist id="moderatorSuggestions"></datalist>
+                <!-- 세션 내 강의 분류 태그 표시 -->
+                <div class="form-group" style="background: #f8f9fa; padding: 0.75rem; border-radius: 8px; border: 1px dashed #ddd;">
+                    <label style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem; display: block;">
+                        📊 세션 내 강의 분류
+                    </label>
+                    <div id="sessionTagsDisplay">
+                        <span style="color: #999; font-size: 0.75rem;">배치된 강의가 없습니다</span>
+                    </div>
                 </div>
                 
-                <div class="form-group">
-                    <label>좌장 (영문)</label>
-                    <input type="text" id="cellSessionModeratorEn" placeholder="Chair name in English">
+                <!-- 좌장 선택 영역 -->
+                <div class="form-group" style="border: 2px solid #e3f2fd; border-radius: 8px; padding: 0.75rem; background: #fafafa;">
+                    <label style="font-weight: bold; color: var(--primary); margin-bottom: 0.5rem; display: block;">
+                        👤 좌장 선택
+                    </label>
+                    
+                    <div class="form-row" style="margin-bottom: 0.75rem;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <input type="text" id="cellSessionModerator" placeholder="좌장명 (한글)" list="moderatorSuggestions">
+                            <datalist id="moderatorSuggestions"></datalist>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <input type="text" id="cellSessionModeratorEn" placeholder="좌장명 (영문)">
+                        </div>
+                    </div>
+                    
+                    <!-- 좌장 추천 목록 -->
+                    <div id="moderatorRecommendations" style="border-top: 1px dashed #ddd; padding-top: 0.75rem; margin-top: 0.5rem;">
+                        <!-- JS에서 동적 생성 -->
+                    </div>
                 </div>
                 
                 <div class="form-row">
@@ -572,7 +599,7 @@
 
     <!-- 연자 수정 모달 -->
     <div class="modal" id="editSpeakerModal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
                 <h2>✏️ 연자 정보 수정</h2>
                 <button class="modal-close" onclick="closeEditSpeakerModal()">×</button>
@@ -580,23 +607,48 @@
             
             <form class="lecture-form" onsubmit="return false;">
                 <input type="hidden" id="editSpeakerIndex">
-                <div class="form-group">
-                    <label>연자명 (한글)</label>
-                    <input type="text" id="editSpeakerNameField" required>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>연자명 (한글)</label>
+                        <input type="text" id="editSpeakerNameField" required>
+                    </div>
+                    <div class="form-group">
+                        <label>연자명 (영문)</label>
+                        <input type="text" id="editSpeakerNameEnField">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>연자명 (영문)</label>
-                    <input type="text" id="editSpeakerNameEnField">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>소속 (한글)</label>
+                        <input type="text" id="editSpeakerAffiliationField" required>
+                    </div>
+                    <div class="form-group">
+                        <label>소속 (영문)</label>
+                        <input type="text" id="editSpeakerAffiliationEnField">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>소속 (한글)</label>
-                    <input type="text" id="editSpeakerAffiliationField" required>
+                
+                <!-- ASLS 멤버 체크박스 -->
+                <div class="form-group" style="border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-top: 0.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="editSpeakerASLS" style="width: 18px; height: 18px; accent-color: #8E24AA;">
+                        <span style="color: #8E24AA; font-weight: bold;">🏅 ASLS 학회 멤버</span>
+                    </label>
+                    <small style="color: #666; display: block; margin-top: 0.3rem;">학회 멤버는 좌장 추천 시 우선 표시됩니다.</small>
                 </div>
-                <div class="form-group">
-                    <label>소속 (영문)</label>
-                    <input type="text" id="editSpeakerAffiliationEnField">
+                
+                <!-- 전문 분야 태그 -->
+                <div class="form-group" style="border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-top: 0.5rem;">
+                    <label style="margin-bottom: 0.5rem; display: block;">
+                        🏷️ 전문 분야 (해당 분야 모두 선택)
+                    </label>
+                    <small style="color: #666; display: block; margin-bottom: 0.5rem;">강의 이력 기반으로 자동 계산되며, 수동으로 수정할 수 있습니다.</small>
+                    <div id="expertiseTagsContainer" style="display: flex; flex-wrap: wrap; gap: 0.2rem;">
+                        <!-- JS에서 동적 생성 -->
+                    </div>
                 </div>
-                <button type="button" class="btn btn-primary" onclick="saveEditedSpeaker()">저장</button>
+                
+                <button type="button" class="btn btn-primary" onclick="saveEditedSpeaker()" style="width: 100%; margin-top: 1rem;">저장</button>
             </form>
         </div>
     </div>
