@@ -218,6 +218,25 @@ window.updateScheduleDisplay = function() {
             const sessionName = AppState.currentLanguage === 'en' && session.nameEn ? session.nameEn : session.name;
             const moderatorLabel = AppState.currentLanguage === 'en' ? 'Chair: ' : '좌장: ';
             const moderatorName = AppState.currentLanguage === 'en' && session.moderatorEn ? session.moderatorEn : session.moderator;
+            
+            // 세션 내 강의 분류 태그 계산
+            const sessionDuration = session.duration || 60;
+            const sessionTags = typeof getSessionCategoryTags === 'function' 
+                ? getSessionCategoryTags(time, room, sessionDuration) 
+                : [];
+            
+            // 태그 HTML 생성 (최대 3개)
+            let tagsHtml = '';
+            if (sessionTags.length > 0) {
+                const displayTags = sessionTags.slice(0, 3);
+                tagsHtml = '<div class="session-tags" style="display: flex; gap: 2px; flex-wrap: wrap; margin-top: 2px;">' +
+                    displayTags.map(tag => {
+                        const shortTag = tag.length > 10 ? tag.substring(0, 8) + '..' : tag;
+                        return `<span style="background: rgba(255,255,255,0.3); padding: 1px 4px; border-radius: 3px; font-size: 0.6rem; white-space: nowrap;">${shortTag}</span>`;
+                    }).join('') +
+                    (sessionTags.length > 3 ? `<span style="font-size: 0.6rem; opacity: 0.8;">+${sessionTags.length - 3}</span>` : '') +
+                    '</div>';
+            }
 
             const sessionHeader = document.createElement('div');
             sessionHeader.className = 'session-header-cell';
@@ -231,6 +250,7 @@ window.updateScheduleDisplay = function() {
             sessionHeader.innerHTML = `
                 <span class="session-name" title="${sessionName}" style="pointer-events: none;">${sessionName}</span>
                 ${moderatorName ? `<span class="session-moderator" style="pointer-events: none;">${moderatorLabel}${moderatorName}</span>` : ''}
+                ${tagsHtml}
                 <button class="session-remove" onclick="event.stopPropagation(); removeSession('${time}', '${room}')" style="pointer-events: auto;">×</button>
             `;
 

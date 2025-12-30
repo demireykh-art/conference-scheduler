@@ -49,12 +49,179 @@ window.openCellSessionModal = function(time, room) {
         btn.classList.toggle('selected', btn.dataset.color === defaultColor);
     });
 
-    // 좌장 추천 목록 채우기
-    const datalist = document.getElementById('moderatorSuggestions');
-    datalist.innerHTML = AppState.speakers.map(s => `<option value="${s.name}">`).join('');
+    // 세션의 카테고리 태그 계산 및 표시
+    const duration = existingSession?.duration || 60;
+    const sessionTags = getSessionCategoryTags(time, room, duration);
+    updateSessionTagsDisplay(sessionTags);
+    
+    // 좌장 스마트 추천 초기화
+    initModeratorSmartSearch(sessionTags);
 
     document.getElementById('cellSessionModal').classList.add('active');
     document.getElementById('cellSessionName').focus();
+};
+
+/**
+ * 세션 카테고리 태그 표시
+ */
+window.updateSessionTagsDisplay = function(tags) {
+    const container = document.getElementById('sessionTagsDisplay');
+    if (!container) return;
+    
+    if (tags.length === 0) {
+        container.innerHTML = '<span style="color: #999; font-size: 0.75rem;">배치된 강의가 없습니다</span>';
+        return;
+    }
+    
+    container.innerHTML = tags.map(tag => {
+        const color = AppConfig.categoryColors[tag] || '#757575';
+        return `<span style="background: ${color}; color: white; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.7rem; margin-right: 0.3rem;">${tag}</span>`;
+    }).join('');
+};
+
+/**
+ * 좌장 스마트 검색 초기화
+ */
+window.initModeratorSmartSearch = function(sessionTags) {
+    const moderatorInput = document.getElementById('cellSessionModerator');
+    const recommendContainer = document.getElementById('moderatorRecommendations');
+    
+    if (!recommendContainer) return;
+    
+    // 추천 목록 생성
+    const recommendations = getModeratorRecommendations(sessionTags);
+    
+    // 매칭되는 연자 (점수 > 0)
+    const matched = recommendations.filter(r => r.matchScore > 0);
+    // ASLS 멤버 (매칭되지 않은 것 중)
+    const aslsOnly = recommendations.filter(r => r.matchScore === 0 && r.isASLS);
+    
+    let html = '';
+    
+    if (matched.length > 0) {
+        html += `<div class="recommend-section">
+            <div class="recommend-header" style="font-weight: bold; font-size: 0.75rem; color: #4CAF50; margin-bottom: 0.5rem;">
+                ✅ 세션 분야 매칭 (${matched.length}명)
+            </div>
+            <div class="recommend-list" style="max-height: 150px; overflow-y: auto;">
+                ${matched.slice(0, 10).map(r => createModeratorRecommendItem(r)).join('')}
+            </div>
+        </div>`;
+    }
+    
+    if (aslsOnly.length > 0) {
+        html += `<div class="recommend-section" style="margin-top: 0.75rem;">
+            <div class="recommend-header" style="font-weight: bold; font-size: 0.75rem; color: #8E24AA; margin-bottom: 0.5rem;">
+                🏅 ASLS 학회 멤버 (${aslsOnly.length}명)
+            </div>
+            <div class="recommend-list" style="max-height: 100px; overflow-y: auto;">
+                ${aslsOnly.slice(0, 5).map(r => createModeratorRecommendItem(r)).join('')}
+            </div>
+        </div>`;
+    }
+    
+    // 전체 목록 보기 버튼
+    html += `<div style="margin-top: 0.75rem; text-align: center;">
+        <button type="button" class="btn btn-secondary btn-small" onclick="showAllModerators()" style="font-size: 0.75rem;">
+            📋 전체 연자 목록 보기 (${AppState.speakers.length}명)
+        </button>
+    </div>`;
+    
+    recommendContainer.innerHTML = html;
+    
+    // 기존 datalist도 유지 (수동 입력용)
+    const datalist = document.getElementById('moderatorSuggestions');
+    datalist.innerHTML = AppState.speakers.map(s => `<option value="${s.name}">`).join('');
+};
+
+/**
+ * 좌장 추천 아이템 생성
+ */
+window.createModeratorRecommendItem = function(recommendation) {
+    const { speaker, isASLS, matchedTags } = recommendation;
+    const aslsBadge = isASLS ? '<span style="background:#8E24AA; color:white; padding:0.1rem 0.3rem; border-radius:3px; font-size:0.6rem; margin-left:0.3rem;">ASLS</span>' : '';
+    
+    const tagsHtml = matchedTags.length > 0 
+        ? matchedTags.map(tag => {
+            const color = AppConfig.categoryColors[tag] || '#757575';
+            return `<span style="background:${color}22; color:${color}; padding:0.1rem 0.3rem; border-radius:3px; font-size:0.6rem; border:1px solid ${color}44;">${tag}</span>`;
+        }).join(' ')
+        : '';
+    
+    return `
+        <div class="moderator-recommend-item" 
+             onclick="selectModerator('${speaker.name}', '${speaker.nameEn || ''}')"
+             style="padding: 0.5rem; border: 1px solid #eee; border-radius: 6px; margin-bottom: 0.4rem; cursor: pointer; background: #fafafa;"
+             onmouseover="this.style.background='#e3f2fd'" 
+             onmouseout="this.style.background='#fafafa'">
+            <div style="font-weight: bold; font-size: 0.85rem;">
+                ${speaker.name}${aslsBadge}
+            </div>
+            <div style="font-size: 0.7rem; color: #666;">${speaker.affiliation}</div>
+            ${tagsHtml ? `<div style="margin-top: 0.3rem;">${tagsHtml}</div>` : ''}
+        </div>
+    `;
+};
+
+/**
+ * 좌장 선택
+ */
+window.selectModerator = function(name, nameEn) {
+    document.getElementById('cellSessionModerator').value = name;
+    document.getElementById('cellSessionModeratorEn').value = nameEn || '';
+};
+
+/**
+ * 전체 연자 목록 모달 표시
+ */
+window.showAllModerators = function() {
+    const container = document.getElementById('moderatorRecommendations');
+    
+    // 검색 입력 + 전체 목록
+    let html = `
+        <div style="margin-bottom: 0.75rem;">
+            <input type="text" id="moderatorSearchInput" placeholder="🔍 연자 검색..." 
+                   oninput="filterModeratorList(this.value)"
+                   style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.85rem;">
+        </div>
+        <div id="moderatorFullList" style="max-height: 250px; overflow-y: auto;">
+            ${AppState.speakers.map(s => {
+                const isASLS = s.isASLSMember;
+                const aslsBadge = isASLS ? '<span style="background:#8E24AA; color:white; padding:0.1rem 0.3rem; border-radius:3px; font-size:0.6rem; margin-left:0.3rem;">ASLS</span>' : '';
+                return `
+                    <div class="moderator-list-item" data-name="${s.name.toLowerCase()}" data-affiliation="${s.affiliation.toLowerCase()}"
+                         onclick="selectModerator('${s.name}', '${s.nameEn || ''}')"
+                         style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #eee; cursor: pointer;"
+                         onmouseover="this.style.background='#e3f2fd'" 
+                         onmouseout="this.style.background='transparent'">
+                        <span style="font-weight: bold;">${s.name}</span>${aslsBadge}
+                        <span style="color: #666; font-size: 0.75rem; margin-left: 0.5rem;">${s.affiliation}</span>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+        <div style="margin-top: 0.75rem; text-align: center;">
+            <button type="button" class="btn btn-secondary btn-small" onclick="initModeratorSmartSearch([])" style="font-size: 0.75rem;">
+                ← 추천 목록으로 돌아가기
+            </button>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+    document.getElementById('moderatorSearchInput').focus();
+};
+
+/**
+ * 좌장 목록 필터링
+ */
+window.filterModeratorList = function(searchTerm) {
+    const term = searchTerm.toLowerCase();
+    document.querySelectorAll('#moderatorFullList .moderator-list-item').forEach(item => {
+        const name = item.dataset.name;
+        const affiliation = item.dataset.affiliation;
+        const match = name.includes(term) || affiliation.includes(term);
+        item.style.display = match ? '' : 'none';
+    });
 };
 
 /**
