@@ -225,16 +225,16 @@ window.updateScheduleDisplay = function() {
                 ? getSessionCategoryTags(time, room, sessionDuration) 
                 : [];
             
-            // 태그 HTML 생성 (최대 3개)
+            // 태그 HTML 생성 (최대 3개) - 우측 정렬, 글자 크기 절반
             let tagsHtml = '';
             if (sessionTags.length > 0) {
                 const displayTags = sessionTags.slice(0, 3);
-                tagsHtml = '<div class="session-tags" style="display: flex; gap: 2px; flex-wrap: wrap; margin-top: 2px;">' +
+                tagsHtml = '<div class="session-tags" style="display: flex; gap: 2px; flex-wrap: wrap; justify-content: flex-end; align-items: center;">' +
                     displayTags.map(tag => {
-                        const shortTag = tag.length > 10 ? tag.substring(0, 8) + '..' : tag;
-                        return `<span style="background: rgba(255,255,255,0.3); padding: 1px 4px; border-radius: 3px; font-size: 0.6rem; white-space: nowrap;">${shortTag}</span>`;
+                        const shortTag = tag.length > 8 ? tag.substring(0, 6) + '..' : tag;
+                        return `<span style="background: rgba(255,255,255,0.3); padding: 1px 3px; border-radius: 2px; font-size: 0.5rem; white-space: nowrap;">${shortTag}</span>`;
                     }).join('') +
-                    (sessionTags.length > 3 ? `<span style="font-size: 0.6rem; opacity: 0.8;">+${sessionTags.length - 3}</span>` : '') +
+                    (sessionTags.length > 3 ? `<span style="font-size: 0.5rem; opacity: 0.8;">+${sessionTags.length - 3}</span>` : '') +
                     '</div>';
             }
 
@@ -248,9 +248,13 @@ window.updateScheduleDisplay = function() {
             sessionHeader.style.userSelect = 'none'; // 텍스트 선택 방지
             sessionHeader.style.cursor = 'grab';
             sessionHeader.innerHTML = `
-                <span class="session-name" title="${sessionName}" style="pointer-events: none;">${sessionName}</span>
-                ${moderatorName ? `<span class="session-moderator" style="pointer-events: none;">${moderatorLabel}${moderatorName}</span>` : ''}
-                ${tagsHtml}
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; padding-right: 20px;">
+                    <div style="flex: 1; min-width: 0; text-align: left;">
+                        <span class="session-name" title="${sessionName}" style="pointer-events: none; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${sessionName}</span>
+                        ${moderatorName ? `<span class="session-moderator" style="pointer-events: none; font-size: 0.65rem; opacity: 0.9;">${moderatorLabel}${moderatorName}</span>` : ''}
+                    </div>
+                    ${tagsHtml}
+                </div>
                 <button class="session-remove" onclick="event.stopPropagation(); removeSession('${time}', '${room}')" style="pointer-events: auto;">×</button>
             `;
 
@@ -1136,5 +1140,33 @@ function getSessionPanelInfoForConflict(panelTime, room, session) {
 }
 
 // 다이얼로그 함수들은 modals.js에서 정의됨
+
+/**
+ * 룸 순서 이동
+ */
+window.moveRoom = function(roomIndex, direction) {
+    const targetIndex = direction === 'left' ? roomIndex - 1 : roomIndex + 1;
+    
+    // 범위 체크
+    if (targetIndex < 0 || targetIndex >= AppState.rooms.length) {
+        return;
+    }
+    
+    saveStateForUndo();
+    
+    const currentRoom = AppState.rooms[roomIndex];
+    const targetRoom = AppState.rooms[targetIndex];
+    
+    // 룸 배열에서 위치 교환
+    AppState.rooms[roomIndex] = targetRoom;
+    AppState.rooms[targetIndex] = currentRoom;
+    
+    // 저장 및 UI 업데이트
+    saveRoomsToStorage();
+    createScheduleTable();
+    updateScheduleDisplay();
+    
+    console.log(`룸 이동: ${currentRoom} ↔ ${targetRoom}`);
+};
 
 console.log('✅ schedule.js 로드 완료');

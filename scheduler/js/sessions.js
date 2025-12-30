@@ -30,7 +30,9 @@ window.openCellSessionModal = function(time, room) {
     document.getElementById('cellSessionId').value = existingSession ? existingSession.id : '';
     document.getElementById('cellSessionName').value = existingSession ? existingSession.name : '';
     document.getElementById('cellSessionNameEn').value = existingSession ? existingSession.nameEn : '';
-    document.getElementById('cellSessionModerator').value = existingSession ? existingSession.moderator : '';
+    
+    // 좌장 드롭다운 채우기 (가나다순 정렬)
+    populateModeratorDropdown(existingSession ? existingSession.moderator : '');
     document.getElementById('cellSessionModeratorEn').value = existingSession ? existingSession.moderatorEn : '';
     
     // 세션 시간 초기화
@@ -59,6 +61,36 @@ window.openCellSessionModal = function(time, room) {
 
     document.getElementById('cellSessionModal').classList.add('active');
     document.getElementById('cellSessionName').focus();
+};
+
+/**
+ * 좌장 드롭다운 채우기 (가나다순 정렬)
+ */
+window.populateModeratorDropdown = function(selectedValue = '') {
+    const select = document.getElementById('cellSessionModerator');
+    if (!select) return;
+    
+    // 가나다순 정렬
+    const sortedSpeakers = [...AppState.speakers].sort((a, b) => 
+        a.name.localeCompare(b.name, 'ko')
+    );
+    
+    // 옵션 생성
+    let options = '<option value="">-- 좌장 선택 --</option>';
+    sortedSpeakers.forEach(speaker => {
+        const isASLS = speaker.isASLSMember ? ' [ASLS]' : '';
+        const selected = speaker.name === selectedValue ? 'selected' : '';
+        options += `<option value="${speaker.name}" data-name-en="${speaker.nameEn || ''}" ${selected}>${speaker.name}${isASLS} (${speaker.affiliation})</option>`;
+    });
+    
+    select.innerHTML = options;
+    
+    // 선택 변경 시 영문명 자동 채우기
+    select.onchange = function() {
+        const selectedOption = this.options[this.selectedIndex];
+        const nameEn = selectedOption.dataset.nameEn || '';
+        document.getElementById('cellSessionModeratorEn').value = nameEn;
+    };
 };
 
 /**
@@ -164,10 +196,18 @@ window.createModeratorRecommendItem = function(recommendation) {
 };
 
 /**
- * 좌장 선택
+ * 좌장 선택 (드롭다운 및 추천 목록에서 선택 시)
  */
 window.selectModerator = function(name, nameEn) {
-    document.getElementById('cellSessionModerator').value = name;
+    const select = document.getElementById('cellSessionModerator');
+    
+    // 드롭다운에서 해당 값 선택
+    if (select.tagName === 'SELECT') {
+        select.value = name;
+    } else {
+        select.value = name;
+    }
+    
     document.getElementById('cellSessionModeratorEn').value = nameEn || '';
 };
 
