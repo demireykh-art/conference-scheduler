@@ -950,9 +950,9 @@ body {
     font-weight: 700;
     text-align: center;
     font-size: 0.8rem;
-    width: 150px;
-    min-width: 150px;
-    max-width: 150px;
+    width: 225px;
+    min-width: 225px;
+    max-width: 225px;
     position: sticky;
     top: 0;
 }
@@ -961,7 +961,7 @@ body {
     position: sticky;
     left: 0;
     z-index: 200;
-    min-width: 55px;
+    min-width: 80px;
 }
 
 .schedule-table tbody td:first-child {
@@ -969,7 +969,7 @@ body {
     left: 0;
     z-index: 50;
     background: var(--bg);
-    min-width: 55px;
+    min-width: 80px;
     font-size: 0.75rem;
     font-weight: 600;
     text-align: right;
@@ -993,14 +993,14 @@ body {
 
 .schedule-table tbody td {
     background: var(--white);
-    min-height: 20px;
-    height: 20px;
+    min-height: 30px;
+    height: 30px;
     position: relative;
     padding: 0;
     vertical-align: top;
-    width: 150px;
-    min-width: 150px;
-    max-width: 150px;
+    width: 225px;
+    min-width: 225px;
+    max-width: 225px;
 }
 
 .schedule-table tbody td.hour-mark {
@@ -1053,9 +1053,9 @@ body {
     text-align: right;
     color: var(--text-light);
     position: relative;
-    min-width: 55px;
-    min-height: 20px;
-    height: 20px;
+    min-width: 80px;
+    min-height: 30px;
+    height: 30px;
     display: flex;
     align-items: flex-start;
     justify-content: flex-end;
@@ -1095,14 +1095,14 @@ body {
 
 .schedule-cell {
     background: var(--white);
-    min-height: 20px;
-    height: 20px;
+    min-height: 30px;
+    height: 30px;
     position: relative;
     transition: all 0.2s;
     padding: 0;
-    width: 150px;
-    min-width: 150px;
-    max-width: 150px;
+    width: 225px;
+    min-width: 225px;
+    max-width: 225px;
 }
 
 .schedule-cell.hour-mark {
