@@ -648,7 +648,10 @@ window.handleDrop = function(e) {
             const speakerConflict = checkSpeakerConflict(time, room, AppState.draggedLecture, AppState.draggedScheduleKey);
             if (speakerConflict.hasConflict) {
                 let alertMessage;
-                if (speakerConflict.isPanelConflict) {
+                if (speakerConflict.conflictType === 'moderator') {
+                    // 좌장 충돌
+                    alertMessage = `⚠️ 좌장 시간 충돌!\n\n연자: ${speakerConflict.speakerName}\n\n이 연자는 "${speakerConflict.sessionName}" 세션의 좌장입니다.\n\n📋 세션 정보:\n룸: ${speakerConflict.conflictRoom}\n시간: ${speakerConflict.conflictTime} ~ ${speakerConflict.conflictEndTime}\n\n❌ 배치하려는 시간: ${time} ~ ${speakerConflict.targetEndTime}\n룸: ${room}\n\n💡 좌장은 해당 세션 시간 동안 다른 룸에서 강의할 수 없습니다.\n⏱️ 다른 룸 간 이동시간 최소 ${AppConfig.SPEAKER_TRANSFER_TIME}분 필요\n\n다른 시간대를 선택해주세요.`;
+                } else if (speakerConflict.isPanelConflict) {
                     // Panel Discussion 세션 충돌
                     alertMessage = `⚠️ Panel Discussion 세션 참여자 충돌!\n\n연자: ${speakerConflict.speakerName}\n\n이 연자는 "${speakerConflict.sessionName}" 세션의 패널리스트입니다.\n\n📋 세션 정보:\n룸: ${speakerConflict.conflictRoom}\n시간: ${speakerConflict.conflictTime} ~ ${speakerConflict.conflictEndTime}\n\n❌ 배치하려는 시간: ${time} ~ ${speakerConflict.targetEndTime}\n룸: ${room}\n\n💡 패널리스트는 해당 세션 전체 시간 동안 다른 룸에서 강의할 수 없습니다.\n\n다른 시간대를 선택해주세요.`;
                 } else {
@@ -819,7 +822,13 @@ window.checkSpeakerConflict = function(targetTime, targetRoom, lecture, excludeK
         }
     }
 
-    // 2. Panel Discussion 세션과의 충돌 체크
+    // 2. 좌장 충돌 체크 (연자가 다른 세션의 좌장인 경우)
+    const moderatorConflict = checkModeratorConflict(targetTime, targetRoom, { speakerKo: speakerName, duration: targetDuration }, excludeKey);
+    if (moderatorConflict.hasConflict) {
+        return moderatorConflict;
+    }
+
+    // 3. Panel Discussion 세션과의 충돌 체크
     const panelConflict = checkPanelSessionConflict(targetTime, targetRoom, targetDuration, speakerName, excludeKey);
     if (panelConflict.hasConflict) {
         return panelConflict;
@@ -827,6 +836,104 @@ window.checkSpeakerConflict = function(targetTime, targetRoom, lecture, excludeK
 
     return { hasConflict: false };
 };
+
+/**
+ * 좌장 충돌 체크
+ * 세션에 좌장으로 배정된 사람은 해당 세션 시간 동안 다른 룸에서 강의 불가 (이동시간 20분 포함)
+ */
+window.checkModeratorConflict = function(targetTime, targetRoom, lecture, excludeKey = null) {
+    const speakerName = (lecture.speakerKo || '').trim();
+    if (!speakerName || speakerName === '미정' || speakerName === '') {
+        return { hasConflict: false };
+    }
+
+    const targetDuration = lecture.duration || 15;
+    const targetStartMin = timeToMinutes(targetTime);
+    const targetEndMin = targetStartMin + targetDuration;
+
+    // 모든 세션 확인
+    for (const session of AppState.sessions) {
+        // 좌장이 없거나 다른 사람이면 스킵
+        const moderatorName = (session.moderator || '').trim();
+        if (!moderatorName || moderatorName !== speakerName) continue;
+
+        // 같은 룸이면 스킵 (같은 룸에서는 좌장이 강의 가능)
+        if (session.room === targetRoom) continue;
+
+        // 세션 시간 범위 계산
+        const sessionStartMin = timeToMinutes(session.time);
+        let sessionEndMin;
+
+        if (session.duration && session.duration > 0) {
+            sessionEndMin = sessionStartMin + session.duration;
+        } else {
+            // duration이 없으면 해당 룸에서 다음 세션이나 마지막 강의까지
+            sessionEndMin = findSessionEndTime(session);
+        }
+
+        // 이동 시간 포함 충돌 체크
+        const gapAfterSession = targetStartMin - sessionEndMin;
+        const gapBeforeSession = sessionStartMin - targetEndMin;
+
+        if (gapAfterSession < AppConfig.SPEAKER_TRANSFER_TIME && gapBeforeSession < AppConfig.SPEAKER_TRANSFER_TIME) {
+            const sessionEndTime = `${Math.floor(sessionEndMin / 60).toString().padStart(2, '0')}:${(sessionEndMin % 60).toString().padStart(2, '0')}`;
+            const targetEndTime = `${Math.floor(targetEndMin / 60).toString().padStart(2, '0')}:${(targetEndMin % 60).toString().padStart(2, '0')}`;
+
+            return {
+                hasConflict: true,
+                conflictType: 'moderator',
+                sessionName: session.name || '세션',
+                conflictRoom: session.room,
+                conflictTime: session.time,
+                conflictEndTime: sessionEndTime,
+                targetEndTime: targetEndTime,
+                speakerName: speakerName,
+                gap: Math.max(gapAfterSession, gapBeforeSession)
+            };
+        }
+    }
+
+    return { hasConflict: false };
+};
+
+/**
+ * 세션 종료 시간 찾기 (duration이 없는 경우)
+ */
+function findSessionEndTime(session) {
+    const sessionStartMin = timeToMinutes(session.time);
+    const sessionTimeIndex = AppState.timeSlots.indexOf(session.time);
+    let lastLectureEndMin = sessionStartMin + 60; // 기본 60분
+
+    // 해당 세션의 룸에서 세션 시작 이후의 강의들 확인
+    for (const [key, lecture] of Object.entries(AppState.schedule)) {
+        const [lectureTime, lectureRoom] = [key.substring(0, 5), key.substring(6)];
+        if (lectureRoom !== session.room) continue;
+
+        const lectureTimeIndex = AppState.timeSlots.indexOf(lectureTime);
+        if (lectureTimeIndex < sessionTimeIndex) continue;
+
+        // 다음 세션이 있으면 그 전까지만
+        const nextSession = AppState.sessions.find(s => 
+            s.room === session.room && 
+            s.id !== session.id && 
+            AppState.timeSlots.indexOf(s.time) > sessionTimeIndex
+        );
+
+        if (nextSession) {
+            const nextSessionTimeIndex = AppState.timeSlots.indexOf(nextSession.time);
+            if (lectureTimeIndex >= nextSessionTimeIndex) continue;
+        }
+
+        const lectureStartMin = timeToMinutes(lectureTime);
+        const lectureEndMin = lectureStartMin + (lecture.duration || 15);
+        
+        if (lectureEndMin > lastLectureEndMin) {
+            lastLectureEndMin = lectureEndMin;
+        }
+    }
+
+    return lastLectureEndMin;
+}
 
 /**
  * Panel Discussion 세션과의 충돌 체크
