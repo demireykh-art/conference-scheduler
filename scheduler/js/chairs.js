@@ -8,30 +8,23 @@
  */
 window.getExpertiseTags = function() {
     // Break 타입 (전문분야에서 제외)
-    const excludeTypes = AppConfig.BREAK_TYPES || ['Coffee Break', 'Lunch', 'Opening/Closing', 'Panel Discussion'];
+    const excludeTypes = (AppConfig && AppConfig.BREAK_TYPES) ? AppConfig.BREAK_TYPES : ['Coffee Break', 'Lunch', 'Opening/Closing', 'Panel Discussion'];
     // 추가로 제외할 타입
     const additionalExclude = ['Luncheon', 'Others', 'Other Solutions'];
     const allExclude = [...excludeTypes, ...additionalExclude];
     
     // AppState.categories에서 Break 타입 제외
-    if (AppState.categories && AppState.categories.length > 0) {
+    if (AppState && AppState.categories && AppState.categories.length > 0) {
         return AppState.categories.filter(cat => !allExclude.includes(cat));
     }
     
     // fallback: AppConfig.categoryColors의 키에서 가져오기
-    if (AppConfig.categoryColors) {
+    if (AppConfig && AppConfig.categoryColors) {
         return Object.keys(AppConfig.categoryColors).filter(cat => !allExclude.includes(cat));
     }
     
     return [];
 };
-
-// 하위 호환성을 위한 getter (기존 코드에서 EXPERTISE_TAGS 사용 시)
-Object.defineProperty(window, 'EXPERTISE_TAGS', {
-    get: function() {
-        return getExpertiseTags();
-    }
-});
 
 /**
  * 연자의 전문 분야 태그 자동 계산 (기존 강의 기반)
@@ -88,7 +81,8 @@ window.getSessionCategoryTags = function(sessionTime, sessionRoom, sessionDurati
         // 강의가 세션 시간대 내에 있는지 확인
         if (lectureStartMin >= sessionStartMin && lectureEndMin <= sessionEndMin) {
             const cat = lecture.category;
-            if (cat && EXPERTISE_TAGS.includes(cat)) {
+            const validTags = getExpertiseTags();
+            if (cat && validTags.includes(cat)) {
                 tags[cat] = (tags[cat] || 0) + 1;
             }
         }
