@@ -22,7 +22,7 @@ window.AppConfig = {
 
     // 시간 설정
     TIME_UNIT: 5, // 5분 단위
-    SPEAKER_TRANSFER_TIME: 20, // 연자 이동시간 (분)
+    SPEAKER_TRANSFER_TIME: 10, // 연자 이동시간 (분)
     ROOM_TRANSFER_TIME: 10, // 룸 이동 시간 (분)
 
     // Undo 최대 횟수
