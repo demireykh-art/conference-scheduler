@@ -134,10 +134,36 @@
             '오픈\n렉처\n(일/10분)': 10
         };
         
+        // 런천강의 여부 컬럼
+        const luncheonColumns = [
+            '런천\n강의\n(정규/일)',
+            '런천\n강의\n(토)',
+            '런천\n강의\n(일/20분)',
+            '런천\n강의\n(일반/토)'
+        ];
+        
         pendingUploadData = [];
         let lastCategory = '';
+        let lastCompanyName = '';
+        let lastBoothCount = 0;
+        
+        // 스폰서 정보 수집 (업체명, 부스갯수)
+        const sponsorInfo = {};
         
         jsonData.forEach((row, index) => {
+            // 업체명과 부스갯수 추적
+            const companyName = (row['업체명'] || '').toString().trim();
+            const boothCount = parseInt(row['부스갯수']) || 0;
+            
+            if (companyName) {
+                lastCompanyName = companyName;
+                lastBoothCount = boothCount || lastBoothCount;
+                // 스폰서 정보 저장
+                if (!sponsorInfo[companyName] || boothCount > 0) {
+                    sponsorInfo[companyName] = boothCount || sponsorInfo[companyName] || 0;
+                }
+            }
+            
             // 제목이 있는 행만 처리
             const titleKo = (row['제목(국문)'] || row['제목'] || '').toString().trim();
             const titleEn = (row['제목(영문)'] || '').toString().trim();
@@ -155,9 +181,15 @@
             
             // 강의 시간 결정
             let duration = 15; // 기본값
+            let isLuncheon = false;
+            
             for (const [col, dur] of Object.entries(durationMapping)) {
                 if (row[col] && row[col] !== '' && !isNaN(row[col])) {
                     duration = dur;
+                    // 런천강의 컬럼인지 확인
+                    if (luncheonColumns.includes(col)) {
+                        isLuncheon = true;
+                    }
                     break;
                 }
             }
@@ -172,6 +204,7 @@
             
             const speakerName = (row['연자'] || row['연자명'] || '').toString().trim();
             const hospitalName = (row['병원명'] || row['소속'] || '').toString().trim();
+            const productInfo = (row['제품세부'] || row['제품명'] || '').toString().trim();
             
             // 연자가 '미정'이면 빈 값으로 처리
             const finalSpeaker = speakerName === '미정' ? '' : speakerName;
@@ -185,13 +218,53 @@
                 speakerEn: '',
                 affiliation: hospitalName,
                 affiliationEn: '',
-                duration: duration
+                duration: duration,
+                // 스폰서 관련 정보 추가
+                companyName: lastCompanyName,
+                productName: productInfo,
+                isLuncheon: isLuncheon
             };
             
             pendingUploadData.push(lecture);
         });
         
+        // 스폰서 정보를 AppState.companies에 저장
+        updateCompaniesFromUpload(sponsorInfo);
+        
         displayUploadPreview();
+    }
+    
+    // 업로드된 스폰서 정보를 companies에 반영
+    function updateCompaniesFromUpload(sponsorInfo) {
+        if (!AppState.companies) {
+            AppState.companies = [];
+        }
+        
+        for (const [companyName, boothCount] of Object.entries(sponsorInfo)) {
+            if (!companyName) continue;
+            
+            const existingIndex = AppState.companies.findIndex(c => 
+                (typeof c === 'string' ? c : c.name) === companyName
+            );
+            
+            if (existingIndex >= 0) {
+                // 기존 업체 업데이트
+                if (typeof AppState.companies[existingIndex] === 'string') {
+                    AppState.companies[existingIndex] = {
+                        name: companyName,
+                        boothCount: boothCount
+                    };
+                } else {
+                    AppState.companies[existingIndex].boothCount = boothCount || AppState.companies[existingIndex].boothCount;
+                }
+            } else {
+                // 새 업체 추가
+                AppState.companies.push({
+                    name: companyName,
+                    boothCount: boothCount
+                });
+            }
+        }
     }
     
     // ============================================

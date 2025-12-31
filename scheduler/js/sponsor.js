@@ -77,9 +77,6 @@
             case 'overview':
                 renderOverviewTab(content);
                 break;
-            case 'byCompany':
-                renderByCompanyTab(content);
-                break;
             case 'unscheduled':
                 renderUnscheduledTab(content);
                 break;
@@ -89,22 +86,31 @@
         }
     };
 
+    // 현재 정렬 상태
+    let currentSort = { field: 'boothCount', order: 'desc' };
+    let currentSearch = '';
+
     /**
-     * 전체 현황 탭
+     * 전체 현황 탭 - 검색, 정렬, 부스갯수 포함
      */
     function renderOverviewTab(container) {
         // 업체별 강의 수 집계
         const companyStats = {};
         
         // 모든 날짜의 강의 수집
-        Object.keys(AppState.dataByDate).forEach(date => {
+        Object.keys(AppState.dataByDate || {}).forEach(date => {
             const lectures = AppState.dataByDate[date].lectures || [];
             const schedule = AppState.dataByDate[date].schedule || {};
             
             lectures.forEach(lecture => {
                 if (lecture.companyName) {
                     if (!companyStats[lecture.companyName]) {
-                        companyStats[lecture.companyName] = { total: 0, scheduled: 0, unscheduled: 0 };
+                        companyStats[lecture.companyName] = { 
+                            total: 0, 
+                            scheduled: 0, 
+                            unscheduled: 0,
+                            boothCount: 0
+                        };
                     }
                     companyStats[lecture.companyName].total++;
                     
@@ -119,40 +125,123 @@
             });
         });
 
-        const sortedCompanies = Object.entries(companyStats).sort((a, b) => b[1].total - a[1].total);
+        // AppState.companies에서 부스갯수 가져오기
+        (AppState.companies || []).forEach(company => {
+            const name = typeof company === 'string' ? company : company.name;
+            const boothCount = typeof company === 'object' ? (company.boothCount || 0) : 0;
+            
+            if (companyStats[name]) {
+                companyStats[name].boothCount = boothCount;
+            } else if (boothCount > 0) {
+                // 강의는 없지만 부스가 있는 업체
+                companyStats[name] = { total: 0, scheduled: 0, unscheduled: 0, boothCount: boothCount };
+            }
+        });
+
+        // 검색 필터링
+        let filteredCompanies = Object.entries(companyStats);
+        if (currentSearch) {
+            const searchLower = currentSearch.toLowerCase();
+            filteredCompanies = filteredCompanies.filter(([name, _]) => 
+                name.toLowerCase().includes(searchLower)
+            );
+        }
+
+        // 정렬
+        filteredCompanies.sort((a, b) => {
+            let aVal, bVal;
+            switch(currentSort.field) {
+                case 'name':
+                    aVal = a[0];
+                    bVal = b[0];
+                    return currentSort.order === 'asc' 
+                        ? aVal.localeCompare(bVal, 'ko') 
+                        : bVal.localeCompare(aVal, 'ko');
+                case 'boothCount':
+                    aVal = a[1].boothCount;
+                    bVal = b[1].boothCount;
+                    break;
+                case 'total':
+                    aVal = a[1].total;
+                    bVal = b[1].total;
+                    break;
+                case 'unscheduled':
+                    aVal = a[1].unscheduled;
+                    bVal = b[1].unscheduled;
+                    break;
+                default:
+                    aVal = a[1].boothCount;
+                    bVal = b[1].boothCount;
+            }
+            return currentSort.order === 'asc' ? aVal - bVal : bVal - aVal;
+        });
+
+        const totalCompanies = Object.keys(companyStats).length;
+        const totalLectures = Object.values(companyStats).reduce((sum, s) => sum + s.total, 0);
+        const totalBooth = Object.values(companyStats).reduce((sum, s) => sum + s.boothCount, 0);
+
+        // 정렬 아이콘 생성 함수
+        const getSortIcon = (field) => {
+            if (currentSort.field !== field) return '↕️';
+            return currentSort.order === 'asc' ? '↑' : '↓';
+        };
 
         let html = `
             <div style="background: #E8F4FD; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
                 <h3 style="margin: 0 0 0.5rem 0;">📊 스폰서 강의 현황</h3>
                 <p style="margin: 0; font-size: 0.9rem; color: #666;">
-                    총 <strong>${sortedCompanies.length}</strong>개 업체, 
-                    <strong>${sortedCompanies.reduce((sum, [_, s]) => sum + s.total, 0)}</strong>개 스폰서 강의
+                    총 <strong>${totalCompanies}</strong>개 업체, 
+                    <strong>${totalLectures}</strong>개 스폰서 강의,
+                    <strong>${totalBooth}</strong>개 부스
                 </p>
             </div>
             
-            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
-                <thead style="background: var(--primary); color: white;">
-                    <tr>
-                        <th style="padding: 0.75rem; text-align: left;">업체명</th>
-                        <th style="padding: 0.75rem; text-align: center; width: 80px;">전체</th>
-                        <th style="padding: 0.75rem; text-align: center; width: 80px;">배치됨</th>
-                        <th style="padding: 0.75rem; text-align: center; width: 80px;">미배치</th>
-                        <th style="padding: 0.75rem; text-align: center; width: 100px;">진행률</th>
-                    </tr>
-                </thead>
-                <tbody>
+            <!-- 검색창 -->
+            <div style="margin-bottom: 1rem;">
+                <input type="text" id="sponsorSearchInput" 
+                    placeholder="🔍 업체명 검색..." 
+                    value="${currentSearch}"
+                    oninput="handleSponsorSearch(this.value)"
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 8px; font-size: 0.9rem;">
+            </div>
+            
+            <div style="max-height: 400px; overflow-y: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                    <thead style="background: var(--primary); color: white; position: sticky; top: 0;">
+                        <tr>
+                            <th style="padding: 0.75rem; text-align: left; cursor: pointer;" onclick="sortSponsorTable('name')">
+                                업체명 ${getSortIcon('name')}
+                            </th>
+                            <th style="padding: 0.75rem; text-align: center; width: 70px; cursor: pointer;" onclick="sortSponsorTable('boothCount')">
+                                부스 ${getSortIcon('boothCount')}
+                            </th>
+                            <th style="padding: 0.75rem; text-align: center; width: 70px; cursor: pointer;" onclick="sortSponsorTable('total')">
+                                강의 ${getSortIcon('total')}
+                            </th>
+                            <th style="padding: 0.75rem; text-align: center; width: 70px;">배치</th>
+                            <th style="padding: 0.75rem; text-align: center; width: 70px; cursor: pointer;" onclick="sortSponsorTable('unscheduled')">
+                                미배치 ${getSortIcon('unscheduled')}
+                            </th>
+                            <th style="padding: 0.75rem; text-align: center; width: 90px;">진행률</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         `;
 
-        sortedCompanies.forEach(([company, stats]) => {
+        filteredCompanies.forEach(([company, stats]) => {
             const progress = stats.total > 0 ? Math.round((stats.scheduled / stats.total) * 100) : 0;
             const progressColor = progress === 100 ? '#27ae60' : progress >= 50 ? '#f39c12' : '#e74c3c';
+            const boothBadge = stats.boothCount > 0 
+                ? `<span style="background: #8E24AA; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem;">${stats.boothCount}</span>`
+                : '<span style="color: #ccc;">-</span>';
             
             html += `
-                <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding: 0.75rem;">${company}</td>
+                <tr style="border-bottom: 1px solid #eee;" onclick="showCompanyLectures('${company}')" style="cursor: pointer;">
+                    <td style="padding: 0.75rem; cursor: pointer;">${company}</td>
+                    <td style="padding: 0.75rem; text-align: center;">${boothBadge}</td>
                     <td style="padding: 0.75rem; text-align: center; font-weight: bold;">${stats.total}</td>
                     <td style="padding: 0.75rem; text-align: center; color: #27ae60;">${stats.scheduled}</td>
-                    <td style="padding: 0.75rem; text-align: center; color: ${stats.unscheduled > 0 ? '#e74c3c' : '#999'};">${stats.unscheduled}</td>
+                    <td style="padding: 0.75rem; text-align: center; color: ${stats.unscheduled > 0 ? '#e74c3c' : '#999'}; font-weight: ${stats.unscheduled > 0 ? 'bold' : 'normal'};">${stats.unscheduled}</td>
                     <td style="padding: 0.75rem; text-align: center;">
                         <div style="background: #eee; border-radius: 10px; height: 8px; overflow: hidden;">
                             <div style="background: ${progressColor}; height: 100%; width: ${progress}%;"></div>
@@ -163,40 +252,117 @@
             `;
         });
 
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
 
-        if (sortedCompanies.length === 0) {
-            html = '<p style="text-align: center; color: #999; padding: 2rem;">스폰서 강의가 없습니다.</p>';
+        if (filteredCompanies.length === 0) {
+            html += '<p style="text-align: center; color: #999; padding: 2rem;">검색 결과가 없습니다.</p>';
         }
 
         container.innerHTML = html;
     }
 
     /**
-     * 업체별 보기 탭
+     * 검색 핸들러
      */
-    function renderByCompanyTab(container) {
-        const companies = [...new Set(
-            Object.values(AppState.dataByDate)
-                .flatMap(d => (d.lectures || []))
-                .filter(l => l.companyName)
-                .map(l => l.companyName)
-        )].sort();
+    window.handleSponsorSearch = function(value) {
+        currentSearch = value;
+        renderOverviewTab(document.getElementById('sponsorTabContent'));
+    };
 
-        let html = `
-            <div style="margin-bottom: 1rem;">
-                <select id="sponsorCompanySelect" onchange="renderCompanyDetail(this.value)" style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem;">
-                    <option value="">-- 업체 선택 --</option>
-                    ${companies.map(c => `<option value="${c}">${c}</option>`).join('')}
-                </select>
-            </div>
-            <div id="companyDetailContent">
-                <p style="text-align: center; color: #999; padding: 2rem;">업체를 선택하세요.</p>
-            </div>
+    /**
+     * 정렬 핸들러
+     */
+    window.sortSponsorTable = function(field) {
+        if (currentSort.field === field) {
+            currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSort.field = field;
+            currentSort.order = 'desc';
+        }
+        renderOverviewTab(document.getElementById('sponsorTabContent'));
+    };
+
+    /**
+     * 업체 강의 상세 보기
+     */
+    window.showCompanyLectures = function(companyName) {
+        // 해당 업체의 모든 강의 찾기
+        const lectures = [];
+        
+        Object.keys(AppState.dataByDate || {}).forEach(date => {
+            const dateLectures = AppState.dataByDate[date].lectures || [];
+            const schedule = AppState.dataByDate[date].schedule || {};
+            
+            dateLectures.forEach(lecture => {
+                if (lecture.companyName === companyName) {
+                    const isScheduled = Object.entries(schedule).find(([key, s]) => s.id === lecture.id);
+                    lectures.push({
+                        ...lecture,
+                        date: date,
+                        isScheduled: !!isScheduled,
+                        scheduleKey: isScheduled ? isScheduled[0] : null
+                    });
+                }
+            });
+        });
+
+        // 부스 정보
+        const companyInfo = (AppState.companies || []).find(c => 
+            (typeof c === 'string' ? c : c.name) === companyName
+        );
+        const boothCount = companyInfo && typeof companyInfo === 'object' ? companyInfo.boothCount : 0;
+
+        let detailHtml = `
+            <div style="background: #f5f5f5; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <h4 style="margin: 0;">🏢 ${companyName}</h4>
+                    <span style="background: #8E24AA; color: white; padding: 4px 12px; border-radius: 15px; font-size: 0.85rem;">
+                        부스 ${boothCount}개
+                    </span>
+                </div>
+                <p style="margin: 0 0 0.75rem 0; font-size: 0.85rem; color: #666;">
+                    총 ${lectures.length}개 강의 | 
+                    배치 ${lectures.filter(l => l.isScheduled).length}개 | 
+                    미배치 ${lectures.filter(l => !l.isScheduled).length}개
+                </p>
         `;
 
-        container.innerHTML = html;
-    }
+        if (lectures.length > 0) {
+            detailHtml += '<div style="max-height: 200px; overflow-y: auto;">';
+            lectures.forEach(lecture => {
+                const statusBadge = lecture.isScheduled 
+                    ? '<span style="background: #27ae60; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.7rem;">배치됨</span>'
+                    : '<span style="background: #e74c3c; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.7rem;">미배치</span>';
+                
+                detailHtml += `
+                    <div style="background: white; padding: 0.5rem; border-radius: 4px; margin-bottom: 0.5rem; font-size: 0.8rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <strong>${lecture.titleKo || lecture.titleEn}</strong>
+                            ${statusBadge}
+                        </div>
+                        <div style="color: #666; font-size: 0.75rem;">
+                            ${lecture.speakerKo || '연자 미정'} | ${lecture.duration}분
+                            ${lecture.scheduleKey ? ` | ${lecture.scheduleKey.split('-')[0]}` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            detailHtml += '</div>';
+        } else {
+            detailHtml += '<p style="color: #999; text-align: center;">등록된 강의가 없습니다.</p>';
+        }
+
+        detailHtml += '</div>';
+
+        // 기존 상세 영역 제거 후 추가
+        const existingDetail = document.getElementById('companyDetailSection');
+        if (existingDetail) existingDetail.remove();
+
+        const detailDiv = document.createElement('div');
+        detailDiv.id = 'companyDetailSection';
+        detailDiv.innerHTML = detailHtml;
+        document.getElementById('sponsorTabContent').appendChild(detailDiv);
+    };
 
     /**
      * 선택한 업체의 상세 정보 렌더링
