@@ -76,30 +76,30 @@
             <!-- 버튼 그룹 1: 사용자 관리 -->
             <div class="btn-group" style="display: flex; gap: 0.2rem; padding: 0.2rem; background: rgba(255,255,255,0.1); border-radius: 6px;">
                 <button class="btn btn-secondary btn-small user-mgmt-btn" onclick="openUserManagementModal()" title="사용자 관리">
-                    👥
+                    👥사용자
                     <span class="pending-badge" id="pendingBadge" style="display:none;">0</span>
                 </button>
             </div>
             
             <!-- 버튼 그룹 2: 편집 도구 -->
             <div class="btn-group" style="display: flex; gap: 0.2rem; padding: 0.2rem; background: rgba(255,255,255,0.1); border-radius: 6px;">
-                <button class="btn btn-secondary btn-small" id="undoBtn" onclick="performUndo()" disabled title="되돌리기 (Ctrl+Z)">↩</button>
-                <button class="btn btn-secondary btn-small" onclick="openSessionModal()" title="세션 관리">📋</button>
-                <button class="btn btn-secondary btn-small" onclick="openSpeakerModal()" title="연자 관리">👤</button>
-                <button class="btn btn-secondary btn-small" onclick="openTypoCheckModal()" title="맞춤법 검사">✏️</button>
+                <button class="btn btn-secondary btn-small" id="undoBtn" onclick="performUndo()" disabled title="되돌리기 (Ctrl+Z)">↩되돌리기</button>
+                <button class="btn btn-secondary btn-small" onclick="openSessionModal()" title="세션 관리">📋세션</button>
+                <button class="btn btn-secondary btn-small" onclick="openSpeakerModal()" title="연자 관리">👤연자</button>
+                <button class="btn btn-secondary btn-small" onclick="openTypoCheckModal()" title="맞춤법 검사">✏️오타</button>
             </div>
             
             <!-- 버튼 그룹 3: 데이터 관리 -->
             <div class="btn-group" style="display: flex; gap: 0.2rem; padding: 0.2rem; background: rgba(255,255,255,0.1); border-radius: 6px;">
-                <button class="btn btn-primary btn-small" onclick="openUploadModal()" title="강의 업로드">📤</button>
-                <button class="btn btn-secondary btn-small" onclick="openBackupModal()" title="백업 관리">💾</button>
-                <button class="btn btn-secondary btn-small" onclick="openSponsorManagementModal()" title="스폰서 강의 관리">🏢</button>
+                <button class="btn btn-primary btn-small" onclick="openUploadModal()" title="강의 업로드">📤업로드</button>
+                <button class="btn btn-secondary btn-small" onclick="openBackupModal()" title="백업 관리">💾백업</button>
+                <button class="btn btn-secondary btn-small" onclick="openSponsorManagementModal()" title="스폰서 강의 관리">🏢스폰서</button>
             </div>
             
             <!-- 버튼 그룹 4: 출력 -->
             <div class="btn-group" style="display: flex; gap: 0.2rem; padding: 0.2rem; background: rgba(255,255,255,0.1); border-radius: 6px;">
                 <div class="dropdown" style="position: relative;">
-                    <button class="btn btn-secondary btn-small" onclick="toggleExportDropdown()" title="출력">🖨️▼</button>
+                    <button class="btn btn-secondary btn-small" onclick="toggleExportDropdown()" title="출력">🖨️출력▼</button>
                     <div class="dropdown-menu" id="exportDropdown" style="display: none; position: absolute; top: 100%; right: 0; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 180px; z-index: 1000;">
                         <button class="dropdown-item" onclick="openPrintModal()">🖨️ 인쇄/PDF</button>
                         <button class="dropdown-item" onclick="exportToExcel()">📊 엑셀로 내보내기</button>
@@ -111,13 +111,13 @@
         </div>
     </div>
 
+    <!-- 사이드바 토글 버튼 (항상 보이도록 container 밖에 배치) -->
+    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="사이드바 접기/펼치기">
+        <span id="sidebarToggleIcon">◀</span>
+    </button>
+
     <div class="container">
         <div class="sidebar" id="sidebar">
-            <!-- 사이드바 토글 버튼 -->
-            <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="사이드바 접기/펼치기">
-                <span id="sidebarToggleIcon">◀</span>
-            </button>
-            
             <div class="sidebar-content" id="sidebarContent">
             <div class="card" id="addLectureCard">
                 <div class="card-title" onclick="toggleCard('addLectureCard')">

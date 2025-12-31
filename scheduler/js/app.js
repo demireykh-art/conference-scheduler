@@ -1369,16 +1369,18 @@ window.restoreBackup = function(backupKey) {
 
 window.toggleSidebar = function() {
     const sidebar = document.getElementById('sidebar');
-    const scheduleGrid = document.getElementById('scheduleGrid');
+    const toggleBtn = document.getElementById('sidebarToggle');
     const toggleIcon = document.getElementById('sidebarToggleIcon');
     
     sidebar.classList.toggle('collapsed');
     
     if (sidebar.classList.contains('collapsed')) {
         toggleIcon.textContent = '▶';
+        toggleBtn.style.left = '10px';
         localStorage.setItem('sidebarCollapsed', 'true');
     } else {
         toggleIcon.textContent = '◀';
+        toggleBtn.style.left = '395px';
         localStorage.setItem('sidebarCollapsed', 'false');
     }
 };
@@ -1386,13 +1388,16 @@ window.toggleSidebar = function() {
 // 사이드바 상태 복원
 window.restoreSidebarState = function() {
     const collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-    if (collapsed) {
-        const sidebar = document.getElementById('sidebar');
-        const toggleIcon = document.getElementById('sidebarToggleIcon');
-        if (sidebar) {
-            sidebar.classList.add('collapsed');
-            if (toggleIcon) toggleIcon.textContent = '▶';
-        }
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('sidebarToggle');
+    const toggleIcon = document.getElementById('sidebarToggleIcon');
+    
+    if (collapsed && sidebar) {
+        sidebar.classList.add('collapsed');
+        if (toggleIcon) toggleIcon.textContent = '▶';
+        if (toggleBtn) toggleBtn.style.left = '10px';
+    } else {
+        if (toggleBtn) toggleBtn.style.left = '395px';
     }
 };
 

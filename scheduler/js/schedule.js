@@ -259,20 +259,27 @@ window.updateScheduleDisplay = function() {
             sessionHeader.style.background = `linear-gradient(135deg, ${session.color} 0%, ${adjustColor(session.color, -20)} 100%)`;
             sessionHeader.style.userSelect = 'none'; // 텍스트 선택 방지
             sessionHeader.style.cursor = 'grab';
+            
+            // 좌장명 포맷: "세션명" + "좌장: 이름" 같은 줄에 표시
+            const moderatorText = moderatorName ? ` | ${moderatorLabel}${moderatorName}` : '';
+            
             sessionHeader.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; padding-right: 20px;">
-                    <div style="flex: 1; min-width: 0; text-align: left;">
-                        <span class="session-name" title="${sessionName}" style="pointer-events: none; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${sessionName}</span>
-                        ${moderatorName ? `<span class="session-moderator" style="pointer-events: none; font-size: 0.65rem; opacity: 0.9;">${moderatorLabel}${moderatorName}</span>` : ''}
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; padding-right: 40px;">
+                    <div style="flex: 1; min-width: 0; text-align: left; overflow: hidden;">
+                        <span class="session-name" title="${sessionName}${moderatorText} (더블클릭하여 수정)" style="pointer-events: none; display: inline; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${sessionName}</span>
+                        ${moderatorName ? `<span class="session-moderator" style="pointer-events: none; font-size: 0.7rem; opacity: 0.85; margin-left: 0.5em; white-space: nowrap;">${moderatorLabel}${moderatorName}</span>` : ''}
                     </div>
                     ${tagsHtml}
                 </div>
+                <button class="session-edit-btn" onclick="event.stopPropagation(); editCellSession('${time}', '${room}')" style="pointer-events: auto; position: absolute; right: 22px; top: 2px; background: rgba(255,255,255,0.3); border: none; color: white; width: 18px; height: 18px; border-radius: 4px; cursor: pointer; font-size: 0.6rem;" title="세션 수정">✏️</button>
                 <button class="session-remove" onclick="event.stopPropagation(); removeSession('${time}', '${room}')" style="pointer-events: auto;">×</button>
             `;
 
-            // 클릭으로 수정 (더블클릭 대신 클릭으로 변경)
-            sessionHeader.addEventListener('click', (e) => {
-                if (!e.target.classList.contains('session-remove')) {
+            // 더블클릭으로 수정 (드래그와 충돌 방지)
+            sessionHeader.addEventListener('dblclick', (e) => {
+                if (!e.target.classList.contains('session-remove') && !e.target.classList.contains('session-edit-btn')) {
+                    e.preventDefault();
+                    e.stopPropagation();
                     editCellSession(time, room);
                 }
             });
@@ -295,7 +302,7 @@ window.updateScheduleDisplay = function() {
             
             // 마우스 다운 시 커서 변경
             sessionHeader.addEventListener('mousedown', (e) => {
-                if (!e.target.classList.contains('session-remove')) {
+                if (!e.target.classList.contains('session-remove') && !e.target.classList.contains('session-edit-btn')) {
                     sessionHeader.style.cursor = 'grabbing';
                 }
             });
