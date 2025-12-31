@@ -261,25 +261,19 @@ window.updateScheduleDisplay = function() {
             // 좌장명 포맷: "세션명" + "좌장: 이름" 같은 줄에 표시
             const moderatorText = moderatorName ? ` | ${moderatorLabel}${moderatorName}` : '';
             
+            // 클릭 이벤트를 인라인으로 설정
+            sessionHeader.setAttribute('onclick', `editCellSession('${time}', '${room}')`);
+            
             sessionHeader.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; padding-right: 40px;">
+                <div class="session-content" style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; padding-right: 25px; pointer-events: none;">
                     <div style="flex: 1; min-width: 0; text-align: left; overflow: hidden;">
                         <span class="session-name" title="${sessionName}${moderatorText} (클릭하여 수정)" style="display: inline; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${sessionName}</span>
                         ${moderatorName ? `<span class="session-moderator" style="font-size: 0.7rem; opacity: 0.85; margin-left: 0.5em; white-space: nowrap;">${moderatorLabel}${moderatorName}</span>` : ''}
                     </div>
                     ${tagsHtml}
                 </div>
-                <button class="session-remove" onclick="event.stopPropagation(); removeSession('${time}', '${room}')" style="pointer-events: auto;">×</button>
+                <button class="session-remove" onclick="event.stopPropagation(); removeSession('${time}', '${room}')" title="세션 삭제">×</button>
             `;
-
-            // 클릭으로 수정
-            sessionHeader.addEventListener('click', (e) => {
-                if (!e.target.classList.contains('session-remove')) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    editCellSession(time, room);
-                }
-            });
 
             cell.appendChild(sessionHeader);
         } else {
