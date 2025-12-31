@@ -172,26 +172,26 @@ window.getSortedAndFilteredSpeakers = function() {
         return nameMatch || nameEnMatch || affiliationMatch || affiliationEnMatch;
     });
 
-    // 2시간 초과자만 필터링
+    // 2시간 초과자만 필터링 - 별표 룸 기준
     let overtimeCount = 0;
     if (typeof calculateSpeakerTotalTime === 'function') {
-        // 전체 초과자 수 계산
+        // 전체 초과자 수 계산 (별표 룸 기준)
         AppState.speakers.forEach(speaker => {
-            const timeStats = calculateSpeakerTotalTime(speaker.name);
+            const timeStats = calculateSpeakerTotalTime(speaker.name, null, null, true);
             if (timeStats.totalMinutes > 120) overtimeCount++;
         });
         
         // 초과자 수 표시
         const countEl = document.getElementById('speakerOvertimeCount');
         if (countEl) {
-            countEl.textContent = overtimeCount > 0 ? `(${overtimeCount}명 초과)` : '(초과자 없음)';
+            countEl.textContent = overtimeCount > 0 ? `(${overtimeCount}명 초과 - ⭐룸 기준)` : '(초과자 없음)';
             countEl.style.color = overtimeCount > 0 ? '#E53935' : '#4CAF50';
         }
         
         // 필터 적용
         if (filterOvertime) {
             filtered = filtered.filter(speaker => {
-                const timeStats = calculateSpeakerTotalTime(speaker.name);
+                const timeStats = calculateSpeakerTotalTime(speaker.name, null, null, true);
                 return timeStats.totalMinutes > 120;
             });
         }
@@ -218,21 +218,21 @@ window.getSortedAndFilteredSpeakers = function() {
             sorted.reverse();
             break;
         case 'time-desc':
-            // 활동시간 많은 순
+            // 활동시간 많은 순 (별표 룸 기준)
             if (typeof calculateSpeakerTotalTime === 'function') {
                 sorted.sort((a, b) => {
-                    const aTime = calculateSpeakerTotalTime(a.name).totalMinutes;
-                    const bTime = calculateSpeakerTotalTime(b.name).totalMinutes;
+                    const aTime = calculateSpeakerTotalTime(a.name, null, null, true).totalMinutes;
+                    const bTime = calculateSpeakerTotalTime(b.name, null, null, true).totalMinutes;
                     return bTime - aTime;
                 });
             }
             break;
         case 'time-asc':
-            // 활동시간 적은 순
+            // 활동시간 적은 순 (별표 룸 기준)
             if (typeof calculateSpeakerTotalTime === 'function') {
                 sorted.sort((a, b) => {
-                    const aTime = calculateSpeakerTotalTime(a.name).totalMinutes;
-                    const bTime = calculateSpeakerTotalTime(b.name).totalMinutes;
+                    const aTime = calculateSpeakerTotalTime(a.name, null, null, true).totalMinutes;
+                    const bTime = calculateSpeakerTotalTime(b.name, null, null, true).totalMinutes;
                     return aTime - bTime;
                 });
             }
@@ -323,21 +323,21 @@ window.updateSpeakerList = function() {
             statsHtml = `<span style="background: ${bgColor}; color: white; padding: 0.1rem 0.5rem; border-radius: 3px; font-size: 0.7rem; margin-left: 0.5rem;">${statParts.join(' / ')}</span>`;
         }
         
-        // 총 활동 시간 계산 (강의 + 좌장)
+        // 총 활동 시간 계산 (강의 + 좌장) - 별표 룸 기준
         let timeStatsHtml = '';
         if (typeof calculateSpeakerTotalTime === 'function') {
-            const timeStats = calculateSpeakerTotalTime(speaker.name);
+            const timeStats = calculateSpeakerTotalTime(speaker.name, null, null, true); // starredOnly = true
             if (timeStats.totalMinutes > 0) {
                 const isOverLimit = timeStats.totalMinutes > 120;
                 const bgColor = isOverLimit ? '#E53935' : '#2196F3';
-                const icon = isOverLimit ? '⚠️' : '⏱️';
+                const icon = isOverLimit ? '⚠️' : '⭐';
                 
                 let timeText = formatMinutesToHM(timeStats.totalMinutes);
-                let detailText = '';
-                if (timeStats.lectureMinutes > 0) detailText += `강의${timeStats.lectureMinutes}분`;
+                let detailText = '⭐별표 룸 기준\n';
+                if (timeStats.lectureMinutes > 0) detailText += `강의 ${timeStats.lectureMinutes}분`;
                 if (timeStats.moderatorMinutes > 0) {
-                    if (detailText) detailText += '+';
-                    detailText += `좌장${timeStats.moderatorMinutes}분`;
+                    if (timeStats.lectureMinutes > 0) detailText += ' + ';
+                    detailText += `좌장 ${timeStats.moderatorMinutes}분`;
                 }
                 
                 timeStatsHtml = `<span style="background: ${bgColor}; color: white; padding: 0.1rem 0.5rem; border-radius: 3px; font-size: 0.7rem; margin-left: 0.3rem;" title="${detailText}">${icon} ${timeText}</span>`;

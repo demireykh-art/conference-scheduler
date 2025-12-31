@@ -730,27 +730,27 @@ window.handleDrop = function(e) {
                 return;
             }
             
-            // 연자 총 활동 시간 체크 (2시간 제한)
+            // 연자 총 활동 시간 체크 (2시간 제한) - 별표 룸에서만 적용
             const speakerName = AppState.draggedLecture.speakerKo;
             if (speakerName) {
                 const lectureDuration = AppState.draggedLecture.duration || 10;
-                const timeCheck = checkSpeakerTimeLimit(speakerName, lectureDuration, AppState.draggedScheduleKey, null);
+                const timeCheck = checkSpeakerTimeLimit(speakerName, lectureDuration, AppState.draggedScheduleKey, null, room);
                 
-                if (timeCheck.isOverLimit) {
+                if (timeCheck.isOverLimit && timeCheck.isStarredRoom) {
                     const detailsText = timeCheck.details.map(d => 
                         `  • ${d.type}: ${d.title} (${d.room}, ${d.time}, ${d.duration}분)`
                     ).join('\n');
                     
-                    const confirmMsg = `⚠️ 연자 총 활동 시간 초과!\n\n` +
+                    const confirmMsg = `⚠️ 연자 총 활동 시간 초과! (⭐별표 룸 기준)\n\n` +
                         `연자: ${speakerName}\n\n` +
-                        `📊 현재 활동 시간:\n` +
+                        `📊 현재 활동 시간 (별표 룸):\n` +
                         `  • 강의: ${formatMinutesToHM(timeCheck.lectureMinutes)}\n` +
                         `  • 좌장: ${formatMinutesToHM(timeCheck.moderatorMinutes)}\n` +
                         `  • 합계: ${formatMinutesToHM(timeCheck.currentMinutes)}\n\n` +
                         `➕ 배치하려는 강의: ${lectureDuration}분\n` +
                         `📈 새 합계: ${formatMinutesToHM(timeCheck.newTotalMinutes)}\n\n` +
                         `⏰ 최대 허용 시간: ${formatMinutesToHM(timeCheck.maxMinutes)}\n\n` +
-                        `📋 현재 배치된 항목:\n${detailsText}\n\n` +
+                        (timeCheck.details.length > 0 ? `📋 현재 배치된 항목 (별표 룸):\n${detailsText}\n\n` : '') +
                         `그래도 배치하시겠습니까?`;
                     
                     if (!confirm(confirmMsg)) {

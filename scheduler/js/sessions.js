@@ -377,27 +377,27 @@ window.saveCellSession = function() {
             }
         }
         
-        // 좌장 총 활동 시간 체크 (2시간 제한)
+        // 좌장 총 활동 시간 체크 (2시간 제한) - 별표 룸에서만 적용
         if (duration > 0) {
             // 수정 시 기존 세션 제외
             const excludeSessionId = sessionId || null;
-            const timeCheck = checkSpeakerTimeLimit(moderator, duration, null, excludeSessionId);
+            const timeCheck = checkSpeakerTimeLimit(moderator, duration, null, excludeSessionId, room);
             
-            if (timeCheck.isOverLimit) {
+            if (timeCheck.isOverLimit && timeCheck.isStarredRoom) {
                 const detailsText = timeCheck.details.map(d => 
                     `  • ${d.type}: ${d.title} (${d.room}, ${d.time}, ${d.duration}분)`
                 ).join('\n');
                 
-                const confirmMsg = `⚠️ 좌장 총 활동 시간 초과!\n\n` +
+                const confirmMsg = `⚠️ 좌장 총 활동 시간 초과! (⭐별표 룸 기준)\n\n` +
                     `좌장: ${moderator}\n\n` +
-                    `📊 현재 활동 시간:\n` +
+                    `📊 현재 활동 시간 (별표 룸):\n` +
                     `  • 강의: ${formatMinutesToHM(timeCheck.lectureMinutes)}\n` +
                     `  • 좌장: ${formatMinutesToHM(timeCheck.moderatorMinutes)}\n` +
                     `  • 합계: ${formatMinutesToHM(timeCheck.currentMinutes)}\n\n` +
                     `➕ 지정하려는 세션 좌장: ${duration}분\n` +
                     `📈 새 합계: ${formatMinutesToHM(timeCheck.newTotalMinutes)}\n\n` +
                     `⏰ 최대 허용 시간: ${formatMinutesToHM(timeCheck.maxMinutes)}\n\n` +
-                    `📋 현재 배치된 항목:\n${detailsText}\n\n` +
+                    (timeCheck.details.length > 0 ? `📋 현재 배치된 항목 (별표 룸):\n${detailsText}\n\n` : '') +
                     `그래도 이 좌장을 지정하시겠습니까?`;
                 
                 if (!confirm(confirmMsg)) {

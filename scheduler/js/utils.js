@@ -227,13 +227,22 @@ document.addEventListener('keydown', function(e) {
 // ============================================
 
 /**
- * 연자의 총 활동 시간 계산 (분 단위)
+ * 룸이 별표(⭐) 룸인지 확인
+ */
+window.isStarredRoom = function(roomName) {
+    if (!roomName) return false;
+    return roomName.includes('⭐') || roomName.includes('★');
+};
+
+/**
+ * 연자의 총 활동 시간 계산 (분 단위) - 별표 룸에서만 계산
  * @param {string} speakerName - 연자 이름
  * @param {string} excludeKey - 제외할 스케줄 키 (수정 시 현재 강의 제외)
  * @param {string} excludeSessionId - 제외할 세션 ID (수정 시 현재 세션 제외)
+ * @param {boolean} starredOnly - 별표 룸에서만 계산할지 여부 (기본: true)
  * @returns {object} { totalMinutes, lectureMinutes, moderatorMinutes, details }
  */
-window.calculateSpeakerTotalTime = function(speakerName, excludeKey = null, excludeSessionId = null) {
+window.calculateSpeakerTotalTime = function(speakerName, excludeKey = null, excludeSessionId = null, starredOnly = true) {
     if (!speakerName) return { totalMinutes: 0, lectureMinutes: 0, moderatorMinutes: 0, details: [] };
     
     const normalizedName = speakerName.trim().toLowerCase();
@@ -241,16 +250,20 @@ window.calculateSpeakerTotalTime = function(speakerName, excludeKey = null, excl
     let moderatorMinutes = 0;
     const details = [];
     
-    // 1. 배치된 강의 시간 계산
+    // 1. 배치된 강의 시간 계산 (별표 룸에서만)
     Object.entries(AppState.schedule || {}).forEach(([key, lecture]) => {
         if (excludeKey && key === excludeKey) return; // 수정 중인 강의 제외
+        
+        const [time, room] = key.split('-');
+        
+        // 별표 룸 필터링
+        if (starredOnly && !isStarredRoom(room)) return;
         
         const lectureSpeaker = (lecture.speakerKo || '').trim().toLowerCase();
         if (lectureSpeaker === normalizedName) {
             const duration = lecture.duration || 10;
             lectureMinutes += duration;
             
-            const [time, room] = key.split('_');
             details.push({
                 type: '강의',
                 title: lecture.titleKo || '제목 없음',
@@ -261,9 +274,12 @@ window.calculateSpeakerTotalTime = function(speakerName, excludeKey = null, excl
         }
     });
     
-    // 2. 좌장 시간 계산
+    // 2. 좌장 시간 계산 (별표 룸에서만)
     (AppState.sessions || []).forEach(session => {
         if (excludeSessionId && session.id === excludeSessionId) return; // 수정 중인 세션 제외
+        
+        // 별표 룸 필터링
+        if (starredOnly && !isStarredRoom(session.room)) return;
         
         const moderatorName = (session.moderator || '').trim().toLowerCase();
         if (moderatorName === normalizedName) {
@@ -289,17 +305,33 @@ window.calculateSpeakerTotalTime = function(speakerName, excludeKey = null, excl
 };
 
 /**
- * 연자 활동 시간 초과 체크 (2시간 = 120분)
+ * 연자 활동 시간 초과 체크 (2시간 = 120분) - 별표 룸에서만 적용
  * @param {string} speakerName - 연자 이름
  * @param {number} additionalMinutes - 추가할 시간 (분)
  * @param {string} excludeKey - 제외할 스케줄 키
  * @param {string} excludeSessionId - 제외할 세션 ID
- * @returns {object} { isOverLimit, currentMinutes, newTotalMinutes, details }
+ * @param {string} targetRoom - 배치하려는 룸 이름
+ * @returns {object} { isOverLimit, currentMinutes, newTotalMinutes, details, isStarredRoom }
  */
-window.checkSpeakerTimeLimit = function(speakerName, additionalMinutes, excludeKey = null, excludeSessionId = null) {
+window.checkSpeakerTimeLimit = function(speakerName, additionalMinutes, excludeKey = null, excludeSessionId = null, targetRoom = null) {
     const MAX_MINUTES = 120; // 2시간
     
-    const stats = calculateSpeakerTotalTime(speakerName, excludeKey, excludeSessionId);
+    // 배치하려는 룸이 별표 룸이 아니면 체크 안 함
+    const targetIsStarred = targetRoom ? isStarredRoom(targetRoom) : true;
+    if (!targetIsStarred) {
+        return {
+            isOverLimit: false,
+            currentMinutes: 0,
+            newTotalMinutes: 0,
+            maxMinutes: MAX_MINUTES,
+            lectureMinutes: 0,
+            moderatorMinutes: 0,
+            details: [],
+            isStarredRoom: false
+        };
+    }
+    
+    const stats = calculateSpeakerTotalTime(speakerName, excludeKey, excludeSessionId, true);
     const newTotal = stats.totalMinutes + additionalMinutes;
     
     return {
@@ -309,7 +341,8 @@ window.checkSpeakerTimeLimit = function(speakerName, additionalMinutes, excludeK
         maxMinutes: MAX_MINUTES,
         lectureMinutes: stats.lectureMinutes,
         moderatorMinutes: stats.moderatorMinutes,
-        details: stats.details
+        details: stats.details,
+        isStarredRoom: true
     };
 };
 
