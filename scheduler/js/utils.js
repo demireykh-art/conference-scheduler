@@ -222,4 +222,110 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
+// ============================================
+// 연자 총 활동 시간 계산 (강의 + 좌장)
+// ============================================
+
+/**
+ * 연자의 총 활동 시간 계산 (분 단위)
+ * @param {string} speakerName - 연자 이름
+ * @param {string} excludeKey - 제외할 스케줄 키 (수정 시 현재 강의 제외)
+ * @param {string} excludeSessionId - 제외할 세션 ID (수정 시 현재 세션 제외)
+ * @returns {object} { totalMinutes, lectureMinutes, moderatorMinutes, details }
+ */
+window.calculateSpeakerTotalTime = function(speakerName, excludeKey = null, excludeSessionId = null) {
+    if (!speakerName) return { totalMinutes: 0, lectureMinutes: 0, moderatorMinutes: 0, details: [] };
+    
+    const normalizedName = speakerName.trim().toLowerCase();
+    let lectureMinutes = 0;
+    let moderatorMinutes = 0;
+    const details = [];
+    
+    // 1. 배치된 강의 시간 계산
+    Object.entries(AppState.schedule || {}).forEach(([key, lecture]) => {
+        if (excludeKey && key === excludeKey) return; // 수정 중인 강의 제외
+        
+        const lectureSpeaker = (lecture.speakerKo || '').trim().toLowerCase();
+        if (lectureSpeaker === normalizedName) {
+            const duration = lecture.duration || 10;
+            lectureMinutes += duration;
+            
+            const [time, room] = key.split('_');
+            details.push({
+                type: '강의',
+                title: lecture.titleKo || '제목 없음',
+                room: room,
+                time: time,
+                duration: duration
+            });
+        }
+    });
+    
+    // 2. 좌장 시간 계산
+    (AppState.sessions || []).forEach(session => {
+        if (excludeSessionId && session.id === excludeSessionId) return; // 수정 중인 세션 제외
+        
+        const moderatorName = (session.moderator || '').trim().toLowerCase();
+        if (moderatorName === normalizedName) {
+            const duration = session.duration || 60;
+            moderatorMinutes += duration;
+            
+            details.push({
+                type: '좌장',
+                title: session.name || '세션',
+                room: session.room,
+                time: session.time,
+                duration: duration
+            });
+        }
+    });
+    
+    return {
+        totalMinutes: lectureMinutes + moderatorMinutes,
+        lectureMinutes,
+        moderatorMinutes,
+        details
+    };
+};
+
+/**
+ * 연자 활동 시간 초과 체크 (2시간 = 120분)
+ * @param {string} speakerName - 연자 이름
+ * @param {number} additionalMinutes - 추가할 시간 (분)
+ * @param {string} excludeKey - 제외할 스케줄 키
+ * @param {string} excludeSessionId - 제외할 세션 ID
+ * @returns {object} { isOverLimit, currentMinutes, newTotalMinutes, details }
+ */
+window.checkSpeakerTimeLimit = function(speakerName, additionalMinutes, excludeKey = null, excludeSessionId = null) {
+    const MAX_MINUTES = 120; // 2시간
+    
+    const stats = calculateSpeakerTotalTime(speakerName, excludeKey, excludeSessionId);
+    const newTotal = stats.totalMinutes + additionalMinutes;
+    
+    return {
+        isOverLimit: newTotal > MAX_MINUTES,
+        currentMinutes: stats.totalMinutes,
+        newTotalMinutes: newTotal,
+        maxMinutes: MAX_MINUTES,
+        lectureMinutes: stats.lectureMinutes,
+        moderatorMinutes: stats.moderatorMinutes,
+        details: stats.details
+    };
+};
+
+/**
+ * 시간을 시:분 형식으로 포맷
+ */
+window.formatMinutesToHM = function(minutes) {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours > 0 && mins > 0) {
+        return `${hours}시간 ${mins}분`;
+    } else if (hours > 0) {
+        return `${hours}시간`;
+    } else {
+        return `${mins}분`;
+    }
+};
+
 console.log('✅ utils.js 로드 완료');

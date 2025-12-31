@@ -252,28 +252,66 @@ window.updateScheduleDisplay = function() {
 
             const sessionHeader = document.createElement('div');
             sessionHeader.className = 'session-header-cell';
+            sessionHeader.draggable = true;
             sessionHeader.dataset.sessionId = session.id;
             sessionHeader.dataset.sessionTime = time;
             sessionHeader.dataset.sessionRoom = room;
             sessionHeader.style.background = `linear-gradient(135deg, ${session.color} 0%, ${adjustColor(session.color, -20)} 100%)`;
-            sessionHeader.style.cursor = 'pointer';
+            sessionHeader.style.cursor = 'grab';
             
             // 좌장명 포맷: "세션명" + "좌장: 이름" 같은 줄에 표시
             const moderatorText = moderatorName ? ` | ${moderatorLabel}${moderatorName}` : '';
             
-            // 클릭 이벤트를 인라인으로 설정
-            sessionHeader.setAttribute('onclick', `editCellSession('${time}', '${room}')`);
-            
             sessionHeader.innerHTML = `
-                <div class="session-content" style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; padding-right: 25px; pointer-events: none;">
+                <div class="session-content" style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; padding-right: 45px; pointer-events: none;">
                     <div style="flex: 1; min-width: 0; text-align: left; overflow: hidden;">
-                        <span class="session-name" title="${sessionName}${moderatorText} (클릭하여 수정)" style="display: inline; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${sessionName}</span>
+                        <span class="session-name" title="${sessionName}${moderatorText} (드래그: 이동 / 더블클릭: 수정)" style="display: inline; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${sessionName}</span>
                         ${moderatorName ? `<span class="session-moderator" style="font-size: 0.7rem; opacity: 0.85; margin-left: 0.5em; white-space: nowrap;">${moderatorLabel}${moderatorName}</span>` : ''}
                     </div>
                     ${tagsHtml}
                 </div>
+                <button class="session-edit-btn" onclick="event.stopPropagation(); editCellSession('${time}', '${room}')" title="세션 수정" style="position: absolute; right: 22px; top: 2px; background: rgba(255,255,255,0.3); border: none; color: white; width: 18px; height: 18px; border-radius: 4px; cursor: pointer; font-size: 0.6rem; pointer-events: auto;">✏️</button>
                 <button class="session-remove" onclick="event.stopPropagation(); removeSession('${time}', '${room}')" title="세션 삭제">×</button>
             `;
+
+            // 드래그 시작
+            sessionHeader.addEventListener('dragstart', (e) => {
+                e.stopPropagation();
+                AppState.draggedSession = session;
+                sessionHeader.style.opacity = '0.5';
+                sessionHeader.style.cursor = 'grabbing';
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', 'session-' + session.id);
+            });
+
+            // 드래그 종료
+            sessionHeader.addEventListener('dragend', (e) => {
+                e.stopPropagation();
+                sessionHeader.style.opacity = '1';
+                sessionHeader.style.cursor = 'grab';
+                AppState.draggedSession = null;
+            });
+
+            // 더블클릭으로 수정
+            sessionHeader.addEventListener('dblclick', (e) => {
+                if (!e.target.classList.contains('session-remove') && !e.target.classList.contains('session-edit-btn')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    editCellSession(time, room);
+                }
+            });
+
+            // 마우스 다운 시 커서 변경
+            sessionHeader.addEventListener('mousedown', (e) => {
+                if (!e.target.classList.contains('session-remove') && !e.target.classList.contains('session-edit-btn')) {
+                    sessionHeader.style.cursor = 'grabbing';
+                }
+            });
+
+            // 마우스 업 시 커서 복원
+            sessionHeader.addEventListener('mouseup', () => {
+                sessionHeader.style.cursor = 'grab';
+            });
 
             cell.appendChild(sessionHeader);
         } else {
@@ -690,6 +728,38 @@ window.handleDrop = function(e) {
                 AppState.draggedLecture = null;
                 AppState.draggedIsBreak = false;
                 return;
+            }
+            
+            // 연자 총 활동 시간 체크 (2시간 제한)
+            const speakerName = AppState.draggedLecture.speakerKo;
+            if (speakerName) {
+                const lectureDuration = AppState.draggedLecture.duration || 10;
+                const timeCheck = checkSpeakerTimeLimit(speakerName, lectureDuration, AppState.draggedScheduleKey, null);
+                
+                if (timeCheck.isOverLimit) {
+                    const detailsText = timeCheck.details.map(d => 
+                        `  • ${d.type}: ${d.title} (${d.room}, ${d.time}, ${d.duration}분)`
+                    ).join('\n');
+                    
+                    const confirmMsg = `⚠️ 연자 총 활동 시간 초과!\n\n` +
+                        `연자: ${speakerName}\n\n` +
+                        `📊 현재 활동 시간:\n` +
+                        `  • 강의: ${formatMinutesToHM(timeCheck.lectureMinutes)}\n` +
+                        `  • 좌장: ${formatMinutesToHM(timeCheck.moderatorMinutes)}\n` +
+                        `  • 합계: ${formatMinutesToHM(timeCheck.currentMinutes)}\n\n` +
+                        `➕ 배치하려는 강의: ${lectureDuration}분\n` +
+                        `📈 새 합계: ${formatMinutesToHM(timeCheck.newTotalMinutes)}\n\n` +
+                        `⏰ 최대 허용 시간: ${formatMinutesToHM(timeCheck.maxMinutes)}\n\n` +
+                        `📋 현재 배치된 항목:\n${detailsText}\n\n` +
+                        `그래도 배치하시겠습니까?`;
+                    
+                    if (!confirm(confirmMsg)) {
+                        AppState.draggedScheduleKey = null;
+                        AppState.draggedLecture = null;
+                        AppState.draggedIsBreak = false;
+                        return;
+                    }
+                }
             }
         }
 

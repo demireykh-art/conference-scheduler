@@ -23,17 +23,30 @@ window.closeSessionModal = function() {
 window.openCellSessionModal = function(time, room) {
     const existingSession = AppState.sessions.find(s => s.time === time && s.room === room);
 
-    document.getElementById('cellSessionModalTitle').textContent = existingSession ? '📋 세션/런치 수정' : '📋 세션/런치 추가';
+    const modalTitle = document.getElementById('cellSessionModalTitle');
+    if (modalTitle) {
+        modalTitle.textContent = existingSession ? '📋 세션/런치 수정' : '📋 세션/런치 추가';
+    }
 
-    document.getElementById('cellSessionTime').value = time;
-    document.getElementById('cellSessionRoom').value = room;
-    document.getElementById('cellSessionId').value = existingSession ? existingSession.id : '';
-    document.getElementById('cellSessionName').value = existingSession ? existingSession.name : '';
-    document.getElementById('cellSessionNameEn').value = existingSession ? existingSession.nameEn : '';
+    const timeInput = document.getElementById('cellSessionTime');
+    const roomInput = document.getElementById('cellSessionRoom');
+    const idInput = document.getElementById('cellSessionId');
+    const nameInput = document.getElementById('cellSessionName');
+    const nameEnInput = document.getElementById('cellSessionNameEn');
+    
+    if (timeInput) timeInput.value = time;
+    if (roomInput) roomInput.value = room;
+    if (idInput) idInput.value = existingSession ? existingSession.id : '';
+    if (nameInput) nameInput.value = existingSession ? existingSession.name : '';
+    if (nameEnInput) nameEnInput.value = existingSession ? existingSession.nameEn : '';
     
     // 좌장 드롭다운 채우기 (가나다순 정렬)
     populateModeratorDropdown(existingSession ? existingSession.moderator : '');
-    document.getElementById('cellSessionModeratorEn').value = existingSession ? existingSession.moderatorEn : '';
+    
+    const moderatorEnInput = document.getElementById('cellSessionModeratorEn');
+    if (moderatorEnInput) {
+        moderatorEnInput.value = existingSession ? existingSession.moderatorEn : '';
+    }
     
     // 세션 시간 초기화
     const durationSelect = document.getElementById('cellSessionDuration');
@@ -44,7 +57,11 @@ window.openCellSessionModal = function(time, room) {
     // 색상 선택
     const colors = ['#3498DB', '#E74C3C', '#2ECC71', '#9B59B6', '#F39C12', '#1ABC9C', '#E91E63', '#5D4037'];
     const defaultColor = existingSession ? existingSession.color : colors[AppState.sessions.length % colors.length];
-    document.getElementById('cellSessionColor').value = defaultColor;
+    
+    const colorInput = document.getElementById('cellSessionColor');
+    if (colorInput) {
+        colorInput.value = defaultColor;
+    }
 
     // 색상 버튼 상태 업데이트
     document.querySelectorAll('#sessionColorPicker .color-btn').forEach(btn => {
@@ -53,14 +70,29 @@ window.openCellSessionModal = function(time, room) {
 
     // 세션의 카테고리 태그 계산 및 표시
     const duration = existingSession?.duration || 60;
-    const sessionTags = getSessionCategoryTags(time, room, duration);
-    updateSessionTagsDisplay(sessionTags);
+    let sessionTags = [];
+    try {
+        sessionTags = getSessionCategoryTags(time, room, duration);
+        updateSessionTagsDisplay(sessionTags);
+    } catch (e) {
+        console.log('세션 태그 계산 실패:', e);
+    }
     
     // 좌장 스마트 추천 초기화
-    initModeratorSmartSearch(sessionTags);
+    try {
+        initModeratorSmartSearch(sessionTags);
+    } catch (e) {
+        console.log('좌장 추천 초기화 실패:', e);
+    }
 
-    document.getElementById('cellSessionModal').classList.add('active');
-    document.getElementById('cellSessionName').focus();
+    const modal = document.getElementById('cellSessionModal');
+    if (modal) {
+        modal.classList.add('active');
+    }
+    
+    if (nameInput) {
+        nameInput.focus();
+    }
 };
 
 /**
@@ -118,10 +150,20 @@ window.initModeratorSmartSearch = function(sessionTags) {
     const moderatorInput = document.getElementById('cellSessionModerator');
     const recommendContainer = document.getElementById('moderatorRecommendations');
     
-    if (!recommendContainer) return;
+    // null 체크 - 요소가 없으면 조용히 종료
+    if (!recommendContainer) {
+        console.log('moderatorRecommendations 요소를 찾을 수 없습니다.');
+        return;
+    }
     
     // 추천 목록 생성
-    const recommendations = getModeratorRecommendations(sessionTags);
+    let recommendations = [];
+    try {
+        recommendations = getModeratorRecommendations(sessionTags || []);
+    } catch (e) {
+        console.log('좌장 추천 목록 생성 실패:', e);
+        recommendations = [];
+    }
     
     // 매칭되는 연자 (점수 > 0)
     const matched = recommendations.filter(r => r.matchScore > 0);
@@ -159,12 +201,10 @@ window.initModeratorSmartSearch = function(sessionTags) {
         </button>
     </div>`;
     
-    recommendContainer.innerHTML = html;
-    
-    // 기존 datalist도 유지 (수동 입력용) - null 체크 추가
-    const datalist = document.getElementById('moderatorSuggestions');
-    if (datalist) {
-        datalist.innerHTML = AppState.speakers.map(s => `<option value="${s.name}">`).join('');
+    try {
+        recommendContainer.innerHTML = html;
+    } catch (e) {
+        console.log('추천 목록 렌더링 실패:', e);
     }
 };
 
@@ -334,6 +374,36 @@ window.saveCellSession = function() {
             if (!proceed) {
                 document.getElementById('cellSessionModerator').focus();
                 return;
+            }
+        }
+        
+        // 좌장 총 활동 시간 체크 (2시간 제한)
+        if (duration > 0) {
+            // 수정 시 기존 세션 제외
+            const excludeSessionId = sessionId || null;
+            const timeCheck = checkSpeakerTimeLimit(moderator, duration, null, excludeSessionId);
+            
+            if (timeCheck.isOverLimit) {
+                const detailsText = timeCheck.details.map(d => 
+                    `  • ${d.type}: ${d.title} (${d.room}, ${d.time}, ${d.duration}분)`
+                ).join('\n');
+                
+                const confirmMsg = `⚠️ 좌장 총 활동 시간 초과!\n\n` +
+                    `좌장: ${moderator}\n\n` +
+                    `📊 현재 활동 시간:\n` +
+                    `  • 강의: ${formatMinutesToHM(timeCheck.lectureMinutes)}\n` +
+                    `  • 좌장: ${formatMinutesToHM(timeCheck.moderatorMinutes)}\n` +
+                    `  • 합계: ${formatMinutesToHM(timeCheck.currentMinutes)}\n\n` +
+                    `➕ 지정하려는 세션 좌장: ${duration}분\n` +
+                    `📈 새 합계: ${formatMinutesToHM(timeCheck.newTotalMinutes)}\n\n` +
+                    `⏰ 최대 허용 시간: ${formatMinutesToHM(timeCheck.maxMinutes)}\n\n` +
+                    `📋 현재 배치된 항목:\n${detailsText}\n\n` +
+                    `그래도 이 좌장을 지정하시겠습니까?`;
+                
+                if (!confirm(confirmMsg)) {
+                    document.getElementById('cellSessionModerator').focus();
+                    return;
+                }
             }
         }
     }
