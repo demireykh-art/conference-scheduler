@@ -252,13 +252,11 @@ window.updateScheduleDisplay = function() {
 
             const sessionHeader = document.createElement('div');
             sessionHeader.className = 'session-header-cell';
-            sessionHeader.draggable = true;
             sessionHeader.dataset.sessionId = session.id;
             sessionHeader.dataset.sessionTime = time;
             sessionHeader.dataset.sessionRoom = room;
             sessionHeader.style.background = `linear-gradient(135deg, ${session.color} 0%, ${adjustColor(session.color, -20)} 100%)`;
-            sessionHeader.style.userSelect = 'none'; // 텍스트 선택 방지
-            sessionHeader.style.cursor = 'grab';
+            sessionHeader.style.cursor = 'pointer';
             
             // 좌장명 포맷: "세션명" + "좌장: 이름" 같은 줄에 표시
             const moderatorText = moderatorName ? ` | ${moderatorLabel}${moderatorName}` : '';
@@ -266,55 +264,20 @@ window.updateScheduleDisplay = function() {
             sessionHeader.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; padding-right: 40px;">
                     <div style="flex: 1; min-width: 0; text-align: left; overflow: hidden;">
-                        <span class="session-name" title="${sessionName}${moderatorText} (더블클릭하여 수정)" style="pointer-events: none; display: inline; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${sessionName}</span>
-                        ${moderatorName ? `<span class="session-moderator" style="pointer-events: none; font-size: 0.7rem; opacity: 0.85; margin-left: 0.5em; white-space: nowrap;">${moderatorLabel}${moderatorName}</span>` : ''}
+                        <span class="session-name" title="${sessionName}${moderatorText} (클릭하여 수정)" style="display: inline; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${sessionName}</span>
+                        ${moderatorName ? `<span class="session-moderator" style="font-size: 0.7rem; opacity: 0.85; margin-left: 0.5em; white-space: nowrap;">${moderatorLabel}${moderatorName}</span>` : ''}
                     </div>
                     ${tagsHtml}
                 </div>
-                <button class="session-edit-btn" onclick="event.stopPropagation(); editCellSession('${time}', '${room}')" style="pointer-events: auto; position: absolute; right: 22px; top: 2px; background: rgba(255,255,255,0.3); border: none; color: white; width: 18px; height: 18px; border-radius: 4px; cursor: pointer; font-size: 0.6rem;" title="세션 수정">✏️</button>
                 <button class="session-remove" onclick="event.stopPropagation(); removeSession('${time}', '${room}')" style="pointer-events: auto;">×</button>
             `;
 
-            // 더블클릭으로 수정 (드래그와 충돌 방지)
-            sessionHeader.addEventListener('dblclick', (e) => {
-                if (!e.target.classList.contains('session-remove') && !e.target.classList.contains('session-edit-btn')) {
+            // 클릭으로 수정
+            sessionHeader.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('session-remove')) {
                     e.preventDefault();
                     e.stopPropagation();
                     editCellSession(time, room);
-                }
-            });
-
-            sessionHeader.addEventListener('dragstart', (e) => {
-                e.stopPropagation();
-                AppState.draggedSession = session;
-                sessionHeader.style.opacity = '0.5';
-                sessionHeader.style.cursor = 'grabbing';
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', session.id); // 데이터 설정 필수
-            });
-
-            sessionHeader.addEventListener('dragend', (e) => {
-                e.stopPropagation();
-                sessionHeader.style.opacity = '1';
-                sessionHeader.style.cursor = 'grab';
-                AppState.draggedSession = null;
-            });
-            
-            // 마우스 다운 시 커서 변경
-            sessionHeader.addEventListener('mousedown', (e) => {
-                if (!e.target.classList.contains('session-remove') && !e.target.classList.contains('session-edit-btn')) {
-                    sessionHeader.style.cursor = 'grabbing';
-                }
-            });
-            
-            sessionHeader.addEventListener('mouseup', () => {
-                sessionHeader.style.cursor = 'grab';
-            });
-            
-            // 마우스가 요소를 벗어나도 드래그 유지
-            sessionHeader.addEventListener('mouseleave', () => {
-                if (!AppState.draggedSession) {
-                    sessionHeader.style.cursor = 'grab';
                 }
             });
 
