@@ -161,9 +161,11 @@ window.initModeratorSmartSearch = function(sessionTags) {
     
     recommendContainer.innerHTML = html;
     
-    // 기존 datalist도 유지 (수동 입력용)
+    // 기존 datalist도 유지 (수동 입력용) - null 체크 추가
     const datalist = document.getElementById('moderatorSuggestions');
-    datalist.innerHTML = AppState.speakers.map(s => `<option value="${s.name}">`).join('');
+    if (datalist) {
+        datalist.innerHTML = AppState.speakers.map(s => `<option value="${s.name}">`).join('');
+    }
 };
 
 /**
