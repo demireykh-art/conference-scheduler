@@ -158,6 +158,7 @@ window.searchSpeakers = function() {
 window.getSortedAndFilteredSpeakers = function() {
     const searchTerm = document.getElementById('speakerSearch').value.toLowerCase().trim();
     const sortType = document.getElementById('speakerSort').value;
+    const filterOvertime = document.getElementById('speakerFilterOvertime')?.checked || false;
 
     // 검색 필터링
     let filtered = AppState.speakers.filter(speaker => {
@@ -170,6 +171,31 @@ window.getSortedAndFilteredSpeakers = function() {
 
         return nameMatch || nameEnMatch || affiliationMatch || affiliationEnMatch;
     });
+
+    // 2시간 초과자만 필터링
+    let overtimeCount = 0;
+    if (typeof calculateSpeakerTotalTime === 'function') {
+        // 전체 초과자 수 계산
+        AppState.speakers.forEach(speaker => {
+            const timeStats = calculateSpeakerTotalTime(speaker.name);
+            if (timeStats.totalMinutes > 120) overtimeCount++;
+        });
+        
+        // 초과자 수 표시
+        const countEl = document.getElementById('speakerOvertimeCount');
+        if (countEl) {
+            countEl.textContent = overtimeCount > 0 ? `(${overtimeCount}명 초과)` : '(초과자 없음)';
+            countEl.style.color = overtimeCount > 0 ? '#E53935' : '#4CAF50';
+        }
+        
+        // 필터 적용
+        if (filterOvertime) {
+            filtered = filtered.filter(speaker => {
+                const timeStats = calculateSpeakerTotalTime(speaker.name);
+                return timeStats.totalMinutes > 120;
+            });
+        }
+    }
 
     // 정렬
     const sorted = [...filtered];
@@ -190,6 +216,26 @@ window.getSortedAndFilteredSpeakers = function() {
             break;
         case 'recent':
             sorted.reverse();
+            break;
+        case 'time-desc':
+            // 활동시간 많은 순
+            if (typeof calculateSpeakerTotalTime === 'function') {
+                sorted.sort((a, b) => {
+                    const aTime = calculateSpeakerTotalTime(a.name).totalMinutes;
+                    const bTime = calculateSpeakerTotalTime(b.name).totalMinutes;
+                    return bTime - aTime;
+                });
+            }
+            break;
+        case 'time-asc':
+            // 활동시간 적은 순
+            if (typeof calculateSpeakerTotalTime === 'function') {
+                sorted.sort((a, b) => {
+                    const aTime = calculateSpeakerTotalTime(a.name).totalMinutes;
+                    const bTime = calculateSpeakerTotalTime(b.name).totalMinutes;
+                    return aTime - bTime;
+                });
+            }
             break;
     }
 
@@ -277,10 +323,31 @@ window.updateSpeakerList = function() {
             statsHtml = `<span style="background: ${bgColor}; color: white; padding: 0.1rem 0.5rem; border-radius: 3px; font-size: 0.7rem; margin-left: 0.5rem;">${statParts.join(' / ')}</span>`;
         }
         
+        // 총 활동 시간 계산 (강의 + 좌장)
+        let timeStatsHtml = '';
+        if (typeof calculateSpeakerTotalTime === 'function') {
+            const timeStats = calculateSpeakerTotalTime(speaker.name);
+            if (timeStats.totalMinutes > 0) {
+                const isOverLimit = timeStats.totalMinutes > 120;
+                const bgColor = isOverLimit ? '#E53935' : '#2196F3';
+                const icon = isOverLimit ? '⚠️' : '⏱️';
+                
+                let timeText = formatMinutesToHM(timeStats.totalMinutes);
+                let detailText = '';
+                if (timeStats.lectureMinutes > 0) detailText += `강의${timeStats.lectureMinutes}분`;
+                if (timeStats.moderatorMinutes > 0) {
+                    if (detailText) detailText += '+';
+                    detailText += `좌장${timeStats.moderatorMinutes}분`;
+                }
+                
+                timeStatsHtml = `<span style="background: ${bgColor}; color: white; padding: 0.1rem 0.5rem; border-radius: 3px; font-size: 0.7rem; margin-left: 0.3rem;" title="${detailText}">${icon} ${timeText}</span>`;
+            }
+        }
+        
         return `
             <div class="speaker-item">
                 <div class="speaker-info">
-                    <strong>${speaker.name}${speaker.nameEn ? ' / ' + speaker.nameEn : ''}${aslsBadge}${statsHtml}</strong>
+                    <strong>${speaker.name}${speaker.nameEn ? ' / ' + speaker.nameEn : ''}${aslsBadge}${statsHtml}${timeStatsHtml}</strong>
                     <small>${speaker.affiliation}${speaker.affiliationEn ? ' / ' + speaker.affiliationEn : ''}</small>
                     ${tagsHtml}
                 </div>

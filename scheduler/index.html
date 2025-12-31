@@ -427,7 +427,16 @@
                         <option value="name-en">ABC순 (영문)</option>
                         <option value="affiliation">소속순</option>
                         <option value="recent">최근 추가순</option>
+                        <option value="time-desc">활동시간 많은순</option>
+                        <option value="time-asc">활동시간 적은순</option>
                     </select>
+                </div>
+                <div style="margin-top: 0.5rem; display: flex; gap: 1rem; align-items: center;">
+                    <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
+                        <input type="checkbox" id="speakerFilterOvertime" onchange="updateSpeakerList()" style="width: 16px; height: 16px; accent-color: #E53935;">
+                        <span style="color: #E53935;">⚠️ 2시간 초과자만 보기</span>
+                    </label>
+                    <span id="speakerOvertimeCount" style="font-size: 0.8rem; color: #666;"></span>
                 </div>
             </div>
 
