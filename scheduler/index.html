@@ -13,6 +13,9 @@
     <!-- SheetJS for Excel parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
+    <!-- CryptoJS for backup encryption -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    
     <!-- Styles -->
     <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -47,11 +50,9 @@
                 <span id="syncText">동기화됨</span>
             </div>
             
-            <!-- 백업 상태 -->
-            <div class="backup-status" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: rgba(255,255,255,0.8);">
-                <button class="btn btn-small" onclick="createManualBackup()" title="수동 백업" style="background: rgba(255,255,255,0.2); color: white; padding: 0.25rem 0.5rem; font-size: 0.7rem;">💾</button>
-                <button class="btn btn-small" onclick="openBackupModal()" title="백업 관리" style="background: rgba(255,255,255,0.2); color: white; padding: 0.25rem 0.5rem; font-size: 0.7rem;">📋</button>
-                <span style="font-size: 0.65rem;">마지막: <span id="lastBackupTime">-</span></span>
+            <!-- 마지막 백업 시간 -->
+            <div class="backup-info" style="font-size: 0.65rem; color: rgba(255,255,255,0.7);">
+                마지막: <span id="lastBackupTime">-</span>
             </div>
             
             <!-- 온라인 사용자 -->
@@ -72,35 +73,52 @@
                 <span id="authText">로그인 필요</span>
             </div>
             
-            <!-- 사용자 관리 버튼 (관리자만 보임) -->
-            <button class="btn btn-secondary btn-small user-mgmt-btn" onclick="openUserManagementModal()">
-                👥사용자
-                <span class="pending-badge" id="pendingBadge" style="display:none;">0</span>
-            </button>
+            <!-- 버튼 그룹 1: 사용자 관리 -->
+            <div class="btn-group" style="display: flex; gap: 0.2rem; padding: 0.2rem; background: rgba(255,255,255,0.1); border-radius: 6px;">
+                <button class="btn btn-secondary btn-small user-mgmt-btn" onclick="openUserManagementModal()" title="사용자 관리">
+                    👥
+                    <span class="pending-badge" id="pendingBadge" style="display:none;">0</span>
+                </button>
+            </div>
             
-            <button class="btn btn-secondary btn-small" id="undoBtn" onclick="performUndo()" disabled>↩(0)</button>
-            <button class="btn btn-secondary btn-small" onclick="openSessionModal()">📋세션</button>
-            <button class="btn btn-secondary btn-small" onclick="openHelpModal()">❓</button>
-            <button class="btn btn-secondary btn-small" onclick="openSpeakerModal()">👤연자</button>
-            <button class="btn btn-secondary btn-small" onclick="openTypoCheckModal()" title="맞춤법 검사">✏️오타</button>
-            <button class="btn btn-primary btn-small" onclick="openUploadModal()">📤업로드</button>
-            <button class="btn btn-secondary btn-small" onclick="openBackupModal()">💾백업</button>
+            <!-- 버튼 그룹 2: 편집 도구 -->
+            <div class="btn-group" style="display: flex; gap: 0.2rem; padding: 0.2rem; background: rgba(255,255,255,0.1); border-radius: 6px;">
+                <button class="btn btn-secondary btn-small" id="undoBtn" onclick="performUndo()" disabled title="되돌리기 (Ctrl+Z)">↩</button>
+                <button class="btn btn-secondary btn-small" onclick="openSessionModal()" title="세션 관리">📋</button>
+                <button class="btn btn-secondary btn-small" onclick="openSpeakerModal()" title="연자 관리">👤</button>
+                <button class="btn btn-secondary btn-small" onclick="openTypoCheckModal()" title="맞춤법 검사">✏️</button>
+            </div>
             
-            <!-- 인쇄/내보내기 드롭다운 -->
-            <div class="dropdown" style="position: relative;">
-                <button class="btn btn-secondary btn-small" onclick="toggleExportDropdown()">🖨️출력 ▼</button>
-                <div class="dropdown-menu" id="exportDropdown" style="display: none; position: absolute; top: 100%; right: 0; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 180px; z-index: 1000;">
-                    <button class="dropdown-item" onclick="openPrintModal()">🖨️ 인쇄/PDF</button>
-                    <button class="dropdown-item" onclick="exportToExcel()">📊 엑셀로 내보내기</button>
+            <!-- 버튼 그룹 3: 데이터 관리 -->
+            <div class="btn-group" style="display: flex; gap: 0.2rem; padding: 0.2rem; background: rgba(255,255,255,0.1); border-radius: 6px;">
+                <button class="btn btn-primary btn-small" onclick="openUploadModal()" title="강의 업로드">📤</button>
+                <button class="btn btn-secondary btn-small" onclick="openBackupModal()" title="백업 관리">💾</button>
+                <button class="btn btn-secondary btn-small" onclick="openSponsorManagementModal()" title="스폰서 강의 관리">🏢</button>
+            </div>
+            
+            <!-- 버튼 그룹 4: 출력 -->
+            <div class="btn-group" style="display: flex; gap: 0.2rem; padding: 0.2rem; background: rgba(255,255,255,0.1); border-radius: 6px;">
+                <div class="dropdown" style="position: relative;">
+                    <button class="btn btn-secondary btn-small" onclick="toggleExportDropdown()" title="출력">🖨️▼</button>
+                    <div class="dropdown-menu" id="exportDropdown" style="display: none; position: absolute; top: 100%; right: 0; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 180px; z-index: 1000;">
+                        <button class="dropdown-item" onclick="openPrintModal()">🖨️ 인쇄/PDF</button>
+                        <button class="dropdown-item" onclick="exportToExcel()">📊 엑셀로 내보내기</button>
+                    </div>
                 </div>
             </div>
             
-            <button class="btn btn-secondary btn-small admin-only-btn" onclick="resetAllData()" style="color:#e74c3c; display:none;">🔄초기화</button>
+            <button class="btn btn-secondary btn-small admin-only-btn" onclick="resetAllData()" style="color:#e74c3c; display:none;" title="전체 초기화">🔄</button>
         </div>
     </div>
 
     <div class="container">
-        <div class="sidebar">
+        <div class="sidebar" id="sidebar">
+            <!-- 사이드바 토글 버튼 -->
+            <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="사이드바 접기/펼치기">
+                <span id="sidebarToggleIcon">◀</span>
+            </button>
+            
+            <div class="sidebar-content" id="sidebarContent">
             <div class="card" id="addLectureCard">
                 <div class="card-title" onclick="toggleCard('addLectureCard')">
                     ➕ 강의 추가
@@ -228,18 +246,18 @@
                     <div class="lecture-list" id="lectureList"></div>
                 </div>
             </div>
+            </div><!-- sidebar-content 닫기 -->
         </div>
 
-        <div class="schedule-grid">
+        <div class="schedule-grid" id="scheduleGrid">
             <div class="grid-header">
                 <h2>시간표</h2>
                 <div class="date-selector-btns" id="dateSelectorBtns">
-                    <button class="date-btn active" data-date="2026-04-11" onclick="switchDate('2026-04-11')">📅 토요일 (4/11)</button>
-                    <button class="date-btn" data-date="2026-04-12" onclick="switchDate('2026-04-12')">📅 일요일 (4/12)</button>
+                    <!-- 날짜 버튼은 JavaScript에서 동적 생성 -->
                 </div>
-                <button class="btn btn-small btn-secondary" onclick="openTimeSettingsModal()" style="margin-left: 0.5rem;" title="시간대 설정">⏰</button>
+                <button class="btn btn-small btn-secondary" onclick="openEventDateModal()" style="margin-left: 0.5rem;" title="행사 날짜 관리">📅+</button>
+                <button class="btn btn-small btn-secondary" onclick="openTimeSettingsModal()" style="margin-left: 0.25rem;" title="시간대 설정">⏰</button>
                 <button class="btn btn-small btn-secondary" onclick="addRoom()" style="margin-left: 0.25rem;" title="룸 추가">➕</button>
-                <button class="btn btn-small btn-primary" onclick="openScheduleUploadModal()" style="margin-left: 0.25rem;" title="배치 완료 파일 업로드">📥 배치업로드</button>
                 <button class="btn btn-small btn-secondary" onclick="openFullScheduleModal()" style="margin-left: 0.25rem;" title="전체 시간표 크게 보기">🔍 크게보기</button>
             </div>
 
@@ -654,52 +672,6 @@
         </div>
     </div>
 
-    <!-- 도움말 모달 -->
-    <div class="modal" id="helpModal">
-        <div class="modal-content" style="max-width: 800px;">
-            <div class="modal-header">
-                <h2>❓ 사용 도움말</h2>
-                <button class="modal-close" onclick="closeHelpModal()">×</button>
-            </div>
-            
-            <div style="max-height: 70vh; overflow-y: auto; padding: 1rem;">
-                <h3 style="color: var(--primary); margin-top: 1rem; margin-bottom: 0.5rem;">🔄 실시간 동기화</h3>
-                <div style="background: #E8F5E9; padding: 1rem; border-radius: 8px; border-left: 4px solid #4CAF50; margin-bottom: 1rem;">
-                    <p>✅ 모든 변경사항은 <strong>Firebase에 자동 저장</strong>됩니다.</p>
-                    <p>✅ 여러 사용자가 동시에 작업해도 충돌 없이 동기화됩니다.</p>
-                </div>
-
-                <h3 style="color: var(--primary); margin-top: 1.5rem; margin-bottom: 0.5rem;">📝 강의 추가</h3>
-                <div style="background: var(--bg); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                    <p>① 분류 선택 (25개 카테고리)</p>
-                    <p>② 제목 입력 (한글/영문)</p>
-                    <p>③ 연자 입력 - 자동완성 활용</p>
-                    <p>④ "강의 추가" 버튼 클릭</p>
-                </div>
-
-                <h3 style="color: var(--primary); margin-top: 1.5rem; margin-bottom: 0.5rem;">🗓️ 시간표 배치</h3>
-                <div style="background: var(--bg); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                    <p>① 강의 목록에서 강의를 <strong>드래그</strong></p>
-                    <p>② 원하는 시간/룸에 <strong>드롭</strong></p>
-                    <p>③ 배치된 강의를 더블클릭하여 수정</p>
-                    <p>④ × 버튼으로 시간표에서 제거</p>
-                </div>
-
-                <h3 style="color: var(--primary); margin-top: 1.5rem; margin-bottom: 0.5rem;">⚠️ 충돌 감지</h3>
-                <div style="background: #FFF3CD; padding: 1rem; border-radius: 8px; border-left: 4px solid #FFC107;">
-                    <p><strong>시간 겹침:</strong> 같은 룸에서 시간이 겹치면 경고</p>
-                    <p><strong>연자 충돌:</strong> 다른 룸 간 이동시간 20분 필요</p>
-                </div>
-
-                <h3 style="color: var(--primary); margin-top: 1.5rem; margin-bottom: 0.5rem;">⌨️ 단축키</h3>
-                <div style="background: var(--bg); padding: 1rem; border-radius: 8px;">
-                    <p><strong>Ctrl+Z:</strong> 되돌리기 (최대 5단계)</p>
-                    <p><strong>Tab:</strong> 배치된 강의 선택 후 세션 소속 토글</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- 사용자 관리 모달 -->
     <div class="modal" id="userManagementModal">
         <div class="modal-content" style="max-width: 550px;">
@@ -741,26 +713,39 @@
 
     <!-- 백업 관리 모달 -->
     <div class="modal" id="backupModal">
-        <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
                 <h2>💾 백업 관리</h2>
                 <button class="modal-close" onclick="closeBackupModal()">×</button>
             </div>
             
             <div style="padding: 1rem;">
-                <div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
-                    <button class="btn btn-primary" onclick="createBackup()" style="flex:1;">➕ 새 백업 생성</button>
-                </div>
-                
-                <div class="backup-list-container">
-                    <h4 style="margin-bottom:0.5rem; color:var(--primary);">📁 저장된 백업</h4>
-                    <div id="backupList" style="max-height:300px; overflow-y:auto;">
-                        <p style="text-align:center; color:#999;">로딩 중...</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <div style="font-size: 0.85rem; color: #666;">
+                        🔄 자동 백업: 매일 저녁 · 최대 10개 유지
                     </div>
+                    <button class="btn btn-primary btn-small" onclick="createManualBackup()">
+                        💾 지금 백업
+                    </button>
                 </div>
                 
-                <div style="margin-top:1rem; padding:0.75rem; background:#fff3cd; border-radius:8px; font-size:0.8rem;">
-                    ⚠️ 복원 시 현재 데이터가 자동으로 백업됩니다.
+                <!-- 백업 암호화 설정 -->
+                <div style="background: #E3F2FD; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="encryptBackup" checked style="width: 18px; height: 18px;">
+                        <span style="font-size: 0.85rem;">🔒 백업 파일 암호화 (다운로드 시)</span>
+                    </label>
+                </div>
+                
+                <div style="background: #f5f5f5; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <p style="font-size: 0.8rem; color: #666; margin: 0;">
+                        ℹ️ 복원 시 현재 데이터가 백업 시점으로 대체됩니다.<br>
+                        복원 전 자동으로 현재 상태가 백업됩니다.
+                    </p>
+                </div>
+                
+                <div id="backupList" style="max-height: 400px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px;">
+                    <p style="text-align: center; padding: 2rem; color: #999;">로딩 중...</p>
                 </div>
             </div>
         </div>
@@ -804,33 +789,67 @@
         </div>
     </div>
 
-    <!-- 백업 관리 모달 -->
-    <div class="modal" id="backupModal">
+    <!-- 행사 날짜 관리 모달 -->
+    <div class="modal" id="eventDateModal">
         <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
-                <h2>💾 백업 관리</h2>
-                <button class="modal-close" onclick="closeBackupModal()">×</button>
+                <h2>📅 행사 날짜 관리</h2>
+                <button class="modal-close" onclick="closeEventDateModal()">×</button>
             </div>
             
             <div style="padding: 1rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <div style="font-size: 0.85rem; color: #666;">
-                        🔄 자동 백업: 5분마다 · 최대 10개 유지
-                    </div>
-                    <button class="btn btn-primary btn-small" onclick="createManualBackup()">
-                        💾 지금 백업
-                    </button>
+                <div style="background: #E8F4FD; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <p style="margin: 0; font-size: 0.9rem;">여러 행사의 날짜를 추가하고 관리할 수 있습니다.</p>
+                    <p style="margin: 0.5rem 0 0 0; font-size: 0.85rem; color: #666;">예: ASLS춘계(4/11), ASLS추계(10/5), ASLS도쿄(6/28)</p>
                 </div>
                 
-                <div style="background: #f5f5f5; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
-                    <p style="font-size: 0.8rem; color: #666; margin: 0;">
-                        ℹ️ 복원 시 현재 데이터가 선택한 시점으로 대체됩니다.<br>
-                        복원 전 자동으로 현재 상태가 백업됩니다.
+                <!-- 새 날짜 추가 -->
+                <div class="form-group">
+                    <label>새 행사 날짜 추가</label>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <input type="date" id="newEventDate" style="flex: 1; min-width: 150px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px;">
+                        <input type="text" id="newEventLabel" placeholder="행사명 (예: ASLS춘계)" style="flex: 1; min-width: 150px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px;">
+                        <button class="btn btn-primary" onclick="addEventDate()">추가</button>
+                    </div>
+                </div>
+                
+                <!-- 현재 날짜 목록 -->
+                <div style="margin-top: 1rem;">
+                    <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">현재 등록된 행사 날짜</label>
+                    <div id="eventDateList" style="max-height: 300px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px;">
+                        <!-- 동적 생성 -->
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1rem; padding: 0.75rem; background: #FFF3E0; border-radius: 8px;">
+                    <p style="font-size: 0.8rem; color: #E65100; margin: 0;">
+                        ⚠️ 날짜를 삭제하면 해당 날짜의 모든 강의와 세션이 삭제됩니다.
                     </p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 스폰서 강의 관리 모달 -->
+    <div class="modal" id="sponsorManagementModal">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh;">
+            <div class="modal-header">
+                <h2>🏢 스폰서 강의 관리</h2>
+                <button class="modal-close" onclick="closeSponsorManagementModal()">×</button>
+            </div>
+            
+            <div style="padding: 1rem;">
+                <!-- 탭 네비게이션 -->
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 2px solid #eee; padding-bottom: 0.5rem;">
+                    <button class="btn btn-small sponsor-tab active" data-tab="overview" onclick="switchSponsorTab('overview')">📊 전체 현황</button>
+                    <button class="btn btn-small sponsor-tab" data-tab="byCompany" onclick="switchSponsorTab('byCompany')">🏢 업체별 보기</button>
+                    <button class="btn btn-small sponsor-tab" data-tab="unscheduled" onclick="switchSponsorTab('unscheduled')">📌 미배치 강의</button>
+                    <button class="btn btn-small sponsor-tab" data-tab="lectureTypes" onclick="switchSponsorTab('lectureTypes')">⚙️ 강의 종류 설정</button>
+                </div>
                 
-                <div id="backupList" style="max-height: 400px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px;">
-                    <p style="text-align: center; padding: 2rem; color: #999;">로딩 중...</p>
+                <!-- 탭 컨텐츠 -->
+                <div id="sponsorTabContent" style="max-height: calc(90vh - 200px); overflow-y: auto;">
+                    <!-- 동적 생성 -->
                 </div>
             </div>
         </div>
@@ -865,31 +884,6 @@
             <div class="speaker-list" id="companyList" style="max-height: 400px; margin: 0 1rem 1rem 1rem;"></div>
         </div>
     </div>
-
-    <!-- 배치 완료 파일 업로드 모달 -->
-    <div class="modal" id="scheduleUploadModal">
-        <div class="modal-content" style="max-width: 700px;">
-            <div class="modal-header">
-                <h2>📥 배치 완료 파일 업로드</h2>
-                <button class="modal-close" onclick="closeScheduleUploadModal()">×</button>
-            </div>
-            
-            <div style="padding: 1rem;">
-                <div style="background: #E8F4FD; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                    <p style="margin-bottom: 0.5rem;"><strong>📋 세션 + 강의 배치 완료 파일</strong></p>
-                    <p style="font-size: 0.85rem; color: #666;">세션명, 시작시간, 종료시간, 강의제목, 연자명이 포함된 엑셀 파일을 업로드하면</p>
-                    <p style="font-size: 0.85rem; color: #666;">세션 생성 + 강의 등록 + 시간표 배치가 한 번에 완료됩니다.</p>
-                </div>
-                
-                <div style="background: #FFF8E1; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
-                    <p style="font-size: 0.8rem; color: #F57C00; margin: 0;">
-                        ⚠️ 파일 형식: 시간(분), 시작시간, 종료시간, 좌장, 좌장명, 세션명, 제목, 병원명, 연자명, 제품명, 업체
-                    </p>
-                </div>
-                
-                <!-- 덮어쓰기 옵션 -->
-                <div style="background: #FFEBEE; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                         <input type="checkbox" id="scheduleOverwriteCheckbox" checked>
                         <span style="font-size: 0.85rem; color: #C62828;">
                             <strong>🔄 기존 강의 덮어쓰기</strong> - 같은 시간대에 기존 강의가 있으면 교체
@@ -995,6 +989,7 @@
     <script src="js/upload.js"></script>
     <script src="js/typo-check.js"></script>
     <script src="js/modals.js"></script>
+    <script src="js/sponsor.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

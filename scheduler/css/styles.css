@@ -490,6 +490,55 @@ body {
 .sidebar {
     width: 380px;
     flex-shrink: 0;
+    position: relative;
+    transition: width 0.3s ease, margin 0.3s ease;
+}
+
+/* 사이드바 토글 버튼 */
+.sidebar-toggle {
+    position: absolute;
+    top: 10px;
+    right: -15px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    border: 2px solid white;
+    cursor: pointer;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    transition: transform 0.3s ease;
+}
+
+.sidebar-toggle:hover {
+    transform: scale(1.1);
+    background: var(--accent);
+}
+
+/* 사이드바 접힌 상태 */
+.sidebar.collapsed {
+    width: 0;
+    margin-right: -1.5rem;
+    overflow: hidden;
+}
+
+.sidebar.collapsed .sidebar-content {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.sidebar.collapsed .sidebar-toggle {
+    right: -45px;
+}
+
+/* 사이드바 접힐 때 시간표 확장 */
+.sidebar.collapsed + .schedule-grid {
+    flex: 1;
 }
 
 /* ============================================
@@ -950,9 +999,9 @@ body {
     font-weight: 700;
     text-align: center;
     font-size: 0.8rem;
-    width: 225px;
-    min-width: 225px;
-    max-width: 225px;
+    width: 150px;
+    min-width: 150px;
+    max-width: 150px;
     position: sticky;
     top: 0;
 }
@@ -961,7 +1010,7 @@ body {
     position: sticky;
     left: 0;
     z-index: 200;
-    min-width: 80px;
+    min-width: 55px;
 }
 
 .schedule-table tbody td:first-child {
@@ -969,7 +1018,7 @@ body {
     left: 0;
     z-index: 50;
     background: var(--bg);
-    min-width: 80px;
+    min-width: 55px;
     font-size: 0.75rem;
     font-weight: 600;
     text-align: right;
@@ -993,14 +1042,14 @@ body {
 
 .schedule-table tbody td {
     background: var(--white);
-    min-height: 30px;
-    height: 30px;
+    min-height: 20px;
+    height: 20px;
     position: relative;
     padding: 0;
     vertical-align: top;
-    width: 225px;
-    min-width: 225px;
-    max-width: 225px;
+    width: 150px;
+    min-width: 150px;
+    max-width: 150px;
 }
 
 .schedule-table tbody td.hour-mark {
@@ -1053,9 +1102,9 @@ body {
     text-align: right;
     color: var(--text-light);
     position: relative;
-    min-width: 80px;
-    min-height: 30px;
-    height: 30px;
+    min-width: 55px;
+    min-height: 20px;
+    height: 20px;
     display: flex;
     align-items: flex-start;
     justify-content: flex-end;
@@ -1095,14 +1144,14 @@ body {
 
 .schedule-cell {
     background: var(--white);
-    min-height: 30px;
-    height: 30px;
+    min-height: 20px;
+    height: 20px;
     position: relative;
     transition: all 0.2s;
     padding: 0;
-    width: 225px;
-    min-width: 225px;
-    max-width: 225px;
+    width: 150px;
+    min-width: 150px;
+    max-width: 150px;
 }
 
 .schedule-cell.hour-mark {
@@ -1984,4 +2033,65 @@ body {
 
 .dropdown-item:not(:last-child) {
     border-bottom: 1px solid #eee;
+}
+
+/* ============================================
+   스폰서 탭 스타일
+   ============================================ */
+
+.sponsor-tab {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    color: #666;
+    transition: all 0.2s;
+}
+
+.sponsor-tab:hover {
+    background: #e0e0e0;
+}
+
+.sponsor-tab.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* ============================================
+   날짜 선택 버튼 스타일
+   ============================================ */
+
+.date-selector-btns {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.date-btn {
+    padding: 0.4rem 0.8rem;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: white;
+    color: var(--text);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.date-btn:hover {
+    border-color: var(--accent);
+    background: #fff0f5;
+}
+
+.date-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* ============================================
+   사이드바 콘텐츠 래퍼
+   ============================================ */
+
+.sidebar-content {
+    transition: opacity 0.3s ease, visibility 0.3s ease;
 }

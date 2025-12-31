@@ -43,6 +43,18 @@ window.createScheduleTable = function() {
         };
         roomHeader.appendChild(expandBtn);
 
+        // 별표 토글 버튼 (룸 이름에 별표 붙이기)
+        const starBtn = document.createElement('button');
+        const hasStars = room.includes('⭐') || room.includes('★');
+        starBtn.textContent = hasStars ? '★' : '☆';
+        starBtn.title = hasStars ? '별표 제거' : '별표 추가';
+        starBtn.style.cssText = `position:absolute;top:2px;left:24px;background:rgba(255,255,255,0.3);border:none;color:${hasStars ? '#FFD700' : 'white'};width:20px;height:20px;border-radius:4px;cursor:pointer;font-size:0.7rem;`;
+        starBtn.onclick = (e) => {
+            e.stopPropagation();
+            toggleRoomStar(roomIndex);
+        };
+        roomHeader.appendChild(starBtn);
+
         // 왼쪽 이동 버튼
         if (roomIndex > 0) {
             const moveLeftBtn = document.createElement('button');
@@ -69,7 +81,7 @@ window.createScheduleTable = function() {
             roomHeader.appendChild(moveRightBtn);
         }
 
-        // 룸 이름 입력
+        // 룸 이름 표시 (별표 포함)
         const roomInput = document.createElement('input');
         roomInput.type = 'text';
         roomInput.value = room;
@@ -1167,6 +1179,33 @@ window.moveRoom = function(roomIndex, direction) {
     updateScheduleDisplay();
     
     console.log(`룸 이동: ${currentRoom} ↔ ${targetRoom}`);
+};
+
+/**
+ * 룸 별표 토글
+ */
+window.toggleRoomStar = function(roomIndex) {
+    const room = AppState.rooms[roomIndex];
+    const oldName = room;
+    let newName;
+    
+    // 별표가 있으면 제거, 없으면 추가
+    if (room.includes('⭐') || room.includes('★')) {
+        newName = room.replace(/[⭐★]\s*/g, '').trim();
+    } else {
+        newName = '⭐ ' + room;
+    }
+    
+    // 룸 이름 업데이트
+    updateRoomNameInData(oldName, newName);
+    AppState.rooms[roomIndex] = newName;
+    
+    saveRoomsToStorage();
+    saveAndSync();
+    createScheduleTable();
+    updateScheduleDisplay();
+    
+    console.log(`룸 별표 토글: ${oldName} → ${newName}`);
 };
 
 console.log('✅ schedule.js 로드 완료');

@@ -228,6 +228,24 @@ window.deleteRoom = function(roomIndex) {
     createScheduleTable();
 };
 
+window.moveRoom = function(roomIndex, direction) {
+    const newIndex = direction === 'left' ? roomIndex - 1 : roomIndex + 1;
+    
+    // 범위 체크
+    if (newIndex < 0 || newIndex >= AppState.rooms.length) return;
+    
+    // 룸 순서 변경
+    const temp = AppState.rooms[roomIndex];
+    AppState.rooms[roomIndex] = AppState.rooms[newIndex];
+    AppState.rooms[newIndex] = temp;
+    
+    // 저장 및 UI 업데이트
+    saveRoomsToStorage();
+    saveAndSync();
+    createScheduleTable();
+    updateScheduleDisplay();
+};
+
 window.updateRoomNameInData = function(oldName, newName) {
     const newSchedule = {};
     Object.entries(AppState.schedule).forEach(([key, value]) => {
@@ -931,29 +949,50 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ============================================
-// 자동 백업 시스템
+// 자동 백업 시스템 (매일 저녁 1회)
 // ============================================
 
-let autoBackupInterval = null;
-const BACKUP_INTERVAL = 5 * 60 * 1000; // 5분
+let dailyBackupTimeout = null;
 const MAX_BACKUPS = 10; // 최대 백업 개수
+const BACKUP_ENCRYPTION_KEY = 'ASLS-Conference-2026-Secure'; // 암호화 키
 
 /**
- * 자동 백업 시작
+ * 매일 저녁 자동 백업 스케줄 시작
  */
 window.startAutoBackup = function() {
-    if (autoBackupInterval) {
-        clearInterval(autoBackupInterval);
+    scheduleDailyBackup();
+    console.log('⏰ 매일 저녁 자동 백업 스케줄 시작');
+};
+
+/**
+ * 다음 백업 시간까지 타이머 설정 (저녁 9시)
+ */
+function scheduleDailyBackup() {
+    if (dailyBackupTimeout) {
+        clearTimeout(dailyBackupTimeout);
     }
     
-    autoBackupInterval = setInterval(() => {
+    const now = new Date();
+    const backupTime = new Date();
+    backupTime.setHours(21, 0, 0, 0); // 저녁 9시
+    
+    // 이미 오늘 9시가 지났으면 내일로
+    if (now > backupTime) {
+        backupTime.setDate(backupTime.getDate() + 1);
+    }
+    
+    const msUntilBackup = backupTime - now;
+    
+    dailyBackupTimeout = setTimeout(() => {
         if (canEdit()) {
             createAutoBackup();
         }
-    }, BACKUP_INTERVAL);
+        // 다음 날 백업 스케줄
+        scheduleDailyBackup();
+    }, msUntilBackup);
     
-    console.log('⏰ 자동 백업 시작 (5분 간격)');
-};
+    console.log(`📅 다음 자동 백업: ${backupTime.toLocaleString('ko-KR')}`);
+}
 
 /**
  * 자동 백업 생성
@@ -992,7 +1031,8 @@ window.createBackup = function(type = 'manual') {
             speakers: AppState.speakers,
             companies: AppState.companies,
             categories: AppState.categories,
-            timeSettingsByDate: AppState.timeSettingsByDate
+            timeSettingsByDate: AppState.timeSettingsByDate,
+            eventDates: AppState.eventDates || []
         }
     };
     
@@ -1007,7 +1047,7 @@ window.createBackup = function(type = 'manual') {
 };
 
 /**
- * 오래된 백업 정리 (최대 개수 유지)
+ * 오래된 백업 정리 (최대 10개 유지)
  */
 window.cleanupOldBackups = function() {
     database.ref('/backups').orderByChild('timestamp').once('value', (snapshot) => {
@@ -1019,13 +1059,143 @@ window.cleanupOldBackups = function() {
         // 오래된 순으로 정렬
         backups.sort((a, b) => a.timestamp - b.timestamp);
         
-        // MAX_BACKUPS 초과 시 오래된 것 삭제
+        // MAX_BACKUPS(10개) 초과 시 오래된 것 삭제
         while (backups.length > MAX_BACKUPS) {
             const oldBackup = backups.shift();
             database.ref(`/backups/${oldBackup.key}`).remove();
             console.log(`🗑️ 오래된 백업 삭제: ${oldBackup.dateStr}`);
         }
     });
+};
+
+/**
+ * 백업 파일 암호화 다운로드
+ */
+window.downloadEncryptedBackup = function(backupKey) {
+    database.ref(`/backups/${backupKey}`).once('value', (snapshot) => {
+        const backup = snapshot.val();
+        if (!backup) {
+            alert('백업 데이터를 찾을 수 없습니다.');
+            return;
+        }
+        
+        const jsonStr = JSON.stringify(backup.data);
+        const encryptCheckbox = document.getElementById('encryptBackup');
+        
+        let downloadData;
+        let filename;
+        
+        if (encryptCheckbox && encryptCheckbox.checked && typeof CryptoJS !== 'undefined') {
+            // AES 암호화
+            const encrypted = CryptoJS.AES.encrypt(jsonStr, BACKUP_ENCRYPTION_KEY).toString();
+            downloadData = JSON.stringify({
+                encrypted: true,
+                data: encrypted,
+                timestamp: backup.timestamp,
+                dateStr: backup.dateStr
+            });
+            filename = `conference_backup_encrypted_${backup.timestamp}.json`;
+            console.log('🔒 암호화된 백업 다운로드');
+        } else {
+            // 일반 다운로드
+            downloadData = JSON.stringify(backup, null, 2);
+            filename = `conference_backup_${backup.timestamp}.json`;
+        }
+        
+        const blob = new Blob([downloadData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        alert('✅ 백업 파일이 다운로드되었습니다.');
+    });
+};
+
+/**
+ * 암호화된 백업 파일 복원
+ */
+window.uploadAndRestoreBackup = function() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const data = JSON.parse(event.target.result);
+                
+                let restoreData;
+                
+                if (data.encrypted && typeof CryptoJS !== 'undefined') {
+                    // 암호화된 백업 복호화
+                    const password = prompt('🔐 백업 파일이 암호화되어 있습니다.\n복호화 키를 입력하세요:');
+                    if (!password) return;
+                    
+                    try {
+                        const decrypted = CryptoJS.AES.decrypt(data.data, password);
+                        const decryptedStr = decrypted.toString(CryptoJS.enc.Utf8);
+                        
+                        if (!decryptedStr) {
+                            alert('❌ 복호화 실패: 잘못된 키입니다.');
+                            return;
+                        }
+                        
+                        restoreData = JSON.parse(decryptedStr);
+                    } catch (err) {
+                        alert('❌ 복호화 실패: ' + err.message);
+                        return;
+                    }
+                } else if (data.data) {
+                    // 일반 백업 파일
+                    restoreData = data.data;
+                } else {
+                    // 직접 데이터
+                    restoreData = data;
+                }
+                
+                if (!confirm('⚠️ 현재 데이터를 백업 파일로 덮어씁니다.\n계속하시겠습니까?')) {
+                    return;
+                }
+                
+                // 복원 전 현재 상태 백업
+                createBackup('before-file-restore');
+                
+                // 데이터 복원
+                if (restoreData.dataByDate) AppState.dataByDate = restoreData.dataByDate;
+                if (restoreData.speakers) AppState.speakers = restoreData.speakers;
+                if (restoreData.companies) AppState.companies = restoreData.companies;
+                if (restoreData.categories) AppState.categories = restoreData.categories;
+                if (restoreData.timeSettingsByDate) AppState.timeSettingsByDate = restoreData.timeSettingsByDate;
+                if (restoreData.eventDates) AppState.eventDates = restoreData.eventDates;
+                
+                loadDateData(AppState.currentDate);
+                generateTimeSlots();
+                saveToFirebase();
+                
+                createScheduleTable();
+                updateLectureList();
+                updateCategoryDropdowns();
+                
+                closeBackupModal();
+                alert('✅ 백업 파일에서 복원되었습니다.');
+                
+            } catch (err) {
+                alert('❌ 파일 읽기 실패: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    };
+    
+    input.click();
 };
 
 /**
@@ -1063,7 +1233,14 @@ window.openBackupModal = function() {
             return;
         }
         
-        list.innerHTML = backups.map((backup, idx) => {
+        let html = `
+            <div style="padding: 0.5rem; background: #f0f0f0; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; color: #666;">총 ${backups.length}개 백업</span>
+                <button class="btn btn-secondary btn-small" onclick="uploadAndRestoreBackup()">📁 파일에서 복원</button>
+            </div>
+        `;
+        
+        html += backups.map((backup, idx) => {
             const typeLabel = backup.type === 'auto' ? '🔄 자동' : '💾 수동';
             const isLatest = idx === 0;
             
@@ -1077,13 +1254,16 @@ window.openBackupModal = function() {
                             ${typeLabel} · ${backup.createdBy || '알 수 없음'}
                         </div>
                     </div>
-                    <div>
-                        <button class="btn btn-secondary btn-small" onclick="previewBackup('${backup.key}')" style="margin-right: 0.25rem;">미리보기</button>
-                        <button class="btn btn-primary btn-small" onclick="restoreBackup('${backup.key}')">복원</button>
+                    <div style="display: flex; gap: 0.25rem;">
+                        <button class="btn btn-secondary btn-small" onclick="downloadEncryptedBackup('${backup.key}')" title="다운로드">📥</button>
+                        <button class="btn btn-secondary btn-small" onclick="previewBackup('${backup.key}')" title="미리보기">👁️</button>
+                        <button class="btn btn-primary btn-small" onclick="restoreBackup('${backup.key}')" title="복원">복원</button>
                     </div>
                 </div>
             `;
         }).join('');
+        
+        list.innerHTML = html;
     });
 };
 
@@ -1182,5 +1362,272 @@ window.restoreBackup = function(backupKey) {
         alert(`✅ ${backup.dateStr} 시점으로 복원되었습니다.`);
     });
 };
+
+// ============================================
+// 사이드바 토글 기능 (요청사항 #10)
+// ============================================
+
+window.toggleSidebar = function() {
+    const sidebar = document.getElementById('sidebar');
+    const scheduleGrid = document.getElementById('scheduleGrid');
+    const toggleIcon = document.getElementById('sidebarToggleIcon');
+    
+    sidebar.classList.toggle('collapsed');
+    
+    if (sidebar.classList.contains('collapsed')) {
+        toggleIcon.textContent = '▶';
+        localStorage.setItem('sidebarCollapsed', 'true');
+    } else {
+        toggleIcon.textContent = '◀';
+        localStorage.setItem('sidebarCollapsed', 'false');
+    }
+};
+
+// 사이드바 상태 복원
+window.restoreSidebarState = function() {
+    const collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+    if (collapsed) {
+        const sidebar = document.getElementById('sidebar');
+        const toggleIcon = document.getElementById('sidebarToggleIcon');
+        if (sidebar) {
+            sidebar.classList.add('collapsed');
+            if (toggleIcon) toggleIcon.textContent = '▶';
+        }
+    }
+};
+
+// ============================================
+// 행사 날짜 관리 (요청사항 #7)
+// ============================================
+
+// 기본 행사 날짜
+if (!AppState.eventDates) {
+    AppState.eventDates = [
+        { date: '2026-04-11', label: 'ASLS춘계 토요일', day: 'sat' },
+        { date: '2026-04-12', label: 'ASLS춘계 일요일', day: 'sun' }
+    ];
+}
+
+/**
+ * 행사 날짜 모달 열기
+ */
+window.openEventDateModal = function() {
+    loadEventDatesFromFirebase();
+    document.getElementById('eventDateModal').classList.add('active');
+    renderEventDateList();
+};
+
+/**
+ * 행사 날짜 모달 닫기
+ */
+window.closeEventDateModal = function() {
+    document.getElementById('eventDateModal').classList.remove('active');
+};
+
+/**
+ * 행사 날짜 목록 렌더링
+ */
+window.renderEventDateList = function() {
+    const list = document.getElementById('eventDateList');
+    
+    if (!AppState.eventDates || AppState.eventDates.length === 0) {
+        list.innerHTML = '<p style="text-align: center; color: #999; padding: 1rem;">등록된 행사 날짜가 없습니다.</p>';
+        return;
+    }
+    
+    list.innerHTML = AppState.eventDates.map((event, idx) => `
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; border-bottom: 1px solid #eee; ${idx % 2 === 0 ? 'background: #fafafa;' : ''}">
+            <div>
+                <strong>${event.label}</strong>
+                <span style="color: #666; font-size: 0.85rem; margin-left: 0.5rem;">(${event.date})</span>
+                ${event.featured ? '<span style="color: #FFD700; margin-left: 0.5rem;">⭐</span>' : ''}
+            </div>
+            <div style="display: flex; gap: 0.25rem;">
+                <button class="btn btn-small btn-secondary" onclick="toggleEventDateStar('${event.date}')" title="별표 토글">⭐</button>
+                <button class="btn btn-small btn-secondary" onclick="editEventDate('${event.date}')" title="수정">✏️</button>
+                <button class="btn btn-small btn-secondary" onclick="deleteEventDate('${event.date}')" style="color: #e74c3c;" title="삭제">🗑️</button>
+            </div>
+        </div>
+    `).join('');
+    
+    // 날짜 선택 버튼도 업데이트
+    updateDateSelectorButtons();
+};
+
+/**
+ * 행사 날짜 추가
+ */
+window.addEventDate = function() {
+    const dateInput = document.getElementById('newEventDate');
+    const labelInput = document.getElementById('newEventLabel');
+    
+    const date = dateInput.value;
+    const label = labelInput.value.trim();
+    
+    if (!date) {
+        alert('날짜를 선택해주세요.');
+        return;
+    }
+    
+    if (!label) {
+        alert('행사명을 입력해주세요.');
+        return;
+    }
+    
+    // 중복 체크
+    if (AppState.eventDates.some(e => e.date === date)) {
+        alert('이미 등록된 날짜입니다.');
+        return;
+    }
+    
+    // 요일 계산
+    const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const dayOfWeek = dayNames[new Date(date).getDay()];
+    
+    AppState.eventDates.push({ date, label, day: dayOfWeek });
+    AppState.eventDates.sort((a, b) => a.date.localeCompare(b.date));
+    
+    // 새 날짜에 대한 데이터 구조 초기화
+    if (!AppState.dataByDate[date]) {
+        AppState.dataByDate[date] = { lectures: [], schedule: {}, sessions: [] };
+    }
+    
+    // 새 날짜에 대한 시간 설정 초기화
+    if (!AppState.timeSettingsByDate[date]) {
+        AppState.timeSettingsByDate[date] = { startTime: '09:00', endTime: '18:00' };
+    }
+    
+    // 새 날짜에 대한 룸 설정 초기화
+    if (!AppConfig.ROOMS_BY_DATE[date]) {
+        AppConfig.ROOMS_BY_DATE[date] = [`(${label})룸1`, `(${label})룸2`];
+    }
+    
+    saveEventDatesToFirebase();
+    saveAndSync();
+    
+    dateInput.value = '';
+    labelInput.value = '';
+    
+    renderEventDateList();
+    alert(`✅ "${label}" 행사 날짜가 추가되었습니다.`);
+};
+
+/**
+ * 행사 날짜 삭제
+ */
+window.deleteEventDate = function(date) {
+    const event = AppState.eventDates.find(e => e.date === date);
+    if (!event) return;
+    
+    if (AppState.eventDates.length <= 1) {
+        alert('최소 1개의 행사 날짜는 유지해야 합니다.');
+        return;
+    }
+    
+    if (!confirm(`⚠️ "${event.label}" (${date}) 행사를 삭제하시겠습니까?\n\n해당 날짜의 모든 강의, 세션, 시간표가 삭제됩니다.`)) {
+        return;
+    }
+    
+    AppState.eventDates = AppState.eventDates.filter(e => e.date !== date);
+    delete AppState.dataByDate[date];
+    delete AppState.timeSettingsByDate[date];
+    delete AppConfig.ROOMS_BY_DATE[date];
+    
+    // 현재 선택된 날짜가 삭제된 경우 첫 번째 날짜로 변경
+    if (AppState.currentDate === date) {
+        AppState.currentDate = AppState.eventDates[0].date;
+        switchDate(AppState.currentDate);
+    }
+    
+    saveEventDatesToFirebase();
+    saveAndSync();
+    renderEventDateList();
+};
+
+/**
+ * 행사 날짜 수정
+ */
+window.editEventDate = function(date) {
+    const event = AppState.eventDates.find(e => e.date === date);
+    if (!event) return;
+    
+    const newLabel = prompt('행사명 수정:', event.label);
+    if (newLabel && newLabel.trim() !== event.label) {
+        event.label = newLabel.trim();
+        saveEventDatesToFirebase();
+        renderEventDateList();
+    }
+};
+
+/**
+ * 행사 날짜 별표 토글
+ */
+window.toggleEventDateStar = function(date) {
+    const event = AppState.eventDates.find(e => e.date === date);
+    if (!event) return;
+    
+    event.featured = !event.featured;
+    saveEventDatesToFirebase();
+    renderEventDateList();
+};
+
+/**
+ * 날짜 선택 버튼 업데이트
+ */
+window.updateDateSelectorButtons = function() {
+    const container = document.getElementById('dateSelectorBtns');
+    if (!container) return;
+    
+    container.innerHTML = AppState.eventDates.map(event => {
+        const isActive = event.date === AppState.currentDate;
+        return `
+            <button class="date-btn ${isActive ? 'active' : ''}" data-date="${event.date}" onclick="switchDate('${event.date}')">
+                ${event.featured ? '⭐ ' : '📅 '}${event.label}
+            </button>
+        `;
+    }).join('');
+};
+
+/**
+ * Firebase에서 행사 날짜 로드
+ */
+window.loadEventDatesFromFirebase = function() {
+    database.ref('/settings/eventDates').once('value', (snapshot) => {
+        if (snapshot.exists()) {
+            AppState.eventDates = snapshot.val();
+            updateDateSelectorButtons();
+        }
+    });
+    
+    database.ref('/settings/roomsByDate').once('value', (snapshot) => {
+        if (snapshot.exists()) {
+            AppConfig.ROOMS_BY_DATE = snapshot.val();
+        }
+    });
+};
+
+/**
+ * Firebase에 행사 날짜 저장
+ */
+window.saveEventDatesToFirebase = function() {
+    if (!canEdit()) return;
+    
+    database.ref('/settings/eventDates').set(AppState.eventDates);
+    database.ref('/settings/roomsByDate').set(AppConfig.ROOMS_BY_DATE);
+};
+
+// ============================================
+// 초기화 시 사이드바 상태 복원
+// ============================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    restoreSidebarState();
+    loadEventDatesFromFirebase();
+    
+    // 날짜 버튼 초기 렌더링
+    setTimeout(() => {
+        updateDateSelectorButtons();
+    }, 500);
+});
 
 console.log('✅ app.js 로드 완료');

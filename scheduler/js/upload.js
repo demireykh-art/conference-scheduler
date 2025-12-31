@@ -473,11 +473,10 @@
         const header = rows[0];
         const dataRows = rows.slice(1);
         
-        // 룸 이름 추출 (첫 번째 데이터 행의 A열에서)
+        // 룸 이름 추출 (첫 번째 데이터 행의 A열에서) - 그대로 사용
         let roomName = '';
         if (dataRows.length > 0 && dataRows[0][0]) {
-            // "(토)1층 전시장B Regional Blueprint0" 에서 숫자 제거
-            roomName = String(dataRows[0][0]).replace(/\d+$/, '').trim();
+            roomName = String(dataRows[0][0]).trim();
         }
         
         // 세션 및 강의 파싱
@@ -867,6 +866,72 @@
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     }
     
+    // 유사한 룸 이름 찾기
+    function findSimilarRoom(roomName) {
+        if (!roomName) return null;
+        
+        const normalize = (str) => {
+            return str
+                .toLowerCase()
+                .replace(/\s+/g, '') // 공백 제거
+                .replace(/[_\-]/g, '') // 언더스코어, 하이픈 제거
+                .replace(/[()（）]/g, ''); // 괄호 제거
+        };
+        
+        const normalizedInput = normalize(roomName);
+        
+        for (const existingRoom of AppState.rooms) {
+            const normalizedExisting = normalize(existingRoom);
+            
+            // 1. 정규화 후 동일
+            if (normalizedInput === normalizedExisting) {
+                return existingRoom;
+            }
+            
+            // 2. 한쪽이 다른 쪽을 포함
+            if (normalizedInput.includes(normalizedExisting) || normalizedExisting.includes(normalizedInput)) {
+                // 길이 차이가 크지 않으면 유사로 판단
+                if (Math.abs(normalizedInput.length - normalizedExisting.length) <= 5) {
+                    return existingRoom;
+                }
+            }
+            
+            // 3. 레벤슈타인 거리 기반 유사도 (간단 버전)
+            const similarity = calculateSimilarity(normalizedInput, normalizedExisting);
+            if (similarity > 0.8) { // 80% 이상 유사
+                return existingRoom;
+            }
+        }
+        
+        return null;
+    }
+    
+    // 간단한 문자열 유사도 계산 (Jaccard 유사도)
+    function calculateSimilarity(str1, str2) {
+        if (str1 === str2) return 1;
+        if (str1.length === 0 || str2.length === 0) return 0;
+        
+        // 2-gram 기반 유사도
+        const getBigrams = (str) => {
+            const bigrams = new Set();
+            for (let i = 0; i < str.length - 1; i++) {
+                bigrams.add(str.substring(i, i + 2));
+            }
+            return bigrams;
+        };
+        
+        const bigrams1 = getBigrams(str1);
+        const bigrams2 = getBigrams(str2);
+        
+        let intersection = 0;
+        bigrams1.forEach(bg => {
+            if (bigrams2.has(bg)) intersection++;
+        });
+        
+        const union = bigrams1.size + bigrams2.size - intersection;
+        return union > 0 ? intersection / union : 0;
+    }
+    
     // Panel Discussion 세션 정보 수집
     function getPanelSessionsInfo() {
         const panelSessions = [];
@@ -1047,7 +1112,7 @@
     }
     
     function confirmScheduleUpload() {
-        const { room, sessions, lectures } = pendingScheduleData;
+        let { room, sessions, lectures } = pendingScheduleData;
         
         if (lectures.length === 0) {
             alert('업로드할 강의가 없습니다.');
@@ -1056,12 +1121,37 @@
         
         // 룸 존재 여부 확인
         if (!AppState.rooms.includes(room)) {
-            if (confirm(`"${room}" 룸이 없습니다. 새로 추가할까요?`)) {
-                AppState.rooms.push(room);
-                window.saveRoomsToStorage();
-                window.createScheduleTable();
+            // 유사한 룸 찾기
+            const similarRoom = findSimilarRoom(room);
+            
+            if (similarRoom) {
+                // 유사한 룸이 있으면 사용자에게 확인
+                const choice = confirm(
+                    `"${room}" 룸이 없습니다.\n\n` +
+                    `유사한 룸 발견: "${similarRoom}"\n\n` +
+                    `[확인] → "${similarRoom}" 룸에 배치\n` +
+                    `[취소] → "${room}" 새 룸 추가`
+                );
+                
+                if (choice) {
+                    // 기존 유사 룸 사용
+                    room = similarRoom;
+                    pendingScheduleData.room = room;
+                } else {
+                    // 새 룸 추가
+                    AppState.rooms.push(room);
+                    window.saveRoomsToStorage();
+                    window.createScheduleTable();
+                }
             } else {
-                return;
+                // 유사한 룸도 없으면 새로 추가
+                if (confirm(`"${room}" 룸이 없습니다. 새로 추가할까요?`)) {
+                    AppState.rooms.push(room);
+                    window.saveRoomsToStorage();
+                    window.createScheduleTable();
+                } else {
+                    return;
+                }
             }
         }
         
