@@ -1160,9 +1160,9 @@ body {
     position: relative;
     transition: all 0.2s;
     padding: 0;
-    width: 150px;
-    min-width: 150px;
-    max-width: 150px;
+    width: 220px;
+    min-width: 220px;
+    max-width: 220px;
 }
 
 .schedule-cell.hour-mark {

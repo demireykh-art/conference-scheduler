@@ -893,33 +893,6 @@
             <div class="speaker-list" id="companyList" style="max-height: 400px; margin: 0 1rem 1rem 1rem;"></div>
         </div>
     </div>
-                        <input type="checkbox" id="scheduleOverwriteCheckbox" checked>
-                        <span style="font-size: 0.85rem; color: #C62828;">
-                            <strong>🔄 기존 강의 덮어쓰기</strong> - 같은 시간대에 기존 강의가 있으면 교체
-                        </span>
-                    </label>
-                </div>
-                
-                <div style="border: 2px dashed var(--border); border-radius: 12px; padding: 2rem; text-align: center; margin-bottom: 1rem; background: var(--bg);" id="scheduleDropZone">
-                    <div style="font-size: 3rem; margin-bottom: 0.5rem;">📁</div>
-                    <p style="margin-bottom: 1rem;">파일을 여기에 드래그하거나 클릭하여 선택</p>
-                    <input type="file" id="scheduleUploadFileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleScheduleFileSelect(event)">
-                    <button class="btn btn-primary" onclick="document.getElementById('scheduleUploadFileInput').click()">
-                        📁 엑셀 파일 선택
-                    </button>
-                </div>
-                
-                <div id="scheduleUploadPreview" style="display: none;">
-                    <div id="schedulePreviewContent"></div>
-                    
-                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee;">
-                        <button class="btn btn-secondary" onclick="closeScheduleUploadModal()">취소</button>
-                        <button class="btn btn-primary" onclick="confirmScheduleUpload()">✅ 업로드 및 배치</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- 강의 일괄 업로드 모달 -->
     <div class="modal" id="uploadModal">

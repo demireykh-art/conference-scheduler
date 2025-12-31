@@ -24,7 +24,7 @@ window.createScheduleTable = function() {
     headerRow.appendChild(timeHeader);
 
     // 각 룸의 폭 계산 (균등)
-    const roomWidth = 180; // 고정 폭
+    const roomWidth = 250; // 고정 폭
 
     AppState.rooms.forEach((room, roomIndex) => {
         const roomHeader = document.createElement('th');
@@ -231,25 +231,6 @@ window.updateScheduleDisplay = function() {
             const moderatorLabel = AppState.currentLanguage === 'en' ? 'Chair: ' : '좌장: ';
             const moderatorName = AppState.currentLanguage === 'en' && session.moderatorEn ? session.moderatorEn : session.moderator;
             
-            // 세션 내 강의 분류 태그 계산
-            const sessionDuration = session.duration || 60;
-            const sessionTags = typeof getSessionCategoryTags === 'function' 
-                ? getSessionCategoryTags(time, room, sessionDuration) 
-                : [];
-            
-            // 태그 HTML 생성 (최대 3개) - 우측 정렬, 글자 크기 절반
-            let tagsHtml = '';
-            if (sessionTags.length > 0) {
-                const displayTags = sessionTags.slice(0, 3);
-                tagsHtml = '<div class="session-tags" style="display: flex; gap: 2px; flex-wrap: wrap; justify-content: flex-end; align-items: center;">' +
-                    displayTags.map(tag => {
-                        const shortTag = tag.length > 8 ? tag.substring(0, 6) + '..' : tag;
-                        return `<span style="background: rgba(255,255,255,0.3); padding: 1px 3px; border-radius: 2px; font-size: 0.5rem; white-space: nowrap;">${shortTag}</span>`;
-                    }).join('') +
-                    (sessionTags.length > 3 ? `<span style="font-size: 0.5rem; opacity: 0.8;">+${sessionTags.length - 3}</span>` : '') +
-                    '</div>';
-            }
-
             const sessionHeader = document.createElement('div');
             sessionHeader.className = 'session-header-cell';
             sessionHeader.draggable = true;
@@ -259,19 +240,17 @@ window.updateScheduleDisplay = function() {
             sessionHeader.style.background = `linear-gradient(135deg, ${session.color} 0%, ${adjustColor(session.color, -20)} 100%)`;
             sessionHeader.style.cursor = 'grab';
             
-            // 좌장명 포맷: "세션명" + "좌장: 이름" 같은 줄에 표시
+            // 좌장명 포맷
             const moderatorText = moderatorName ? ` | ${moderatorLabel}${moderatorName}` : '';
             
             sessionHeader.innerHTML = `
-                <div class="session-content" style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; padding-right: 45px; pointer-events: none;">
-                    <div style="flex: 1; min-width: 0; text-align: left; overflow: hidden;">
-                        <span class="session-name" title="${sessionName}${moderatorText} (드래그: 이동 / 더블클릭: 수정)" style="display: inline; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${sessionName}</span>
-                        ${moderatorName ? `<span class="session-moderator" style="font-size: 0.7rem; opacity: 0.85; margin-left: 0.5em; white-space: nowrap;">${moderatorLabel}${moderatorName}</span>` : ''}
+                <div class="session-content" style="display: flex; flex-direction: column; width: calc(100% - 25px); pointer-events: none;">
+                    <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <span class="session-name" title="${sessionName}${moderatorText} (드래그: 이동 / 더블클릭: 수정)">${sessionName}</span>
                     </div>
-                    ${tagsHtml}
+                    ${moderatorName ? `<div style="font-size: 0.65rem; opacity: 0.9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${moderatorLabel}${moderatorName}</div>` : ''}
                 </div>
-                <button class="session-edit-btn" onclick="event.stopPropagation(); editCellSession('${time}', '${room}')" title="세션 수정" style="position: absolute; right: 22px; top: 2px; background: rgba(255,255,255,0.3); border: none; color: white; width: 18px; height: 18px; border-radius: 4px; cursor: pointer; font-size: 0.6rem; pointer-events: auto;">✏️</button>
-                <button class="session-remove" onclick="event.stopPropagation(); removeSession('${time}', '${room}')" title="세션 삭제">×</button>
+                <button class="session-remove" onclick="event.stopPropagation(); removeSession('${time}', '${room}')" title="세션 삭제" style="position: absolute; right: 3px; top: 3px; background: rgba(255,255,255,0.3); border: none; color: white; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 0.7rem; pointer-events: auto; line-height: 1;">×</button>
             `;
 
             // 드래그 시작
@@ -294,7 +273,7 @@ window.updateScheduleDisplay = function() {
 
             // 더블클릭으로 수정
             sessionHeader.addEventListener('dblclick', (e) => {
-                if (!e.target.classList.contains('session-remove') && !e.target.classList.contains('session-edit-btn')) {
+                if (!e.target.classList.contains('session-remove')) {
                     e.preventDefault();
                     e.stopPropagation();
                     editCellSession(time, room);
@@ -380,8 +359,12 @@ window.updateScheduleDisplay = function() {
         const title = AppState.currentLanguage === 'en' && lecture.titleEn ? lecture.titleEn : lecture.titleKo;
         const speaker = AppState.currentLanguage === 'en' && lecture.speakerEn ? lecture.speakerEn : lecture.speakerKo;
 
+        // 종료 시간 계산
+        const endTime = addMinutesToTime(startTime, duration);
+        const timeRangeDisplay = `${startTime}~${endTime} ⏱️${duration}분`;
+
         // 호버 시 전체 제목 표시를 위한 data 속성
-        const fullTooltip = `${title}\n👤 ${speaker || '미정'} | ⏱️ ${duration}분`;
+        const fullTooltip = `${title}\n👤 ${speaker || '미정'} | ${timeRangeDisplay}`;
         lectureDiv.dataset.fullTitle = fullTooltip;
 
         // 메타 정보 생성
@@ -405,11 +388,11 @@ window.updateScheduleDisplay = function() {
             // 런천강의 - 별표 + 스폰서 표시
             titleDisplay = `⭐ ${title}`;
             const sponsorInfo = lecture.companyName ? ` (${lecture.companyName})` : '';
-            metaDisplay = `<span class="speaker-name" style="color: #333;">${speaker || '미정'}${sponsorInfo}</span><span class="duration-badge">⏱️ ${duration}분</span>`;
+            metaDisplay = `<span class="speaker-name" style="color: #333;">${speaker || '미정'}${sponsorInfo}</span><span class="duration-badge">${timeRangeDisplay}</span>`;
         } else if (isBreak && !isPanelDiscussion) {
-            metaDisplay = `<span class="duration-badge">⏱️ ${duration}분</span>`;
+            metaDisplay = `<span class="duration-badge">${timeRangeDisplay}</span>`;
         } else {
-            metaDisplay = `<span class="speaker-name" style="color: #333;">${speaker || '미정'}</span><span class="duration-badge">⏱️ ${duration}분</span>`;
+            metaDisplay = `<span class="speaker-name" style="color: #333;">${speaker || '미정'}</span><span class="duration-badge">${timeRangeDisplay}</span>`;
         }
 
         lectureDiv.innerHTML = `
