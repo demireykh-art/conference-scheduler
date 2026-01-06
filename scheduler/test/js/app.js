@@ -33,6 +33,37 @@ window.startRealtimeListeners = function() {
     database.ref(`/data/dataByDate/${currentDate}/schedule`).on('child_added', handleScheduleChange);
     database.ref(`/data/dataByDate/${currentDate}/schedule`).on('child_changed', handleScheduleChange);
     database.ref(`/data/dataByDate/${currentDate}/schedule`).on('child_removed', handleScheduleRemoved);
+    
+    // 룸 설정 실시간 감지
+    database.ref('/settings/roomsByDate').on('value', (snapshot) => {
+        if (snapshot.exists()) {
+            const newRoomsByDate = snapshot.val();
+            // 현재 날짜의 룸 목록이 변경되었는지 확인
+            const currentRooms = JSON.stringify(AppConfig.ROOMS_BY_DATE[AppState.currentDate] || []);
+            const newRooms = JSON.stringify(newRoomsByDate[AppState.currentDate] || []);
+            
+            if (currentRooms !== newRooms) {
+                AppConfig.ROOMS_BY_DATE = newRoomsByDate;
+                AppState.rooms = newRoomsByDate[AppState.currentDate] || [];
+                console.log('[실시간] 룸 설정 업데이트:', AppState.rooms);
+                createScheduleTable();
+                updateScheduleDisplay();
+            } else {
+                AppConfig.ROOMS_BY_DATE = newRoomsByDate;
+            }
+        }
+    });
+    
+    // 룸 담당자 실시간 감지
+    database.ref(`/settings/roomManagers/${currentDate}`).on('value', (snapshot) => {
+        if (snapshot.exists()) {
+            AppState.roomManagers = snapshot.val();
+            console.log('[실시간] 룸 담당자 업데이트:', AppState.roomManagers);
+            if (typeof updateRoomManagerDropdowns === 'function') {
+                updateRoomManagerDropdowns();
+            }
+        }
+    });
 
     database.ref('/data').on('value', (snapshot) => {
         const data = snapshot.val();
@@ -244,9 +275,10 @@ window.switchDate = function(date) {
     const previousDate = AppState.currentDate;
     saveToFirebase();
 
-    // 이전 날짜의 스케줄 리스너 해제
+    // 이전 날짜의 스케줄 및 담당자 리스너 해제
     if (previousDate) {
         database.ref(`/data/dataByDate/${previousDate}/schedule`).off();
+        database.ref(`/settings/roomManagers/${previousDate}`).off();
     }
 
     AppState.currentDate = date;
@@ -259,6 +291,19 @@ window.switchDate = function(date) {
     database.ref(`/data/dataByDate/${date}/schedule`).on('child_added', handleScheduleChange);
     database.ref(`/data/dataByDate/${date}/schedule`).on('child_changed', handleScheduleChange);
     database.ref(`/data/dataByDate/${date}/schedule`).on('child_removed', handleScheduleRemoved);
+    
+    // 새 날짜의 담당자 실시간 리스너 설정
+    database.ref(`/settings/roomManagers/${date}`).on('value', (snapshot) => {
+        if (snapshot.exists()) {
+            AppState.roomManagers = snapshot.val();
+            console.log('[실시간] 룸 담당자 업데이트:', AppState.roomManagers);
+            if (typeof updateRoomManagerDropdowns === 'function') {
+                updateRoomManagerDropdowns();
+            }
+        } else {
+            AppState.roomManagers = {};
+        }
+    });
     
     // 룸 담당자 로드
     if (typeof loadRoomManagers === 'function') {
@@ -366,7 +411,17 @@ window.updateRoomNameInData = function(oldName, newName) {
 };
 
 window.saveRoomsToStorage = function() {
+    // localStorage에 저장
     localStorage.setItem('conference_rooms', JSON.stringify(AppState.rooms));
+    
+    // Firebase에도 저장 (ROOMS_BY_DATE 업데이트)
+    const currentDate = AppState.currentDate;
+    if (currentDate) {
+        AppConfig.ROOMS_BY_DATE[currentDate] = [...AppState.rooms];
+        database.ref('/settings/roomsByDate').set(AppConfig.ROOMS_BY_DATE)
+            .then(() => console.log('룸 설정 Firebase 저장 완료'))
+            .catch(err => console.error('룸 설정 저장 실패:', err));
+    }
 };
 
 // ============================================
@@ -1043,12 +1098,35 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 자동 백업 시작 (5분마다)
     startAutoBackup();
+    
+    // ESC 키로 모든 모달 닫기
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeAllModals();
+        }
+    });
 
     console.log('=== 초기화 완료 ===');
     console.log('Speakers:', AppState.speakers.length);
     console.log('Categories:', AppState.categories.length);
     console.log('Companies:', AppState.companies.length);
 });
+
+/**
+ * 모든 활성 모달 닫기
+ */
+window.closeAllModals = function() {
+    // 모든 활성 모달 찾기
+    const activeModals = document.querySelectorAll('.modal.active');
+    
+    if (activeModals.length === 0) return;
+    
+    // 가장 위에 있는 모달만 닫기 (z-index가 높은 것)
+    const topModal = activeModals[activeModals.length - 1];
+    topModal.classList.remove('active');
+    
+    console.log('ESC: 모달 닫힘');
+};
 
 // ============================================
 // 자동 백업 시스템 (매일 저녁 1회)

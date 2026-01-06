@@ -1339,6 +1339,21 @@ window.loadRoomManagers = function() {
         } else {
             AppState.roomManagers = {};
         }
+        // 담당자 로드 후 드롭다운 업데이트
+        updateRoomManagerDropdowns();
+    });
+};
+
+/**
+ * 룸 담당자 드롭다운 업데이트
+ */
+window.updateRoomManagerDropdowns = function() {
+    AppState.rooms.forEach((room, index) => {
+        const select = document.getElementById(`roomManager-${index}`);
+        if (select) {
+            const currentManager = (AppState.roomManagers || {})[room] || '';
+            select.value = currentManager;
+        }
     });
 };
 
