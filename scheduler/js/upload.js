@@ -42,36 +42,39 @@
     
     function setupDropZone() {
         const dropZone = document.getElementById('dropZone');
+        if (!dropZone) return;
         
-        // 기존 이벤트 리스너 제거 후 재설정
-        const newDropZone = dropZone.cloneNode(true);
-        dropZone.parentNode.replaceChild(newDropZone, dropZone);
-        
-        newDropZone.addEventListener('dragover', (e) => {
+        // 드래그 오버 이벤트
+        dropZone.ondragover = (e) => {
             e.preventDefault();
-            newDropZone.style.borderColor = 'var(--accent)';
-            newDropZone.style.background = 'rgba(255, 107, 157, 0.1)';
-        });
+            e.stopPropagation();
+            dropZone.style.borderColor = 'var(--accent)';
+            dropZone.style.background = 'rgba(255, 107, 157, 0.1)';
+        };
         
-        newDropZone.addEventListener('dragleave', (e) => {
+        // 드래그 떠날 때 이벤트
+        dropZone.ondragleave = (e) => {
             e.preventDefault();
-            newDropZone.style.borderColor = 'var(--border)';
-            newDropZone.style.background = 'var(--bg)';
-        });
+            e.stopPropagation();
+            dropZone.style.borderColor = 'var(--border)';
+            dropZone.style.background = 'var(--bg)';
+        };
         
-        newDropZone.addEventListener('drop', (e) => {
+        // 드롭 이벤트
+        dropZone.ondrop = (e) => {
             e.preventDefault();
-            newDropZone.style.borderColor = 'var(--border)';
-            newDropZone.style.background = 'var(--bg)';
+            e.stopPropagation();
+            dropZone.style.borderColor = 'var(--border)';
+            dropZone.style.background = 'var(--bg)';
             
             const files = e.dataTransfer.files;
             if (files.length > 0) {
                 processUploadFile(files[0]);
             }
-        });
+        };
         
-        // 파일 선택 버튼 재연결
-        const selectBtn = newDropZone.querySelector('#selectFileBtn') || document.getElementById('selectFileBtn');
+        // 파일 선택 버튼 연결
+        const selectBtn = document.getElementById('selectFileBtn');
         if (selectBtn) {
             selectBtn.onclick = () => document.getElementById('uploadFileInput').click();
         }
@@ -483,21 +486,25 @@
             }
         });
         
-        // 저장 및 UI 업데이트
-        window.saveAndSync();
-        window.updateCategoryDropdowns();
-        window.createCategoryFilters();
-        window.updateLectureList();
-        
-        // 결과 메시지
+        // 결과 메시지 먼저 표시 (저장은 백그라운드에서)
         let message = `✅ 업로드 완료!\n\n`;
         message += `📥 새로 추가: ${addedCount}개\n`;
         if (updatedCount > 0) message += `🔄 업데이트: ${updatedCount}개\n`;
         if (skippedCount > 0) message += `⏭️ 건너뜀: ${skippedCount}개\n`;
         message += `\n📚 현재 총 강의: ${window.AppState.lectures.length}개`;
+        message += `\n\n💾 데이터 저장 중...`;
         
         alert(message);
         closeUploadModal();
+        
+        // UI 먼저 업데이트
+        window.updateCategoryDropdowns();
+        window.createCategoryFilters();
+        window.updateLectureList();
+        window.updateScheduleDisplay();
+        
+        // 저장은 마지막에 (비동기)
+        window.saveAndSync();
     }
     
     // 제목으로 기존 강의 찾기
