@@ -352,8 +352,7 @@
             return;
         }
         
-        const appendMode = document.getElementById('appendMode').checked;
-        const duplicateAction = document.querySelector('input[name="duplicateAction"]:checked')?.value || 'skip';
+        const replaceAllMode = document.getElementById('replaceAllMode')?.checked || false;
         
         const lectures = window.AppState.lectures;
         const dataByDate = window.AppState.dataByDate;
@@ -362,7 +361,7 @@
         const schedule = window.AppState.schedule;
         
         // 전체 교체 모드
-        if (!appendMode) {
+        if (replaceAllMode) {
             if (!confirm(`⚠️ 기존 강의 ${lectures.length}개를 모두 삭제하고 새로운 ${pendingUploadData.length}개로 대체합니다.\n\n⚠️ 시간표 배치도 모두 초기화됩니다!\n\n계속하시겠습니까?`)) {
                 return;
             }
@@ -389,71 +388,66 @@
         pendingUploadData.forEach((lecture, index) => {
             const isDuplicate = duplicates[index];
             
-                if (isDuplicate) {
-                if (duplicateAction === 'skip') {
-                    // 건너뛰기
-                    skippedCount++;
-                    return;
-                } else if (duplicateAction === 'update') {
-                    // 기존 강의 업데이트
-                    const existingLecture = findExistingLecture(lecture);
-                    if (existingLecture) {
-                        // 기존 강의 정보 업데이트 (ID와 배치 정보는 유지)
-                        existingLecture.category = lecture.category || existingLecture.category;
-                        existingLecture.titleKo = lecture.titleKo || existingLecture.titleKo;
-                        existingLecture.titleEn = lecture.titleEn || existingLecture.titleEn;
-                        existingLecture.speakerKo = lecture.speakerKo || existingLecture.speakerKo;
-                        existingLecture.speakerEn = lecture.speakerEn || existingLecture.speakerEn;
-                        existingLecture.affiliation = lecture.affiliation || existingLecture.affiliation;
-                        existingLecture.duration = lecture.duration || existingLecture.duration;
-                        // 파트너사 정보 업데이트
-                        existingLecture.companyName = lecture.companyName || existingLecture.companyName;
-                        existingLecture.productName = lecture.productName || existingLecture.productName;
-                        existingLecture.isLuncheon = lecture.isLuncheon || existingLecture.isLuncheon;
-                        
-                        // 배치된 스케줄에도 동일하게 업데이트
-                        const lectureId = existingLecture.id;
-                        
-                        // 현재 날짜 스케줄 업데이트
-                        Object.keys(window.AppState.schedule).forEach(key => {
-                            if (window.AppState.schedule[key].id === lectureId) {
-                                window.AppState.schedule[key].category = existingLecture.category;
-                                window.AppState.schedule[key].titleKo = existingLecture.titleKo;
-                                window.AppState.schedule[key].titleEn = existingLecture.titleEn;
-                                window.AppState.schedule[key].speakerKo = existingLecture.speakerKo;
-                                window.AppState.schedule[key].speakerEn = existingLecture.speakerEn;
-                                window.AppState.schedule[key].affiliation = existingLecture.affiliation;
-                                window.AppState.schedule[key].duration = existingLecture.duration;
-                                window.AppState.schedule[key].companyName = existingLecture.companyName;
-                                window.AppState.schedule[key].productName = existingLecture.productName;
-                                window.AppState.schedule[key].isLuncheon = existingLecture.isLuncheon;
+            // 중복인 경우: 항상 업데이트 (새 UI에서는 자동으로 업데이트)
+            if (isDuplicate) {
+                // 기존 강의 업데이트
+                const existingLecture = findExistingLecture(lecture);
+                if (existingLecture) {
+                    // 기존 강의 정보 업데이트 (ID와 배치 정보는 유지)
+                    existingLecture.category = lecture.category || existingLecture.category;
+                    existingLecture.titleKo = lecture.titleKo || existingLecture.titleKo;
+                    existingLecture.titleEn = lecture.titleEn || existingLecture.titleEn;
+                    existingLecture.speakerKo = lecture.speakerKo || existingLecture.speakerKo;
+                    existingLecture.speakerEn = lecture.speakerEn || existingLecture.speakerEn;
+                    existingLecture.affiliation = lecture.affiliation || existingLecture.affiliation;
+                    existingLecture.duration = lecture.duration || existingLecture.duration;
+                    // 파트너사 정보 업데이트
+                    existingLecture.companyName = lecture.companyName || existingLecture.companyName;
+                    existingLecture.productName = lecture.productName || existingLecture.productName;
+                    existingLecture.isLuncheon = lecture.isLuncheon || existingLecture.isLuncheon;
+                    
+                    // 배치된 스케줄에도 동일하게 업데이트
+                    const lectureId = existingLecture.id;
+                    
+                    // 현재 날짜 스케줄 업데이트
+                    Object.keys(window.AppState.schedule).forEach(key => {
+                        if (window.AppState.schedule[key].id === lectureId) {
+                            window.AppState.schedule[key].category = existingLecture.category;
+                            window.AppState.schedule[key].titleKo = existingLecture.titleKo;
+                            window.AppState.schedule[key].titleEn = existingLecture.titleEn;
+                            window.AppState.schedule[key].speakerKo = existingLecture.speakerKo;
+                            window.AppState.schedule[key].speakerEn = existingLecture.speakerEn;
+                            window.AppState.schedule[key].affiliation = existingLecture.affiliation;
+                            window.AppState.schedule[key].duration = existingLecture.duration;
+                            window.AppState.schedule[key].companyName = existingLecture.companyName;
+                            window.AppState.schedule[key].productName = existingLecture.productName;
+                            window.AppState.schedule[key].isLuncheon = existingLecture.isLuncheon;
+                        }
+                    });
+                    
+                    // 모든 날짜의 스케줄도 업데이트
+                    Object.keys(dataByDate).forEach(date => {
+                        const dateSchedule = dataByDate[date]?.schedule || {};
+                        Object.keys(dateSchedule).forEach(key => {
+                            if (dateSchedule[key].id === lectureId) {
+                                dateSchedule[key].category = existingLecture.category;
+                                dateSchedule[key].titleKo = existingLecture.titleKo;
+                                dateSchedule[key].titleEn = existingLecture.titleEn;
+                                dateSchedule[key].speakerKo = existingLecture.speakerKo;
+                                dateSchedule[key].speakerEn = existingLecture.speakerEn;
+                                dateSchedule[key].affiliation = existingLecture.affiliation;
+                                dateSchedule[key].duration = existingLecture.duration;
+                                dateSchedule[key].companyName = existingLecture.companyName;
+                                dateSchedule[key].productName = existingLecture.productName;
+                                dateSchedule[key].isLuncheon = existingLecture.isLuncheon;
                             }
                         });
-                        
-                        // 모든 날짜의 스케줄도 업데이트
-                        Object.keys(dataByDate).forEach(date => {
-                            const dateSchedule = dataByDate[date]?.schedule || {};
-                            Object.keys(dateSchedule).forEach(key => {
-                                if (dateSchedule[key].id === lectureId) {
-                                    dateSchedule[key].category = existingLecture.category;
-                                    dateSchedule[key].titleKo = existingLecture.titleKo;
-                                    dateSchedule[key].titleEn = existingLecture.titleEn;
-                                    dateSchedule[key].speakerKo = existingLecture.speakerKo;
-                                    dateSchedule[key].speakerEn = existingLecture.speakerEn;
-                                    dateSchedule[key].affiliation = existingLecture.affiliation;
-                                    dateSchedule[key].duration = existingLecture.duration;
-                                    dateSchedule[key].companyName = existingLecture.companyName;
-                                    dateSchedule[key].productName = existingLecture.productName;
-                                    dateSchedule[key].isLuncheon = existingLecture.isLuncheon;
-                                }
-                            });
-                        });
-                        
-                        updatedCount++;
-                        return;
-                    }
+                    });
+                    
+                    updatedCount++;
+                    return;
                 }
-                // duplicateAction === 'add' 이거나 기존 강의를 찾지 못한 경우 새로 추가
+                // 기존 강의를 찾지 못한 경우 새로 추가
             }
             
             // 새 강의 추가
