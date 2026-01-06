@@ -407,6 +407,12 @@ window.addLectureToList = function() {
         productDescription: document.getElementById('productDescription').value.trim(),
         isLuncheon: isLuncheon
     };
+    
+    // 회사명이 있고 목록에 없으면 자동 추가
+    if (lecture.companyName && !AppState.companies.includes(lecture.companyName)) {
+        AppState.companies.push(lecture.companyName);
+        AppState.companies.sort((a, b) => a.localeCompare(b, 'ko'));
+    }
 
     AppState.lectures.push(lecture);
     saveAndSync();
@@ -520,9 +526,15 @@ window.saveEditedLecture = function() {
             affiliation: document.getElementById('editAffiliation').value,
             duration: parseInt(document.getElementById('editDuration').value) || 15,
             isLuncheon: isLuncheon,
-            companyName: companyName,
-            productName: productName
+            companyName: companyName.trim(),
+            productName: productName.trim()
         };
+        
+        // 회사명이 있고 목록에 없으면 자동 추가
+        if (updatedLecture.companyName && !AppState.companies.includes(updatedLecture.companyName)) {
+            AppState.companies.push(updatedLecture.companyName);
+            AppState.companies.sort((a, b) => a.localeCompare(b, 'ko'));
+        }
 
         AppState.lectures[lectureIndex] = updatedLecture;
 

@@ -218,17 +218,31 @@ window.deleteCompany = function(name) {
 };
 
 // ============================================
-// 업체 자동완성
+// 업체 자동완성 (키보드 선택 지원)
 // ============================================
 
+// 현재 선택된 항목 인덱스
+let companySelectedIndex = -1;
+let editCompanySelectedIndex = -1;
+
 window.setupCompanyAutocomplete = function() {
-    const input = document.getElementById('companyName');
-    const dropdown = document.getElementById('companyAutocomplete');
+    // 강의 추가 모달
+    setupCompanyInput('companyName', 'companyAutocomplete', 'add');
+    // 강의 수정 모달
+    setupCompanyInput('editCompanyName', 'editCompanyAutocomplete', 'edit');
+};
+
+function setupCompanyInput(inputId, dropdownId, mode) {
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(dropdownId);
 
     if (!input || !dropdown) return;
 
     input.addEventListener('input', function() {
         const value = this.value.trim().toLowerCase();
+        
+        if (mode === 'add') companySelectedIndex = -1;
+        else editCompanySelectedIndex = -1;
 
         if (value.length === 0) {
             dropdown.style.display = 'none';
@@ -244,11 +258,7 @@ window.setupCompanyAutocomplete = function() {
             return;
         }
 
-        dropdown.innerHTML = matches.map(company => `
-            <div class="autocomplete-item" onmousedown="selectCompany('${company.replace(/'/g, "\\'")}')">
-                ${company}
-            </div>
-        `).join('');
+        renderCompanyDropdown(dropdown, matches, mode);
         dropdown.style.display = 'block';
     });
 
@@ -259,12 +269,65 @@ window.setupCompanyAutocomplete = function() {
     });
 
     input.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
+        const items = dropdown.querySelectorAll('.autocomplete-item');
+        if (items.length === 0 || dropdown.style.display === 'none') return;
+
+        let selectedIndex = mode === 'add' ? companySelectedIndex : editCompanySelectedIndex;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+            updateCompanySelection(items, selectedIndex, mode);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectedIndex = Math.max(selectedIndex - 1, 0);
+            updateCompanySelection(items, selectedIndex, mode);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (selectedIndex >= 0 && items[selectedIndex]) {
+                const company = items[selectedIndex].dataset.company;
+                selectCompanyForInput(inputId, dropdownId, company, mode);
+            }
+        } else if (e.key === 'Escape') {
             dropdown.style.display = 'none';
+        }
+    });
+}
+
+function renderCompanyDropdown(dropdown, matches, mode) {
+    dropdown.innerHTML = matches.map((company, index) => `
+        <div class="autocomplete-item" 
+             data-company="${company.replace(/"/g, '&quot;')}"
+             data-index="${index}"
+             onmousedown="selectCompanyForInput('${mode === 'add' ? 'companyName' : 'editCompanyName'}', '${mode === 'add' ? 'companyAutocomplete' : 'editCompanyAutocomplete'}', '${company.replace(/'/g, "\\'")}', '${mode}')"
+             onmouseenter="updateCompanySelection(document.querySelectorAll('#${mode === 'add' ? 'companyAutocomplete' : 'editCompanyAutocomplete'} .autocomplete-item'), ${index}, '${mode}')">
+            ${company}
+        </div>
+    `).join('');
+}
+
+window.updateCompanySelection = function(items, index, mode) {
+    if (mode === 'add') companySelectedIndex = index;
+    else editCompanySelectedIndex = index;
+
+    items.forEach((item, i) => {
+        if (i === index) {
+            item.classList.add('selected');
+            item.scrollIntoView({ block: 'nearest' });
+        } else {
+            item.classList.remove('selected');
         }
     });
 };
 
+window.selectCompanyForInput = function(inputId, dropdownId, company, mode) {
+    document.getElementById(inputId).value = company;
+    document.getElementById(dropdownId).style.display = 'none';
+    if (mode === 'add') companySelectedIndex = -1;
+    else editCompanySelectedIndex = -1;
+};
+
+// 기존 함수 유지 (하위 호환)
 window.selectCompany = function(name) {
     document.getElementById('companyName').value = name;
     document.getElementById('companyAutocomplete').style.display = 'none';
