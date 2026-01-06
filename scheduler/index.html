@@ -968,27 +968,19 @@
                     </div>
                     
                     <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                        <label style="display: flex; align-items: center; gap: 0.5rem;">
-                            <input type="checkbox" id="appendMode" checked>
-                            <span>기존 강의에 추가 (체크 해제 시 전체 교체)</span>
-                        </label>
-                        <div id="duplicateOptionsSection" style="display: none; margin-left: 1.5rem; padding: 0.75rem; background: #FFF8E1; border-radius: 8px; border: 1px solid #FFB74D;">
-                            <p style="margin: 0 0 0.5rem 0; font-size: 0.85rem; color: #E65100; font-weight: bold;">🔄 중복 강의 처리 방법 (<span id="skipDuplicateCount">0</span>개)</p>
-                            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
-                                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;">
-                                    <input type="radio" name="duplicateAction" value="skip" checked>
-                                    <span>건너뛰기 - 중복 강의는 업로드하지 않음</span>
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;">
-                                    <input type="radio" name="duplicateAction" value="update">
-                                    <span>업데이트 - 기존 강의 정보 덮어쓰기 (연자, 회사, 카테고리 등)</span>
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;">
-                                    <input type="radio" name="duplicateAction" value="add">
-                                    <span>모두 추가 - 중복이어도 새 강의로 추가</span>
-                                </label>
-                            </div>
+                        <div id="duplicateOptionsSection" style="display: none; padding: 0.75rem; background: #E3F2FD; border-radius: 8px; border: 1px solid #64B5F6;">
+                            <p style="margin: 0; font-size: 0.85rem; color: #1565C0;">
+                                ℹ️ 기존 강의 <strong><span id="skipDuplicateCount">0</span>개</strong>가 감지되었습니다.<br>
+                                <span style="color: #666;">→ 새 강의는 추가되고, 기존 강의는 회사/제품 정보만 업데이트됩니다.</span>
+                            </p>
                         </div>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                            <input type="checkbox" id="replaceAllMode">
+                            <span style="color: #D32F2F;">⚠️ 전체 교체 모드 (기존 강의 삭제 후 새로 업로드)</span>
+                        </label>
+                        <!-- 숨겨진 기존 옵션 (호환성 유지) -->
+                        <input type="checkbox" id="appendMode" checked style="display: none;">
+                        <input type="radio" name="duplicateAction" value="update" checked style="display: none;">
                     </div>
                     
                     <div style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
