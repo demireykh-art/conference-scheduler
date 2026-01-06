@@ -28,11 +28,31 @@ window.startRealtimeListeners = function() {
     loadTimeSettingsFromFirebase();
     loadLastBackupTime();
 
+    // 스케줄 변경 실시간 감지 (개별 항목)
+    const currentDate = AppState.currentDate;
+    database.ref(`/data/dataByDate/${currentDate}/schedule`).on('child_added', handleScheduleChange);
+    database.ref(`/data/dataByDate/${currentDate}/schedule`).on('child_changed', handleScheduleChange);
+    database.ref(`/data/dataByDate/${currentDate}/schedule`).on('child_removed', handleScheduleRemoved);
+
     database.ref('/data').on('value', (snapshot) => {
         const data = snapshot.val();
         if (data) {
             if (data.dataByDate) {
-                AppState.dataByDate = data.dataByDate;
+                // 현재 작업 중인 날짜의 스케줄은 병합 처리
+                Object.keys(data.dataByDate).forEach(date => {
+                    if (!AppState.dataByDate[date]) {
+                        AppState.dataByDate[date] = data.dataByDate[date];
+                    } else {
+                        // 강의 목록과 세션은 서버 데이터로 업데이트
+                        AppState.dataByDate[date].lectures = data.dataByDate[date].lectures || [];
+                        AppState.dataByDate[date].sessions = data.dataByDate[date].sessions || [];
+                        // 스케줄은 서버 데이터와 병합 (서버 우선)
+                        AppState.dataByDate[date].schedule = {
+                            ...AppState.dataByDate[date].schedule,
+                            ...data.dataByDate[date].schedule
+                        };
+                    }
+                });
             }
             if (data.speakers && data.speakers.length > 0) {
                 AppState.speakers = data.speakers;
@@ -62,6 +82,34 @@ window.startRealtimeListeners = function() {
             updateSyncStatus('synced', '준비됨');
         }
     });
+};
+
+/**
+ * 스케줄 변경 핸들러 (다른 사용자의 변경 실시간 반영)
+ */
+window.handleScheduleChange = function(snapshot) {
+    const key = snapshot.key;
+    const lecture = snapshot.val();
+    
+    if (lecture && JSON.stringify(AppState.schedule[key]) !== JSON.stringify(lecture)) {
+        console.log(`[실시간] 스케줄 업데이트: ${key}`);
+        AppState.schedule[key] = lecture;
+        updateScheduleDisplay();
+    }
+};
+
+/**
+ * 스케줄 삭제 핸들러
+ */
+window.handleScheduleRemoved = function(snapshot) {
+    const key = snapshot.key;
+    
+    if (AppState.schedule[key]) {
+        console.log(`[실시간] 스케줄 삭제: ${key}`);
+        delete AppState.schedule[key];
+        updateScheduleDisplay();
+        updateLectureList();
+    }
 };
 
 /**
@@ -95,16 +143,16 @@ window.saveToFirebase = function() {
         sessions: AppState.sessions
     };
 
-    const dataToSave = {
-        dataByDate: AppState.dataByDate,
-        speakers: AppState.speakers,
-        companies: AppState.companies,
-        categories: AppState.categories,
-        lastModified: firebase.database.ServerValue.TIMESTAMP,
-        lastModifiedBy: AppState.currentUser ? AppState.currentUser.email : 'unknown'
-    };
+    // update()를 사용하여 특정 경로만 업데이트 (전체 덮어쓰기 방지)
+    const updates = {};
+    updates['/data/dataByDate'] = AppState.dataByDate;
+    updates['/data/speakers'] = AppState.speakers;
+    updates['/data/companies'] = AppState.companies;
+    updates['/data/categories'] = AppState.categories;
+    updates['/data/lastModified'] = firebase.database.ServerValue.TIMESTAMP;
+    updates['/data/lastModifiedBy'] = AppState.currentUser ? AppState.currentUser.email : 'unknown';
 
-    database.ref('/data').set(dataToSave)
+    database.ref().update(updates)
         .then(() => {
             updateSyncStatus('synced', '저장됨');
             console.log('Firebase 저장 완료');
@@ -113,6 +161,44 @@ window.saveToFirebase = function() {
             updateSyncStatus('offline', '저장 실패');
             console.error('Firebase 저장 실패:', error);
         });
+};
+
+/**
+ * 스케줄 항목 개별 저장 (동시 작업 시 충돌 방지)
+ */
+window.saveScheduleItem = function(scheduleKey, lectureData) {
+    if (!canEdit()) return;
+    
+    const currentDate = AppState.currentDate;
+    const path = `/data/dataByDate/${currentDate}/schedule/${scheduleKey}`;
+    
+    if (lectureData) {
+        // 강의 배치
+        database.ref(path).set(lectureData)
+            .then(() => console.log(`스케줄 저장: ${scheduleKey}`))
+            .catch(err => console.error('스케줄 저장 실패:', err));
+    } else {
+        // 강의 삭제
+        database.ref(path).remove()
+            .then(() => console.log(`스케줄 삭제: ${scheduleKey}`))
+            .catch(err => console.error('스케줄 삭제 실패:', err));
+    }
+    
+    // lastModified 업데이트
+    database.ref('/data/lastModified').set(firebase.database.ServerValue.TIMESTAMP);
+    database.ref('/data/lastModifiedBy').set(AppState.currentUser ? AppState.currentUser.email : 'unknown');
+};
+
+/**
+ * 세션 항목 개별 저장
+ */
+window.saveSessionsToFirebase = function() {
+    if (!canEdit()) return;
+    
+    const currentDate = AppState.currentDate;
+    database.ref(`/data/dataByDate/${currentDate}/sessions`).set(AppState.sessions)
+        .then(() => console.log('세션 저장 완료'))
+        .catch(err => console.error('세션 저장 실패:', err));
 };
 
 /**
@@ -155,13 +241,24 @@ window.loadTimeSettingsFromFirebase = function() {
 // ============================================
 
 window.switchDate = function(date) {
+    const previousDate = AppState.currentDate;
     saveToFirebase();
+
+    // 이전 날짜의 스케줄 리스너 해제
+    if (previousDate) {
+        database.ref(`/data/dataByDate/${previousDate}/schedule`).off();
+    }
 
     AppState.currentDate = date;
     AppState.rooms = AppConfig.ROOMS_BY_DATE[date] || [];
 
     generateTimeSlots();
     loadDateData(date);
+    
+    // 새 날짜의 스케줄 리스너 설정
+    database.ref(`/data/dataByDate/${date}/schedule`).on('child_added', handleScheduleChange);
+    database.ref(`/data/dataByDate/${date}/schedule`).on('child_changed', handleScheduleChange);
+    database.ref(`/data/dataByDate/${date}/schedule`).on('child_removed', handleScheduleRemoved);
     
     // 룸 담당자 로드
     if (typeof loadRoomManagers === 'function') {

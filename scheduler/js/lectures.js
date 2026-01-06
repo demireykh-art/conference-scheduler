@@ -534,6 +534,12 @@ window.saveEditedLecture = function() {
 window.removeLecture = function(key) {
     saveStateForUndo();
     delete AppState.schedule[key];
+    
+    // 개별 스케줄 항목 삭제 (동시 작업 충돌 방지)
+    if (typeof saveScheduleItem === 'function') {
+        saveScheduleItem(key, null);
+    }
+    
     saveAndSync();
     updateScheduleDisplay();
     updateLectureList();

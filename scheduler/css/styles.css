@@ -1053,14 +1053,14 @@ body {
 
 .schedule-table tbody td {
     background: var(--white);
-    min-height: 20px;
-    height: 20px;
+    min-height: 26px;
+    height: 26px;
     position: relative;
     padding: 0;
     vertical-align: top;
-    width: 220px;
-    min-width: 220px;
-    max-width: 220px;
+    width: 290px;
+    min-width: 290px;
+    max-width: 290px;
 }
 
 .schedule-table tbody td.hour-mark {
@@ -1114,8 +1114,8 @@ body {
     color: var(--text-light);
     position: relative;
     min-width: 55px;
-    min-height: 20px;
-    height: 20px;
+    min-height: 26px;
+    height: 26px;
     display: flex;
     align-items: flex-start;
     justify-content: flex-end;
@@ -1155,14 +1155,14 @@ body {
 
 .schedule-cell {
     background: var(--white);
-    min-height: 20px;
-    height: 20px;
+    min-height: 26px;
+    height: 26px;
     position: relative;
     transition: all 0.2s;
     padding: 0;
-    width: 220px;
-    min-width: 220px;
-    max-width: 220px;
+    width: 290px;
+    min-width: 290px;
+    max-width: 290px;
 }
 
 .schedule-cell.hour-mark {

@@ -24,7 +24,7 @@ window.createScheduleTable = function() {
     headerRow.appendChild(timeHeader);
 
     // 각 룸의 폭 계산 (균등)
-    const roomWidth = 250; // 고정 폭
+    const roomWidth = 290; // 고정 폭
 
     AppState.rooms.forEach((room, roomIndex) => {
         const roomHeader = document.createElement('th');
@@ -417,7 +417,7 @@ window.updateScheduleDisplay = function() {
             lectureDiv.style.borderLeft = `4px solid ${color}`;
         }
 
-        const cellHeight = 21; // CSS height 20px + border-spacing 1px
+        const cellHeight = 27; // CSS height 26px + border-spacing 1px
         const totalHeight = slotsSpan * cellHeight;
         // 세션 헤더가 있으면 강의를 아래로 내리고 높이 조정
         lectureDiv.style.height = `${totalHeight - sessionHeaderHeight - 2}px`; // 2px 여백
@@ -459,7 +459,15 @@ window.updateScheduleDisplay = function() {
         } else if (isBreak && !isPanelDiscussion) {
             metaDisplay = `<span class="duration-badge">${timeRangeDisplay}</span>`;
         } else {
-            metaDisplay = `<span class="speaker-name" style="color: #333;">${speaker || '미정'}</span><span class="duration-badge">${timeRangeDisplay}</span>`;
+            // 일반 강의 - 스폰서/제품명 표시
+            let sponsorLine = '';
+            if (lecture.companyName || lecture.productName) {
+                const parts = [];
+                if (lecture.companyName) parts.push(lecture.companyName);
+                if (lecture.productName) parts.push(lecture.productName);
+                sponsorLine = `<span class="sponsor-info" style="font-size: 0.6rem; color: #666; display: block; margin-top: 1px;">🏢 ${parts.join(' - ')}</span>`;
+            }
+            metaDisplay = `<span class="speaker-name" style="color: #333;">${speaker || '미정'}</span><span class="duration-badge">${timeRangeDisplay}</span>${sponsorLine}`;
         }
 
         lectureDiv.innerHTML = `
@@ -818,6 +826,10 @@ window.handleDrop = function(e) {
         // 시간표 내 이동인 경우 기존 위치에서 삭제
         if (AppState.draggedScheduleKey && AppState.draggedScheduleKey !== key) {
             delete AppState.schedule[AppState.draggedScheduleKey];
+            // Firebase에서도 삭제
+            if (typeof saveScheduleItem === 'function') {
+                saveScheduleItem(AppState.draggedScheduleKey, null);
+            }
         }
 
         // 강의 배치
@@ -844,6 +856,12 @@ window.handleDrop = function(e) {
         }
 
         AppState.schedule[key] = newLecture;
+        
+        // 개별 스케줄 항목 저장 (동시 작업 충돌 방지)
+        if (typeof saveScheduleItem === 'function') {
+            saveScheduleItem(key, newLecture);
+        }
+        
         saveAndSync();
         updateScheduleDisplay();
 
