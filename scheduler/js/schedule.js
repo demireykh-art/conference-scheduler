@@ -137,7 +137,7 @@ window.createScheduleTable = function() {
         managerCell.style.cssText = 'background: #f5f5f5; padding: 2px 4px; height: 28px;';
         
         const managerSelect = document.createElement('select');
-        managerSelect.id = `roomManager-${index}`;
+        managerSelect.id = `roomManager-${roomIndex}`;
         managerSelect.className = 'room-manager-select';
         managerSelect.dataset.room = room;
         managerSelect.style.cssText = 'width: 100%; padding: 2px 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.7rem; background: white; cursor: pointer; text-align: center;';
