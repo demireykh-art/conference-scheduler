@@ -297,18 +297,14 @@ window.switchDate = function(date) {
         if (snapshot.exists()) {
             AppState.roomManagers = snapshot.val();
             console.log('[실시간] 룸 담당자 업데이트:', AppState.roomManagers);
-            if (typeof updateRoomManagerDropdowns === 'function') {
-                updateRoomManagerDropdowns();
-            }
         } else {
             AppState.roomManagers = {};
         }
+        // 드롭다운 업데이트
+        if (typeof updateRoomManagerDropdowns === 'function') {
+            updateRoomManagerDropdowns();
+        }
     });
-    
-    // 룸 담당자 로드
-    if (typeof loadRoomManagers === 'function') {
-        loadRoomManagers();
-    }
 
     document.querySelectorAll('.date-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.date === date);
