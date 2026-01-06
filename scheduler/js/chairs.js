@@ -412,6 +412,7 @@ window.updateSpeakerList = function() {
                     ${tagsHtml}
                 </div>
                 <div class="speaker-actions">
+                    <button class="btn btn-secondary btn-small" onclick="openSpeakerDetailModal('${speaker.name.replace(/'/g, "\\'")}')" title="강의 목록 보기" style="background: #5C3D8E; color: white;">📋 상세</button>
                     <button class="btn btn-secondary btn-small" onclick="editSpeaker(event, ${originalIndex})">수정</button>
                     <button class="btn btn-secondary btn-small" onclick="deleteSpeaker(event, ${originalIndex})">삭제</button>
                 </div>
@@ -720,6 +721,282 @@ window.confirmAddNewSpeaker = function() {
 
         addLectureToList();
     }
+};
+
+// ============================================
+// 연자 상세보기 기능
+// ============================================
+
+/**
+ * 연자 상세보기 모달 열기
+ */
+window.openSpeakerDetailModal = function(speakerName) {
+    const speaker = AppState.speakers.find(s => s.name === speakerName);
+    if (!speaker) {
+        alert('연자 정보를 찾을 수 없습니다.');
+        return;
+    }
+    
+    // 해당 연자의 모든 강의 찾기
+    const speakerLectures = [];
+    
+    // 모든 날짜에서 강의 수집
+    Object.entries(AppState.dataByDate || {}).forEach(([date, dateData]) => {
+        const dateLectures = dateData.lectures || [];
+        const dateSchedule = dateData.schedule || {};
+        const dateSessions = dateData.sessions || [];
+        
+        // 강의 목록에서 찾기
+        dateLectures.forEach(lecture => {
+            if (lecture.speakerKo === speakerName) {
+                // 배치 정보 확인
+                let scheduleInfo = null;
+                Object.entries(dateSchedule).forEach(([key, scheduledLecture]) => {
+                    if (scheduledLecture.id === lecture.id) {
+                        const [time, room] = key.split('_');
+                        scheduleInfo = { time, room, key };
+                    }
+                });
+                
+                speakerLectures.push({
+                    ...lecture,
+                    date,
+                    dateLabel: AppConfig.CONFERENCE_DATES.find(d => d.date === date)?.label || date,
+                    scheduleInfo,
+                    type: 'lecture'
+                });
+            }
+        });
+        
+        // 세션에서 좌장 역할 확인
+        dateSessions.forEach(session => {
+            if (session.moderator === speakerName || session.moderator2 === speakerName) {
+                speakerLectures.push({
+                    titleKo: session.name,
+                    date,
+                    dateLabel: AppConfig.CONFERENCE_DATES.find(d => d.date === date)?.label || date,
+                    scheduleInfo: { time: session.startTime, room: session.room },
+                    duration: session.duration || 60,
+                    type: 'moderator',
+                    category: 'Session'
+                });
+            }
+        });
+    });
+    
+    // 날짜 및 시간순 정렬
+    speakerLectures.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        const timeA = a.scheduleInfo?.time || '99:99';
+        const timeB = b.scheduleInfo?.time || '99:99';
+        return timeA.localeCompare(timeB);
+    });
+    
+    // 모달 HTML 생성
+    const modalHtml = `
+        <div class="modal active" id="speakerDetailModal">
+            <div class="modal-content" style="max-width: 700px; max-height: 90vh;">
+                <div class="modal-header">
+                    <h2>👤 ${speaker.name} ${speaker.nameEn ? `/ ${speaker.nameEn}` : ''}</h2>
+                    <button class="modal-close" onclick="closeSpeakerDetailModal()">×</button>
+                </div>
+                <div style="padding: 0.5rem 1rem; background: var(--bg); border-bottom: 1px solid var(--border);">
+                    <p style="margin: 0; color: #666;">
+                        🏥 ${speaker.affiliation || '(소속 미입력)'}
+                        ${speaker.isASLS ? ' | <span style="color: #8E24AA; font-weight: bold;">ASLS 회원</span>' : ''}
+                    </p>
+                    <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem;">
+                        📊 총 <strong>${speakerLectures.filter(l => l.type === 'lecture').length}</strong>개 강의, 
+                        좌장 <strong>${speakerLectures.filter(l => l.type === 'moderator').length}</strong>회
+                    </p>
+                </div>
+                <div style="padding: 1rem; overflow-y: auto; max-height: calc(90vh - 200px);" id="speakerDetailContent">
+                    ${generateSpeakerDetailContent(speakerLectures, speaker)}
+                </div>
+                <div style="padding: 1rem; border-top: 1px solid var(--border); display: flex; gap: 0.5rem;">
+                    <button class="btn btn-primary" onclick="exportSpeakerDetailPDF('${speakerName}')" style="flex: 1;">
+                        📄 PDF 저장
+                    </button>
+                    <button class="btn btn-secondary" onclick="closeSpeakerDetailModal()">닫기</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // 기존 모달 제거 후 새로 추가
+    const existingModal = document.getElementById('speakerDetailModal');
+    if (existingModal) existingModal.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+};
+
+/**
+ * 연자 상세 내용 생성
+ */
+function generateSpeakerDetailContent(lectures, speaker) {
+    if (lectures.length === 0) {
+        return '<p style="text-align: center; color: #999;">등록된 강의가 없습니다.</p>';
+    }
+    
+    let html = '';
+    let currentDate = '';
+    
+    lectures.forEach((lecture, index) => {
+        // 날짜 구분
+        if (lecture.dateLabel !== currentDate) {
+            if (currentDate !== '') html += '</div>';
+            currentDate = lecture.dateLabel;
+            html += `
+                <div style="margin-top: ${index > 0 ? '1rem' : '0'};">
+                    <h4 style="margin: 0 0 0.5rem 0; color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 0.25rem;">
+                        📅 ${currentDate}
+                    </h4>
+            `;
+        }
+        
+        const categoryColor = AppConfig.categoryColors[lecture.category] || '#757575';
+        const isScheduled = lecture.scheduleInfo;
+        const statusIcon = isScheduled ? '✅' : '⏳';
+        const statusText = isScheduled ? `${lecture.scheduleInfo.time} | ${lecture.scheduleInfo.room}` : '미배치';
+        
+        if (lecture.type === 'moderator') {
+            html += `
+                <div style="padding: 0.75rem; margin-bottom: 0.5rem; background: #FFF3E0; border-left: 4px solid #FF9800; border-radius: 4px;">
+                    <div style="font-weight: bold; color: #E65100;">🎤 좌장: ${lecture.titleKo}</div>
+                    <div style="font-size: 0.85rem; color: #666; margin-top: 0.25rem;">
+                        ${statusText} | ⏱️ ${lecture.duration || 60}분
+                    </div>
+                </div>
+            `;
+        } else {
+            html += `
+                <div style="padding: 0.75rem; margin-bottom: 0.5rem; background: white; border: 1px solid var(--border); border-left: 4px solid ${categoryColor}; border-radius: 4px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="flex: 1;">
+                            <span style="background: ${categoryColor}; color: white; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.7rem; margin-right: 0.5rem;">${lecture.category}</span>
+                            ${lecture.isLuncheon ? '<span style="color: #FF8F00;">⭐</span>' : ''}
+                            ${lecture.isAcademicLecture || lecture.companyName === '학회강의' ? '<span style="color: #8E24AA;">🎓</span>' : ''}
+                        </div>
+                        <span style="font-size: 0.75rem; color: ${isScheduled ? '#4CAF50' : '#FF9800'};">${statusIcon} ${statusText}</span>
+                    </div>
+                    <div style="font-weight: 600; margin: 0.5rem 0 0.25rem 0; color: #333;">${lecture.titleKo}</div>
+                    ${lecture.titleEn ? `<div style="font-size: 0.8rem; color: #666;">${lecture.titleEn}</div>` : ''}
+                    <div style="font-size: 0.85rem; color: #666; margin-top: 0.25rem;">
+                        ⏱️ ${lecture.duration || 15}분
+                        ${lecture.companyName && lecture.companyName !== '학회강의' ? ` | 🏢 ${lecture.companyName}` : ''}
+                        ${lecture.productName ? ` - ${lecture.productName}` : ''}
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    html += '</div>';
+    return html;
+}
+
+/**
+ * 연자 상세보기 모달 닫기
+ */
+window.closeSpeakerDetailModal = function() {
+    const modal = document.getElementById('speakerDetailModal');
+    if (modal) modal.remove();
+};
+
+/**
+ * 연자 상세 정보 PDF 저장
+ */
+window.exportSpeakerDetailPDF = function(speakerName) {
+    const speaker = AppState.speakers.find(s => s.name === speakerName);
+    if (!speaker) return;
+    
+    const content = document.getElementById('speakerDetailContent');
+    if (!content) return;
+    
+    // PDF 생성을 위한 새 창 열기
+    const printWindow = window.open('', '_blank');
+    
+    // 스타일과 함께 HTML 생성
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>${speaker.name} - 강의 일정</title>
+            <style>
+                body {
+                    font-family: 'Malgun Gothic', sans-serif;
+                    padding: 20px;
+                    max-width: 800px;
+                    margin: 0 auto;
+                }
+                h1 {
+                    color: #5C3D8E;
+                    border-bottom: 3px solid #5C3D8E;
+                    padding-bottom: 10px;
+                }
+                .info {
+                    background: #f5f5f5;
+                    padding: 15px;
+                    border-radius: 8px;
+                    margin-bottom: 20px;
+                }
+                h4 {
+                    color: #5C3D8E;
+                    border-bottom: 2px solid #5C3D8E;
+                    padding-bottom: 5px;
+                    margin-top: 20px;
+                }
+                .lecture-item {
+                    padding: 12px;
+                    margin-bottom: 8px;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                    page-break-inside: avoid;
+                }
+                .moderator-item {
+                    background: #FFF3E0;
+                    border-left: 4px solid #FF9800;
+                }
+                .category-badge {
+                    display: inline-block;
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                    color: white;
+                    font-size: 11px;
+                }
+                .footer {
+                    margin-top: 30px;
+                    text-align: center;
+                    color: #999;
+                    font-size: 12px;
+                }
+                @media print {
+                    body { padding: 0; }
+                    .no-print { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <h1>👤 ${speaker.name} ${speaker.nameEn ? `/ ${speaker.nameEn}` : ''}</h1>
+            <div class="info">
+                <p><strong>🏥 소속:</strong> ${speaker.affiliation || '(미입력)'}</p>
+                ${speaker.isASLS ? '<p><strong style="color: #8E24AA;">ASLS 회원</strong></p>' : ''}
+            </div>
+            ${content.innerHTML}
+            <div class="footer">
+                ASLS Conference Schedule System - ${new Date().toLocaleDateString('ko-KR')}
+            </div>
+            <script>
+                window.onload = function() {
+                    window.print();
+                }
+            </script>
+        </body>
+        </html>
+    `);
+    
+    printWindow.document.close();
 };
 
 console.log('✅ chairs.js 로드 완료');

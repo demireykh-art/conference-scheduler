@@ -393,6 +393,16 @@ window.addLectureToList = function() {
         }
     }
 
+    // 학회강의 체크박스 처리
+    const isAcademicCheckbox = document.getElementById('isAcademicLecture');
+    const isAcademicLecture = isAcademicCheckbox ? isAcademicCheckbox.checked : false;
+    
+    // 학회강의 체크 시 회사명을 '학회강의'로 설정
+    let companyNameValue = document.getElementById('companyName').value.trim();
+    if (isAcademicLecture) {
+        companyNameValue = '학회강의';
+    }
+
     const lecture = {
         id: Date.now(),
         category: category,
@@ -402,10 +412,11 @@ window.addLectureToList = function() {
         speakerEn: speakerEn,
         affiliation: affiliation,
         duration: parseInt(document.getElementById('lectureDuration').value) || 15,
-        companyName: document.getElementById('companyName').value.trim(),
+        companyName: companyNameValue,
         productName: document.getElementById('productName').value.trim(),
         productDescription: document.getElementById('productDescription').value.trim(),
-        isLuncheon: isLuncheon
+        isLuncheon: isLuncheon,
+        isAcademicLecture: isAcademicLecture
     };
     
     // 회사명이 있고 목록에 없으면 자동 추가
@@ -430,6 +441,7 @@ window.addLectureToList = function() {
     document.getElementById('productName').value = '';
     document.getElementById('productDescription').value = '';
     if (isLuncheonCheckbox) isLuncheonCheckbox.checked = false;
+    if (isAcademicCheckbox) isAcademicCheckbox.checked = false;
 
     const autocompleteList = document.getElementById('autocompleteList');
     autocompleteList.classList.remove('active');
@@ -460,10 +472,20 @@ window.openEditModal = function(lectureId) {
         editIsLuncheonCheckbox.checked = lecture.isLuncheon || false;
     }
     
+    // 학회강의 체크박스 처리
+    const editIsAcademicCheckbox = document.getElementById('editIsAcademicLecture');
+    if (editIsAcademicCheckbox) {
+        // 회사명이 '학회강의'이거나 isAcademicLecture가 true면 체크
+        editIsAcademicCheckbox.checked = lecture.isAcademicLecture || lecture.companyName === '학회강의';
+    }
+    
     // 파트너사 정보 처리
     const editCompanyName = document.getElementById('editCompanyName');
     const editProductName = document.getElementById('editProductName');
-    if (editCompanyName) editCompanyName.value = lecture.companyName || '';
+    // 학회강의인 경우 회사명 필드는 비워둠
+    if (editCompanyName) {
+        editCompanyName.value = (lecture.companyName === '학회강의') ? '' : (lecture.companyName || '');
+    }
     if (editProductName) editProductName.value = lecture.productName || '';
 
     document.getElementById('editModal').classList.add('active');
@@ -511,9 +533,18 @@ window.saveEditedLecture = function() {
     const editIsLuncheonCheckbox = document.getElementById('editIsLuncheon');
     const isLuncheon = editIsLuncheonCheckbox ? editIsLuncheonCheckbox.checked : false;
     
+    // 학회강의 체크박스
+    const editIsAcademicCheckbox = document.getElementById('editIsAcademicLecture');
+    const isAcademicLecture = editIsAcademicCheckbox ? editIsAcademicCheckbox.checked : false;
+    
     // 파트너사 정보
-    const companyName = document.getElementById('editCompanyName')?.value || '';
+    let companyName = document.getElementById('editCompanyName')?.value || '';
     const productName = document.getElementById('editProductName')?.value || '';
+    
+    // 학회강의 체크 시 회사명을 '학회강의'로 설정
+    if (isAcademicLecture) {
+        companyName = '학회강의';
+    }
 
     if (lectureIndex !== -1) {
         const updatedLecture = {
@@ -526,6 +557,7 @@ window.saveEditedLecture = function() {
             affiliation: document.getElementById('editAffiliation').value,
             duration: parseInt(document.getElementById('editDuration').value) || 15,
             isLuncheon: isLuncheon,
+            isAcademicLecture: isAcademicLecture,
             companyName: companyName.trim(),
             productName: productName.trim()
         };
@@ -696,12 +728,12 @@ window.createCategoryFilters = function() {
             row.style.cssText = 'display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; justify-content: flex-start;';
             
             group.forEach(category => {
-                if (!AppConfig.categoryColors[category]) return;
+                // AppConfig.categoryColors 또는 AppState.categories에 있는 카테고리만 표시
+                const color = AppConfig.categoryColors[category] || '#757575';
                 
                 const count = categoryCounts[category] || 0;
                 const btn = document.createElement('button');
                 btn.className = 'category-filter-btn';
-                const color = AppConfig.categoryColors[category];
                 btn.style.borderColor = color;
                 btn.style.color = color;
                 btn.innerHTML = `${category}${count > 0 ? `<span class="category-count" style="background:${color};">${count}</span>` : ''}`;
@@ -714,6 +746,33 @@ window.createCategoryFilters = function() {
                 container.appendChild(row);
             }
         });
+        
+        // AppState.categories에 있지만 categoryGroups에 없는 카테고리 추가 (분류 관리에서 추가된 것들)
+        const groupedCategories = AppConfig.categoryGroups.flat();
+        const ungroupedCategories = AppState.categories.filter(cat => !groupedCategories.includes(cat));
+        
+        if (ungroupedCategories.length > 0) {
+            const extraRow = document.createElement('div');
+            extraRow.className = 'category-row';
+            extraRow.style.cssText = 'display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; justify-content: flex-start;';
+            
+            ungroupedCategories.forEach(category => {
+                const count = categoryCounts[category] || 0;
+                const color = AppConfig.categoryColors[category] || '#757575';
+                const btn = document.createElement('button');
+                btn.className = 'category-filter-btn';
+                btn.style.borderColor = color;
+                btn.style.color = color;
+                btn.innerHTML = `${category}${count > 0 ? `<span class="category-count" style="background:${color};">${count}</span>` : ''}`;
+                btn.onclick = () => filterLectures(category);
+                btn.dataset.category = category;
+                extraRow.appendChild(btn);
+            });
+            
+            if (extraRow.children.length > 0) {
+                container.appendChild(extraRow);
+            }
+        }
     } else {
         // 그룹이 없으면 기존 방식
         Object.keys(AppConfig.categoryColors).forEach(category => {

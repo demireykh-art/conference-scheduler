@@ -400,10 +400,21 @@ window.updateScheduleDisplay = function() {
         const sessionAtSameTime = AppState.sessions.find(s => s.time === startTime && s.room === room);
         const sessionHeaderHeight = sessionAtSameTime ? 25 : 0; // 세션 헤더 높이
         
-        lectureDiv.className = 'scheduled-lecture' + (isInSession ? ' in-session' : '') + (isBreak ? ' break-item' : '') + (isPanelDiscussion ? ' panel-discussion' : '') + (isLuncheon ? ' luncheon-lecture' : '');
+        // Lunch 카테고리인지 확인
+        const isLunch = category === 'Lunch';
+        
+        lectureDiv.className = 'scheduled-lecture' + (isInSession ? ' in-session' : '') + (isBreak ? ' break-item' : '') + (isPanelDiscussion ? ' panel-discussion' : '') + (isLuncheon ? ' luncheon-lecture' : '') + (isLunch ? ' lunch-item' : '');
         lectureDiv.draggable = true;
         lectureDiv.dataset.scheduleKey = key;
         lectureDiv.tabIndex = 0;
+        
+        // z-index 설정: Lunch는 1, 일반 강의는 10 (강의가 Lunch 위에 표시됨)
+        if (isLunch) {
+            lectureDiv.style.zIndex = '1';
+            lectureDiv.style.opacity = '0.7'; // Lunch를 약간 투명하게
+        } else {
+            lectureDiv.style.zIndex = '10';
+        }
         
         // 스타일: 흰색 배경 + 좌측 컬러바 (강의목록과 동일)
         if (isPanelDiscussion) {
@@ -769,15 +780,58 @@ window.handleDrop = function(e) {
         }
 
         // 이미 강의가 있는 셀인지 확인
+        let isPlacingOnLunch = false;
         if (AppState.schedule[key]) {
             if (!AppState.draggedScheduleKey || AppState.draggedScheduleKey !== key) {
-                showSwapDialog(key, time, room, AppState.draggedLecture, AppState.draggedScheduleKey);
-                return;
+                // Lunch 위에 강의를 놓는 경우는 스왑 대신 중복 배치 허용
+                const existingLecture = AppState.schedule[key];
+                if (existingLecture.category === 'Lunch') {
+                    // Lunch 위에는 강의 배치 허용 - 스왑 다이얼로그 건너뛰기
+                    isPlacingOnLunch = true;
+                    console.log('Lunch 위에 강의 배치 허용');
+                } else {
+                    showSwapDialog(key, time, room, AppState.draggedLecture, AppState.draggedScheduleKey);
+                    return;
+                }
+            }
+        }
+        
+        // Lunch 시간대인지 확인 (직접 Lunch 셀이 아니더라도 Lunch 시간대에 겹치는 경우)
+        if (!isPlacingOnLunch) {
+            for (const [scheduleKey, scheduledLecture] of Object.entries(AppState.schedule)) {
+                if (scheduledLecture.category === 'Lunch') {
+                    const [lunchTime, lunchRoom] = [scheduleKey.substring(0, 5), scheduleKey.substring(6)];
+                    if (lunchRoom !== room) continue;
+                    
+                    const lunchStartMin = timeToMinutes(lunchTime);
+                    const lunchEndMin = lunchStartMin + (scheduledLecture.duration || 60);
+                    const targetStartMin = timeToMinutes(time);
+                    const targetEndMin = targetStartMin + (AppState.draggedLecture.duration || 15);
+                    
+                    // 시간이 겹치면 Lunch 위에 배치하는 것으로 간주
+                    if (targetStartMin < lunchEndMin && targetEndMin > lunchStartMin) {
+                        isPlacingOnLunch = true;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Lunch 위에 배치하는데 런천강의가 아닌 경우 안내
+        if (isPlacingOnLunch && !isBreak && !AppState.draggedLecture.isLuncheon) {
+            alert(`⭐ 런천강의로 지정됩니다!\n\n"${AppState.draggedLecture.titleKo}" 강의가\nLunch 시간대에 배치되어 런천강의(Luncheon Lecture)로\n자동 지정됩니다.`);
+            // 런천강의 태그 추가
+            AppState.draggedLecture.isLuncheon = true;
+            
+            // 원본 강의 데이터도 업데이트
+            const originalLecture = AppState.lectures.find(l => l.id === AppState.draggedLecture.id);
+            if (originalLecture) {
+                originalLecture.isLuncheon = true;
             }
         }
 
-        // 시간 겹침 체크
-        const overlapCheck = checkTimeOverlap(time, room, AppState.draggedLecture.duration || 15, AppState.draggedScheduleKey);
+        // 시간 겹침 체크 (Lunch와 강의는 중복 허용)
+        const overlapCheck = checkTimeOverlap(time, room, AppState.draggedLecture.duration || 15, AppState.draggedScheduleKey, AppState.draggedLecture);
         if (overlapCheck.hasOverlap) {
             alert(`⚠️ 시간이 겹칩니다!\n\n배치하려는 강의: ${time} ~ ${overlapCheck.newEndTime} (${AppState.draggedLecture.duration || 15}분)\n\n겹치는 강의: "${overlapCheck.conflictLecture.titleKo}"\n시간: ${overlapCheck.conflictTime} ~ ${overlapCheck.conflictEndTime}\n\n다른 시간대를 선택해주세요.`);
             AppState.draggedScheduleKey = null;
@@ -920,12 +974,15 @@ window.handleDrop = function(e) {
 /**
  * 시간 겹침 체크
  */
-window.checkTimeOverlap = function(targetTime, targetRoom, targetDuration, excludeKey = null) {
+window.checkTimeOverlap = function(targetTime, targetRoom, targetDuration, excludeKey = null, draggedLecture = null) {
     const targetStartIndex = AppState.timeSlots.indexOf(targetTime);
     if (targetStartIndex === -1) return { hasOverlap: false };
 
     const targetEndIndex = targetStartIndex + Math.ceil(targetDuration / 5);
     const targetEndTime = AppState.timeSlots[Math.min(targetEndIndex, AppState.timeSlots.length - 1)] || AppState.timeSlots[AppState.timeSlots.length - 1];
+
+    // 배치하려는 강의가 런천강의인지 확인
+    const isLuncheonLecture = draggedLecture && (draggedLecture.isLuncheon || draggedLecture.category === 'Luncheon');
 
     for (const [scheduleKey, lecture] of Object.entries(AppState.schedule)) {
         if (excludeKey && scheduleKey === excludeKey) continue;
@@ -941,6 +998,20 @@ window.checkTimeOverlap = function(targetTime, targetRoom, targetDuration, exclu
         const existingEndTime = AppState.timeSlots[Math.min(existingEndIndex, AppState.timeSlots.length - 1)] || AppState.timeSlots[AppState.timeSlots.length - 1];
 
         if (targetStartIndex < existingEndIndex && targetEndIndex > existingStartIndex) {
+            // Lunch와 런천강의(또는 일반 강의)는 중복 허용
+            const isExistingLunch = lecture.category === 'Lunch';
+            const isExistingLuncheon = lecture.isLuncheon || lecture.category === 'Luncheon';
+            
+            // 기존이 Lunch이고 새로 배치하는 것이 강의면 허용
+            if (isExistingLunch) {
+                continue; // 중복 허용, 다음 항목 확인
+            }
+            
+            // 새로 배치하는 것이 Lunch이고 기존이 강의면 허용
+            if (draggedLecture && draggedLecture.category === 'Lunch') {
+                continue; // 중복 허용
+            }
+            
             return {
                 hasOverlap: true,
                 conflictLecture: lecture,
