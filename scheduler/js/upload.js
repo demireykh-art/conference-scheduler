@@ -389,7 +389,7 @@
         pendingUploadData.forEach((lecture, index) => {
             const isDuplicate = duplicates[index];
             
-            if (isDuplicate) {
+                if (isDuplicate) {
                 if (duplicateAction === 'skip') {
                     // 건너뛰기
                     skippedCount++;
@@ -410,6 +410,45 @@
                         existingLecture.companyName = lecture.companyName || existingLecture.companyName;
                         existingLecture.productName = lecture.productName || existingLecture.productName;
                         existingLecture.isLuncheon = lecture.isLuncheon || existingLecture.isLuncheon;
+                        
+                        // 배치된 스케줄에도 동일하게 업데이트
+                        const lectureId = existingLecture.id;
+                        
+                        // 현재 날짜 스케줄 업데이트
+                        Object.keys(window.AppState.schedule).forEach(key => {
+                            if (window.AppState.schedule[key].id === lectureId) {
+                                window.AppState.schedule[key].category = existingLecture.category;
+                                window.AppState.schedule[key].titleKo = existingLecture.titleKo;
+                                window.AppState.schedule[key].titleEn = existingLecture.titleEn;
+                                window.AppState.schedule[key].speakerKo = existingLecture.speakerKo;
+                                window.AppState.schedule[key].speakerEn = existingLecture.speakerEn;
+                                window.AppState.schedule[key].affiliation = existingLecture.affiliation;
+                                window.AppState.schedule[key].duration = existingLecture.duration;
+                                window.AppState.schedule[key].companyName = existingLecture.companyName;
+                                window.AppState.schedule[key].productName = existingLecture.productName;
+                                window.AppState.schedule[key].isLuncheon = existingLecture.isLuncheon;
+                            }
+                        });
+                        
+                        // 모든 날짜의 스케줄도 업데이트
+                        Object.keys(dataByDate).forEach(date => {
+                            const dateSchedule = dataByDate[date]?.schedule || {};
+                            Object.keys(dateSchedule).forEach(key => {
+                                if (dateSchedule[key].id === lectureId) {
+                                    dateSchedule[key].category = existingLecture.category;
+                                    dateSchedule[key].titleKo = existingLecture.titleKo;
+                                    dateSchedule[key].titleEn = existingLecture.titleEn;
+                                    dateSchedule[key].speakerKo = existingLecture.speakerKo;
+                                    dateSchedule[key].speakerEn = existingLecture.speakerEn;
+                                    dateSchedule[key].affiliation = existingLecture.affiliation;
+                                    dateSchedule[key].duration = existingLecture.duration;
+                                    dateSchedule[key].companyName = existingLecture.companyName;
+                                    dateSchedule[key].productName = existingLecture.productName;
+                                    dateSchedule[key].isLuncheon = existingLecture.isLuncheon;
+                                }
+                            });
+                        });
+                        
                         updatedCount++;
                         return;
                     }
