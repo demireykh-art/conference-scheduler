@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧪 테스트 - 학술대회 스케줄러</title>
+    <title>학술대회 스케줄러</title>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -20,12 +20,6 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <!-- 테스트 모드 배너 -->
-    <div id="testModeBanner" style="background: linear-gradient(90deg, #FF6B6B, #FF8E53); color: white; padding: 8px 16px; text-align: center; font-weight: bold; position: fixed; top: 0; left: 0; right: 0; z-index: 10000; font-size: 0.9rem; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
-        🧪 테스트 모드 - 운영 데이터에 영향 없음 | 
-        <a href="../" style="color: white; text-decoration: underline;">운영 버전으로 이동 →</a>
-    </div>
-    
     <!-- 드래그 툴팁 -->
     <div class="drag-tooltip" id="dragTooltip">
         <div class="tooltip-title" id="tooltipTitle"></div>
@@ -36,7 +30,7 @@
     <!-- 로그인 오버레이 -->
     <div class="login-overlay" id="loginOverlay">
         <div class="login-box">
-            <h2>🧪 테스트 - 학술대회 스케줄러</h2>
+            <h2>📅 학술대회 스케줄러</h2>
             <p>편집하려면 Google 계정으로 로그인하세요.<br>승인된 사용자만 수정할 수 있습니다.</p>
             <button class="google-login-btn" onclick="signInWithGoogle()">
                 <img src="https://www.google.com/favicon.ico" alt="Google">
@@ -45,9 +39,9 @@
         </div>
     </div>
 
-    <div class="header" style="margin-top: 36px;">
+    <div class="header">
         <div>
-            <h1>🧪 테스트 - 학술대회 스케줄러</h1>
+            <h1>📅 학술대회 스케줄러</h1>
         </div>
         <div class="header-actions">
             <!-- 동기화 상태 -->
@@ -99,7 +93,7 @@
             <div class="btn-group" style="display: flex; gap: 0.2rem; padding: 0.2rem; background: rgba(255,255,255,0.1); border-radius: 6px;">
                 <button class="btn btn-primary btn-small" onclick="openUploadModal()" title="강의 업로드">📤업로드</button>
                 <button class="btn btn-secondary btn-small" onclick="openBackupModal()" title="백업 관리">💾백업</button>
-                <button class="btn btn-secondary btn-small" onclick="openSponsorManagementModal()" title="스폰서 강의 관리">🏢스폰서</button>
+                <button class="btn btn-secondary btn-small" onclick="openSponsorManagementModal()" title="파트너사 강의 관리">🏢파트너사</button>
             </div>
             
             <!-- 버튼 그룹 4: 출력 -->
@@ -187,18 +181,18 @@
                         </div>
                         
                         <div class="form-group" style="border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-top: 0.5rem;">
-                            <label style="color: var(--accent);">🏢 스폰서/제품 정보 (선택)</label>
+                            <label style="color: var(--accent);">🏢 파트너사/제품 정보 (선택)</label>
                         </div>
                         
                         <div class="form-row">
                             <div class="form-group" style="position: relative;">
                                 <label>회사명</label>
-                                <input type="text" id="companyName" placeholder="예: 대웅제약" autocomplete="off">
+                                <input type="text" id="companyName" placeholder="예: 원텍" autocomplete="off">
                                 <div id="companyAutocomplete" class="autocomplete-dropdown"></div>
                             </div>
                             <div class="form-group">
                                 <label>제품명</label>
-                                <input type="text" id="productName" placeholder="예: 나보타">
+                                <input type="text" id="productName" placeholder="예: 올리지오키스">
                             </div>
                         </div>
                         
@@ -213,7 +207,7 @@
                                 <input type="checkbox" id="isLuncheon" style="width: 18px; height: 18px; accent-color: #FF8F00;">
                                 <span style="color: #FF8F00; font-weight: bold;">⭐ 런천강의 (Luncheon Lecture)</span>
                             </label>
-                            <small style="color: #666; margin-left: 1.5rem;">런치 시간 내 스폰서 강의인 경우 체크</small>
+                            <small style="color: #666; margin-left: 1.5rem;">런치 시간 내 파트너사 강의인 경우 체크</small>
                         </div>
                         
                         <button type="button" class="btn btn-primary" id="addLectureBtn">강의 추가</button>
@@ -510,6 +504,21 @@
                         <input type="checkbox" id="editIsLuncheon" style="width: 18px; height: 18px; accent-color: #FF8F00;">
                         <span style="color: #FF8F00; font-weight: bold;">⭐ 런천강의 (Luncheon Lecture)</span>
                     </label>
+                </div>
+                
+                <!-- 파트너사 정보 -->
+                <div class="form-group" style="border-top: 1px dashed var(--border); padding-top: 0.5rem; margin-top: 0.5rem;">
+                    <label style="color: var(--accent);">🏢 파트너사/제품 정보 (선택)</label>
+                    <div class="form-row" style="margin-top: 0.5rem;">
+                        <div class="form-group" style="flex: 1;">
+                            <label style="font-size: 0.8rem;">회사명</label>
+                            <input type="text" id="editCompanyName" placeholder="예: 원텍">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label style="font-size: 0.8rem;">제품명</label>
+                            <input type="text" id="editProductName" placeholder="예: 올리지오키스">
+                        </div>
+                    </div>
                 </div>
                 
                 <div style="display: flex; gap: 0.5rem;">
@@ -845,11 +854,11 @@
         </div>
     </div>
 
-    <!-- 스폰서 강의 관리 모달 -->
+    <!-- 파트너사 강의 관리 모달 -->
     <div class="modal" id="sponsorManagementModal">
         <div class="modal-content" style="max-width: 900px; max-height: 90vh;">
             <div class="modal-header">
-                <h2>🏢 스폰서 강의 관리</h2>
+                <h2>🏢 파트너사 강의 관리</h2>
                 <button class="modal-close" onclick="closeSponsorManagementModal()">×</button>
             </div>
             

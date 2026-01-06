@@ -1,13 +1,8 @@
 /**
  * config.js - Firebase 및 앱 설정
- * ⚠️ 테스트 버전 - 운영 데이터와 분리됨
  */
 
 window.AppConfig = {
-    // 테스트 모드 플래그
-    isTestMode: true,
-    testPrefix: '/test', // Firebase 경로 prefix
-    
     // Firebase 설정
     firebase: {
         apiKey: "AIzaSyBzV50mjOaEnUS86sS8zOhBH0i9OePnDhM",
@@ -152,19 +147,4 @@ firebase.initializeApp(window.AppConfig.firebase);
 window.auth = firebase.auth();
 window.database = firebase.database();
 
-// 테스트 모드용 database.ref 래퍼
-// 원본 ref 함수 저장
-const originalRef = window.database.ref.bind(window.database);
-
-// 테스트 모드면 경로에 prefix 추가
-window.database.ref = function(path) {
-    if (window.AppConfig.isTestMode && path && !path.startsWith('.info')) {
-        const testPath = window.AppConfig.testPrefix + path;
-        console.log(`[TEST DB] ${path} → ${testPath}`);
-        return originalRef(testPath);
-    }
-    return originalRef(path);
-};
-
-console.log('✅ config.js 로드 완료 [🧪 테스트 모드]');
-console.log('⚠️ 테스트 데이터베이스 사용 중: /test/* 경로');
+console.log('✅ config.js 로드 완료');

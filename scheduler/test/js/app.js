@@ -565,8 +565,8 @@ window.generateFullScheduleHTML = function() {
                         </div>
                     </td>`;
                 } else if (isLuncheonLecture) {
-                    // Luncheon Lecture - 별표 + 스폰서 표시
-                    const sponsorInfo = lecture.companyName ? ` (스폰서: ${lecture.companyName})` : '';
+                    // Luncheon Lecture - 별표 + 파트너사 표시
+                    const sponsorInfo = lecture.companyName ? ` (파트너사: ${lecture.companyName})` : '';
                     html += `<td style="padding: 0.5rem; border: 1px solid #ddd; vertical-align: top; height: 80px; border-left: 4px solid #FFD700;">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.3rem;">
                             <div style="flex: 1; min-width: 0;">
@@ -689,8 +689,8 @@ window.generateRoomScheduleHTML = function(room) {
                     </td>
                 </tr>`;
             } else if (isLuncheonLecture) {
-                // Luncheon Lecture - 별표 + 스폰서 표시
-                const sponsorInfo = lecture.companyName ? ` (스폰서: ${lecture.companyName})` : '';
+                // Luncheon Lecture - 별표 + 파트너사 표시
+                const sponsorInfo = lecture.companyName ? ` (파트너사: ${lecture.companyName})` : '';
                 html += `<tr style="background: ${isHourMark ? '#f9f9f9' : 'white'}; border-left: 4px solid #FFD700;">
                     <td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center; font-weight: ${isHourMark ? 'bold' : 'normal'};">
                         ${time}<br><span style="font-size: 0.7rem; color: #999;">~${endTime}</span>

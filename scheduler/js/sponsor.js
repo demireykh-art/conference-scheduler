@@ -1,5 +1,5 @@
 /**
- * sponsor.js - 업체별 스폰서 강의 관리 모듈
+ * sponsor.js - 업체별 파트너사 강의 관리 모듈
  * 요청사항 #9: 업체별 스폰강의 디테일
  */
 
@@ -20,7 +20,7 @@
     let companyLectureAllocations = {}; // { companyName: { lectureTypeId: count } }
 
     /**
-     * 스폰서 관리 모달 열기
+     * 파트너사 관리 모달 열기
      */
     window.openSponsorManagementModal = function() {
         loadSponsorData();
@@ -29,14 +29,14 @@
     };
 
     /**
-     * 스폰서 관리 모달 닫기
+     * 파트너사 관리 모달 닫기
      */
     window.closeSponsorManagementModal = function() {
         document.getElementById('sponsorManagementModal').classList.remove('active');
     };
 
     /**
-     * 스폰서 데이터 Firebase에서 로드
+     * 파트너사 데이터 Firebase에서 로드
      */
     function loadSponsorData() {
         database.ref('/settings/sponsorLectureTypes').once('value', (snapshot) => {
@@ -53,7 +53,7 @@
     }
 
     /**
-     * 스폰서 데이터 Firebase에 저장
+     * 파트너사 데이터 Firebase에 저장
      */
     function saveSponsorData() {
         if (!canEdit()) return;
@@ -188,10 +188,10 @@
 
         let html = `
             <div style="background: #E8F4FD; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                <h3 style="margin: 0 0 0.5rem 0;">📊 스폰서 강의 현황</h3>
+                <h3 style="margin: 0 0 0.5rem 0;">📊 파트너사 강의 현황</h3>
                 <p style="margin: 0; font-size: 0.9rem; color: #666;">
                     총 <strong>${totalCompanies}</strong>개 업체, 
-                    <strong>${totalLectures}</strong>개 스폰서 강의,
+                    <strong>${totalLectures}</strong>개 파트너사 강의,
                     <strong>${totalBooth}</strong>개 부스
                 </p>
             </div>
@@ -473,7 +473,7 @@
 
         let html = `
             <div style="background: #FFF3E0; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                <h3 style="margin: 0 0 0.5rem 0;">📌 미배치 스폰서 강의</h3>
+                <h3 style="margin: 0 0 0.5rem 0;">📌 미배치 파트너사 강의</h3>
                 <p style="margin: 0; font-size: 0.9rem; color: #E65100;">
                     총 <strong>${unscheduledLectures.length}</strong>개 강의가 시간표에 배치되지 않았습니다.
                 </p>
@@ -481,7 +481,7 @@
         `;
 
         if (unscheduledLectures.length === 0) {
-            html += '<p style="text-align: center; color: #27ae60; padding: 2rem;">✅ 모든 스폰서 강의가 배치되었습니다!</p>';
+            html += '<p style="text-align: center; color: #27ae60; padding: 2rem;">✅ 모든 파트너사 강의가 배치되었습니다!</p>';
         } else {
             Object.entries(byCompany).sort((a, b) => b[1].length - a[1].length).forEach(([company, lectures]) => {
                 html += `

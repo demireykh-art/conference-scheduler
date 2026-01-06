@@ -452,14 +452,14 @@ window.updateScheduleDisplay = function() {
                 <span class="moderator-info" style="font-size: 0.6rem; color: #333;">좌장: ${moderatorStr}</span>
             `;
         } else if (isLuncheon) {
-            // 런천강의 - 별표 + 스폰서 표시
+            // 런천강의 - 별표 + 파트너사 표시
             titleDisplay = `⭐ ${title}`;
             const sponsorInfo = lecture.companyName ? ` (${lecture.companyName})` : '';
             metaDisplay = `<span class="speaker-name" style="color: #333;">${speaker || '미정'}${sponsorInfo}</span><span class="duration-badge">${timeRangeDisplay}</span>`;
         } else if (isBreak && !isPanelDiscussion) {
             metaDisplay = `<span class="duration-badge">${timeRangeDisplay}</span>`;
         } else {
-            // 일반 강의 - 스폰서/제품명 표시
+            // 일반 강의 - 파트너사/제품명 표시
             let sponsorLine = '';
             if (lecture.companyName || lecture.productName) {
                 const parts = [];

@@ -317,7 +317,7 @@ function createLectureItem(lecture, lectureId, isScheduled, isBreak) {
     const speakerTag = !isBreak && speakerDisplay ? 
         `<span class="tag tag-speaker">${speakerDisplay || '미정'}</span>` : '';
     
-    // 런천강의 스폰서 표시
+    // 런천강의 파트너사 표시
     const sponsorTag = isLuncheon && lecture.companyName ? 
         `<span class="tag" style="background: #FFF8E1; color: #FF8F00;">🏢 ${lecture.companyName}</span>` : '';
     
@@ -453,6 +453,12 @@ window.openEditModal = function(lectureId) {
     if (editIsLuncheonCheckbox) {
         editIsLuncheonCheckbox.checked = lecture.isLuncheon || false;
     }
+    
+    // 파트너사 정보 처리
+    const editCompanyName = document.getElementById('editCompanyName');
+    const editProductName = document.getElementById('editProductName');
+    if (editCompanyName) editCompanyName.value = lecture.companyName || '';
+    if (editProductName) editProductName.value = lecture.productName || '';
 
     document.getElementById('editModal').classList.add('active');
 };
@@ -498,6 +504,10 @@ window.saveEditedLecture = function() {
     const category = document.getElementById('editCategory').value;
     const editIsLuncheonCheckbox = document.getElementById('editIsLuncheon');
     const isLuncheon = editIsLuncheonCheckbox ? editIsLuncheonCheckbox.checked : false;
+    
+    // 파트너사 정보
+    const companyName = document.getElementById('editCompanyName')?.value || '';
+    const productName = document.getElementById('editProductName')?.value || '';
 
     if (lectureIndex !== -1) {
         const updatedLecture = {
@@ -509,7 +519,9 @@ window.saveEditedLecture = function() {
             speakerEn: document.getElementById('editSpeakerEn').value,
             affiliation: document.getElementById('editAffiliation').value,
             duration: parseInt(document.getElementById('editDuration').value) || 15,
-            isLuncheon: isLuncheon
+            isLuncheon: isLuncheon,
+            companyName: companyName,
+            productName: productName
         };
 
         AppState.lectures[lectureIndex] = updatedLecture;

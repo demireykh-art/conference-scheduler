@@ -147,7 +147,7 @@
         let lastCompanyName = '';
         let lastBoothCount = 0;
         
-        // 스폰서 정보 수집 (업체명, 부스갯수)
+        // 파트너사 정보 수집 (업체명, 부스갯수)
         const sponsorInfo = {};
         
         jsonData.forEach((row, index) => {
@@ -158,7 +158,7 @@
             if (companyName) {
                 lastCompanyName = companyName;
                 lastBoothCount = boothCount || lastBoothCount;
-                // 스폰서 정보 저장
+                // 파트너사 정보 저장
                 if (!sponsorInfo[companyName] || boothCount > 0) {
                     sponsorInfo[companyName] = boothCount || sponsorInfo[companyName] || 0;
                 }
@@ -219,7 +219,7 @@
                 affiliation: hospitalName,
                 affiliationEn: '',
                 duration: duration,
-                // 스폰서 관련 정보 추가
+                // 파트너사 관련 정보 추가
                 companyName: lastCompanyName,
                 productName: productInfo,
                 isLuncheon: isLuncheon
@@ -228,13 +228,13 @@
             pendingUploadData.push(lecture);
         });
         
-        // 스폰서 정보를 AppState.companies에 저장
+        // 파트너사 정보를 AppState.companies에 저장
         updateCompaniesFromUpload(sponsorInfo);
         
         displayUploadPreview();
     }
     
-    // 업로드된 스폰서 정보를 companies에 반영
+    // 업로드된 파트너사 정보를 companies에 반영
     function updateCompaniesFromUpload(sponsorInfo) {
         if (!AppState.companies) {
             AppState.companies = [];
@@ -406,7 +406,7 @@
                         existingLecture.speakerEn = lecture.speakerEn || existingLecture.speakerEn;
                         existingLecture.affiliation = lecture.affiliation || existingLecture.affiliation;
                         existingLecture.duration = lecture.duration || existingLecture.duration;
-                        // 스폰서 정보 업데이트
+                        // 파트너사 정보 업데이트
                         existingLecture.companyName = lecture.companyName || existingLecture.companyName;
                         existingLecture.productName = lecture.productName || existingLecture.productName;
                         existingLecture.isLuncheon = lecture.isLuncheon || existingLecture.isLuncheon;
