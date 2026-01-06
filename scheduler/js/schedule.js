@@ -430,9 +430,29 @@ window.updateScheduleDisplay = function() {
         const endTime = addMinutesToTime(startTime, duration);
         const timeRangeDisplay = `${startTime}~${endTime} ⏱️${duration}분`;
 
+        // 파트너사/제품 정보 준비
+        let sponsorText = '';
+        if (lecture.companyName || lecture.productName) {
+            const parts = [];
+            if (lecture.companyName) parts.push(lecture.companyName);
+            if (lecture.productName) parts.push(lecture.productName);
+            sponsorText = parts.join(' - ');
+        }
+
         // 호버 시 전체 제목 표시를 위한 data 속성
-        const fullTooltip = `${title}\n👤 ${speaker || '미정'} | ${timeRangeDisplay}`;
+        // 순서: 제목 → 연자+소속+시간 → 파트너사
+        let tooltipLine2 = `👤 ${speaker || '미정'}`;
+        if (lecture.affiliation) {
+            tooltipLine2 += `  🏥 ${lecture.affiliation}`;
+        }
+        tooltipLine2 += `  ⏱️ ${timeRangeDisplay}`;
+        
+        let fullTooltip = `📌 ${title}\n${tooltipLine2}`;
+        if (sponsorText) {
+            fullTooltip += `\n🏢 ${sponsorText}`;
+        }
         lectureDiv.dataset.fullTitle = fullTooltip;
+        lectureDiv.title = fullTooltip; // 기본 브라우저 툴팁
 
         // 메타 정보 생성
         let metaDisplay = '';
@@ -459,15 +479,14 @@ window.updateScheduleDisplay = function() {
         } else if (isBreak && !isPanelDiscussion) {
             metaDisplay = `<span class="duration-badge">${timeRangeDisplay}</span>`;
         } else {
-            // 일반 강의 - 파트너사/제품명 표시
-            let sponsorLine = '';
-            if (lecture.companyName || lecture.productName) {
-                const parts = [];
-                if (lecture.companyName) parts.push(lecture.companyName);
-                if (lecture.productName) parts.push(lecture.productName);
-                sponsorLine = `<span class="sponsor-info" style="font-size: 0.6rem; color: #666; display: block; margin-top: 1px;">🏢 ${parts.join(' - ')}</span>`;
-            }
-            metaDisplay = `<span class="speaker-name" style="color: #333;">${speaker || '미정'}</span><span class="duration-badge">${timeRangeDisplay}</span>${sponsorLine}`;
+            // 일반 강의
+            metaDisplay = `<span class="speaker-name" style="color: #333;">${speaker || '미정'}</span><span class="duration-badge">${timeRangeDisplay}</span>`;
+        }
+        
+        // 파트너사/제품명 별도 줄로 표시
+        let sponsorLine = '';
+        if (sponsorText) {
+            sponsorLine = `<div class="sponsor-line" style="font-size: 0.6rem; color: #888; margin-top: 2px;">🏢 ${sponsorText}</div>`;
         }
 
         lectureDiv.innerHTML = `
@@ -476,6 +495,7 @@ window.updateScheduleDisplay = function() {
             <div class="lecture-meta-display">
                 ${metaDisplay}
             </div>
+            ${sponsorLine}
         `;
 
         lectureDiv.addEventListener('dragstart', handleScheduleDragStart);
