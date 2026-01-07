@@ -411,10 +411,17 @@
                     
                     // 배치된 스케줄에도 동일하게 업데이트
                     const lectureId = existingLecture.id;
+                    const lectureTitleKo = existingLecture.titleKo;
                     
-                    // 현재 날짜 스케줄 업데이트
+                    // 현재 날짜 스케줄 업데이트 (id 또는 제목으로 매칭)
                     Object.keys(window.AppState.schedule).forEach(key => {
-                        if (window.AppState.schedule[key].id === lectureId) {
+                        const scheduledLecture = window.AppState.schedule[key];
+                        const isMatch = scheduledLecture.id === lectureId || 
+                                       scheduledLecture.titleKo === lectureTitleKo ||
+                                       (window.normalizeTitle && window.calculateSimilarity && 
+                                        window.calculateSimilarity(window.normalizeTitle(scheduledLecture.titleKo || ''), window.normalizeTitle(lectureTitleKo || '')) > 0.8);
+                        
+                        if (isMatch) {
                             window.AppState.schedule[key].category = existingLecture.category;
                             window.AppState.schedule[key].titleKo = existingLecture.titleKo;
                             window.AppState.schedule[key].titleEn = existingLecture.titleEn;
@@ -425,6 +432,7 @@
                             window.AppState.schedule[key].companyName = existingLecture.companyName;
                             window.AppState.schedule[key].productName = existingLecture.productName;
                             window.AppState.schedule[key].isLuncheon = existingLecture.isLuncheon;
+                            console.log(`[업데이트] 스케줄 강의: ${lectureTitleKo}, 회사: ${existingLecture.companyName}`);
                         }
                     });
                     
@@ -432,7 +440,13 @@
                     Object.keys(dataByDate).forEach(date => {
                         const dateSchedule = dataByDate[date]?.schedule || {};
                         Object.keys(dateSchedule).forEach(key => {
-                            if (dateSchedule[key].id === lectureId) {
+                            const scheduledLecture = dateSchedule[key];
+                            const isMatch = scheduledLecture.id === lectureId || 
+                                           scheduledLecture.titleKo === lectureTitleKo ||
+                                           (window.normalizeTitle && window.calculateSimilarity && 
+                                            window.calculateSimilarity(window.normalizeTitle(scheduledLecture.titleKo || ''), window.normalizeTitle(lectureTitleKo || '')) > 0.8);
+                            
+                            if (isMatch) {
                                 dateSchedule[key].category = existingLecture.category;
                                 dateSchedule[key].titleKo = existingLecture.titleKo;
                                 dateSchedule[key].titleEn = existingLecture.titleEn;
