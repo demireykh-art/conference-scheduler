@@ -519,6 +519,26 @@
         window.updateLectureList();
         window.updateScheduleDisplay();
         
+        // undefined 값을 제거하는 함수 (Firebase는 undefined 저장 불가)
+        function sanitizeForFirebase(obj) {
+            if (obj === undefined) return null;
+            if (obj === null) return null;
+            if (typeof obj !== 'object') return obj;
+            if (Array.isArray(obj)) {
+                return obj.map(item => sanitizeForFirebase(item));
+            }
+            const sanitized = {};
+            for (const key in obj) {
+                if (obj.hasOwnProperty(key)) {
+                    const value = obj[key];
+                    if (value !== undefined) {
+                        sanitized[key] = sanitizeForFirebase(value);
+                    }
+                }
+            }
+            return sanitized;
+        }
+        
         // Firebase에 저장 (동기적으로 기다림)
         try {
             // dataByDate 전체를 저장
@@ -528,10 +548,16 @@
                 sessions: window.AppState.sessions
             };
             
-            await firebase.database().ref('/data/dataByDate').set(window.AppState.dataByDate);
-            await firebase.database().ref('/data/speakers').set(window.AppState.speakers);
-            await firebase.database().ref('/data/companies').set(window.AppState.companies);
-            await firebase.database().ref('/data/categories').set(window.AppState.categories);
+            // undefined 값 제거 후 저장
+            const sanitizedDataByDate = sanitizeForFirebase(window.AppState.dataByDate);
+            const sanitizedSpeakers = sanitizeForFirebase(window.AppState.speakers);
+            const sanitizedCompanies = sanitizeForFirebase(window.AppState.companies);
+            const sanitizedCategories = sanitizeForFirebase(window.AppState.categories);
+            
+            await firebase.database().ref('/data/dataByDate').set(sanitizedDataByDate);
+            await firebase.database().ref('/data/speakers').set(sanitizedSpeakers);
+            await firebase.database().ref('/data/companies').set(sanitizedCompanies);
+            await firebase.database().ref('/data/categories').set(sanitizedCategories);
             await firebase.database().ref('/data/lastModified').set(firebase.database.ServerValue.TIMESTAMP);
             await firebase.database().ref('/data/lastModifiedBy').set(window.AppState.currentUser ? window.AppState.currentUser.email : 'unknown');
             
