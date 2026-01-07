@@ -356,7 +356,7 @@
     // 업로드 확정
     // ============================================
     
-    function confirmUpload() {
+    async function confirmUpload() {
         if (pendingUploadData.length === 0) {
             alert('업로드할 데이터가 없습니다.');
             return;
@@ -513,25 +513,44 @@
             window.AppState.schedule = dataByDate[currentDate].schedule;
         }
         
-        // 결과 메시지 먼저 표시 (저장은 백그라운드에서)
-        let message = `✅ 업로드 완료!\n\n`;
-        message += `📥 새로 추가: ${addedCount}개\n`;
-        if (updatedCount > 0) message += `🔄 업데이트: ${updatedCount}개\n`;
-        if (skippedCount > 0) message += `⏭️ 건너뜀: ${skippedCount}개\n`;
-        message += `\n📚 현재 총 강의: ${window.AppState.lectures.length}개`;
-        message += `\n\n💾 데이터 저장 중...`;
-        
-        alert(message);
-        closeUploadModal();
-        
         // UI 먼저 업데이트
         window.updateCategoryDropdowns();
         window.createCategoryFilters();
         window.updateLectureList();
         window.updateScheduleDisplay();
         
-        // 저장은 마지막에 (비동기)
-        window.saveAndSync();
+        // Firebase에 저장 (동기적으로 기다림)
+        try {
+            // dataByDate 전체를 저장
+            window.AppState.dataByDate[currentDate] = {
+                lectures: window.AppState.lectures,
+                schedule: window.AppState.schedule,
+                sessions: window.AppState.sessions
+            };
+            
+            await firebase.database().ref('/data/dataByDate').set(window.AppState.dataByDate);
+            await firebase.database().ref('/data/speakers').set(window.AppState.speakers);
+            await firebase.database().ref('/data/companies').set(window.AppState.companies);
+            await firebase.database().ref('/data/categories').set(window.AppState.categories);
+            await firebase.database().ref('/data/lastModified').set(firebase.database.ServerValue.TIMESTAMP);
+            await firebase.database().ref('/data/lastModifiedBy').set(window.AppState.currentUser ? window.AppState.currentUser.email : 'unknown');
+            
+            console.log('✅ Firebase 저장 완료');
+            
+            // 결과 메시지
+            let message = `✅ 업로드 및 저장 완료!\n\n`;
+            message += `📥 새로 추가: ${addedCount}개\n`;
+            if (updatedCount > 0) message += `🔄 업데이트: ${updatedCount}개\n`;
+            if (skippedCount > 0) message += `⏭️ 건너뜀: ${skippedCount}개\n`;
+            message += `\n📚 현재 총 강의: ${window.AppState.lectures.length}개`;
+            
+            alert(message);
+        } catch (error) {
+            console.error('❌ Firebase 저장 실패:', error);
+            alert(`⚠️ 저장 중 오류 발생!\n\n${error.message}\n\n데이터가 저장되지 않았을 수 있습니다.`);
+        }
+        
+        closeUploadModal();
     }
     
     // 제목으로 기존 강의 찾기
