@@ -1125,49 +1125,45 @@ window.closeAllModals = function() {
 };
 
 // ============================================
-// 자동 백업 시스템 (매일 저녁 1회)
+// 자동 백업 시스템 (1시간마다)
 // ============================================
 
-let dailyBackupTimeout = null;
-const MAX_BACKUPS = 10; // 최대 백업 개수
+let hourlyBackupInterval = null;
+const MAX_BACKUPS = 24; // 최대 백업 개수 (24시간분)
 const BACKUP_ENCRYPTION_KEY = 'ASLS-Conference-2026-Secure'; // 암호화 키
 
 /**
- * 매일 저녁 자동 백업 스케줄 시작
+ * 1시간마다 자동 백업 스케줄 시작
  */
 window.startAutoBackup = function() {
-    scheduleDailyBackup();
-    console.log('⏰ 매일 저녁 자동 백업 스케줄 시작');
+    scheduleHourlyBackup();
+    console.log('⏰ 1시간마다 자동 백업 스케줄 시작');
 };
 
 /**
- * 다음 백업 시간까지 타이머 설정 (저녁 9시)
+ * 1시간마다 백업 타이머 설정
  */
-function scheduleDailyBackup() {
-    if (dailyBackupTimeout) {
-        clearTimeout(dailyBackupTimeout);
+function scheduleHourlyBackup() {
+    if (hourlyBackupInterval) {
+        clearInterval(hourlyBackupInterval);
     }
     
-    const now = new Date();
-    const backupTime = new Date();
-    backupTime.setHours(21, 0, 0, 0); // 저녁 9시
+    // 즉시 첫 백업 실행 (페이지 로드 시)
+    setTimeout(() => {
+        if (canEdit()) {
+            createAutoBackup();
+            console.log('📦 초기 자동 백업 완료');
+        }
+    }, 5000); // 5초 후 (데이터 로드 완료 대기)
     
-    // 이미 오늘 9시가 지났으면 내일로
-    if (now > backupTime) {
-        backupTime.setDate(backupTime.getDate() + 1);
-    }
-    
-    const msUntilBackup = backupTime - now;
-    
-    dailyBackupTimeout = setTimeout(() => {
+    // 1시간마다 백업
+    hourlyBackupInterval = setInterval(() => {
         if (canEdit()) {
             createAutoBackup();
         }
-        // 다음 날 백업 스케줄
-        scheduleDailyBackup();
-    }, msUntilBackup);
+    }, 60 * 60 * 1000); // 1시간 = 3600000ms
     
-    console.log(`📅 다음 자동 백업: ${backupTime.toLocaleString('ko-KR')}`);
+    console.log(`📅 자동 백업: 1시간마다 (최대 ${MAX_BACKUPS}개 보관)`);
 }
 
 /**
