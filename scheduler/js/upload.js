@@ -28,12 +28,19 @@
     
     function clearUploadPreview() {
         pendingUploadData = [];
-        document.getElementById('uploadPreview').style.display = 'none';
-        document.getElementById('previewTableBody').innerHTML = '';
-        document.getElementById('previewCount').textContent = '0';
-        document.getElementById('uploadFileInput').value = '';
-        document.getElementById('duplicateWarning').style.display = 'none';
-        document.getElementById('skipDuplicatesLabel').style.display = 'none';
+        const uploadPreview = document.getElementById('uploadPreview');
+        const previewTableBody = document.getElementById('previewTableBody');
+        const previewCount = document.getElementById('previewCount');
+        const uploadFileInput = document.getElementById('uploadFileInput');
+        const duplicateWarning = document.getElementById('duplicateWarning');
+        const duplicateOptionsSection = document.getElementById('duplicateOptionsSection');
+        
+        if (uploadPreview) uploadPreview.style.display = 'none';
+        if (previewTableBody) previewTableBody.innerHTML = '';
+        if (previewCount) previewCount.textContent = '0';
+        if (uploadFileInput) uploadFileInput.value = '';
+        if (duplicateWarning) duplicateWarning.style.display = 'none';
+        if (duplicateOptionsSection) duplicateOptionsSection.style.display = 'none';
     }
     
     // ============================================
@@ -499,6 +506,12 @@
                 dataByDate[date].lectures = [...window.AppState.lectures];
             }
         });
+        
+        // 현재 날짜의 스케줄을 AppState.schedule과 동기화 (중요!)
+        const currentDate = window.AppState.currentDate;
+        if (dataByDate[currentDate] && dataByDate[currentDate].schedule) {
+            window.AppState.schedule = dataByDate[currentDate].schedule;
+        }
         
         // 결과 메시지 먼저 표시 (저장은 백그라운드에서)
         let message = `✅ 업로드 완료!\n\n`;
