@@ -71,17 +71,26 @@ window.startRealtimeListeners = function() {
             if (data.dataByDate) {
                 // 현재 작업 중인 날짜의 스케줄은 병합 처리
                 Object.keys(data.dataByDate).forEach(date => {
+                    const serverData = data.dataByDate[date];
+                    if (!serverData) return;
+                    
                     if (!AppState.dataByDate[date]) {
-                        AppState.dataByDate[date] = data.dataByDate[date];
+                        AppState.dataByDate[date] = serverData;
                     } else {
-                        // 강의 목록과 세션은 서버 데이터로 업데이트
-                        AppState.dataByDate[date].lectures = data.dataByDate[date].lectures || [];
-                        AppState.dataByDate[date].sessions = data.dataByDate[date].sessions || [];
-                        // 스케줄은 서버 데이터와 병합 (서버 우선)
-                        AppState.dataByDate[date].schedule = {
-                            ...AppState.dataByDate[date].schedule,
-                            ...data.dataByDate[date].schedule
-                        };
+                        // 강의 목록과 세션은 서버 데이터로 업데이트 (비어있지 않은 경우만)
+                        if (serverData.lectures && serverData.lectures.length > 0) {
+                            AppState.dataByDate[date].lectures = serverData.lectures;
+                        }
+                        if (serverData.sessions && serverData.sessions.length > 0) {
+                            AppState.dataByDate[date].sessions = serverData.sessions;
+                        }
+                        // 스케줄은 서버 데이터가 비어있지 않은 경우만 병합
+                        if (serverData.schedule && Object.keys(serverData.schedule).length > 0) {
+                            AppState.dataByDate[date].schedule = {
+                                ...AppState.dataByDate[date].schedule,
+                                ...serverData.schedule
+                            };
+                        }
                     }
                 });
             }
