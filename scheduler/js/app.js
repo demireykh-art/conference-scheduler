@@ -1101,6 +1101,11 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.classList.toggle('active', btn.dataset.date === AppState.currentDate);
     });
 
+    // 의협제출 룸 설정 로드
+    if (typeof loadKmaRooms === 'function') {
+        loadKmaRooms();
+    }
+
     // 자동 백업 시작 (5분마다)
     startAutoBackup();
     

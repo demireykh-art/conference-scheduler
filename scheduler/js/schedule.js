@@ -43,17 +43,15 @@ window.createScheduleTable = function() {
         };
         roomHeader.appendChild(expandBtn);
 
-        // 별표 토글 버튼 (룸 이름에 별표 붙이기)
-        const starBtn = document.createElement('button');
-        const hasStars = room.includes('⭐') || room.includes('★');
-        starBtn.textContent = hasStars ? '★' : '☆';
-        starBtn.title = hasStars ? '별표 제거' : '별표 추가';
-        starBtn.style.cssText = `position:absolute;top:2px;left:24px;background:rgba(255,255,255,0.3);border:none;color:${hasStars ? '#FFD700' : 'white'};width:20px;height:20px;border-radius:4px;cursor:pointer;font-size:0.7rem;`;
-        starBtn.onclick = (e) => {
-            e.stopPropagation();
-            toggleRoomStar(roomIndex);
-        };
-        roomHeader.appendChild(starBtn);
+        // 의협제출 표시 아이콘 (상태 표시용)
+        const kmaIndicator = document.createElement('span');
+        kmaIndicator.className = 'kma-indicator';
+        kmaIndicator.dataset.roomIndex = roomIndex;
+        const isKma = isStarredRoom(room);
+        kmaIndicator.textContent = isKma ? '🏥' : '';
+        kmaIndicator.title = isKma ? '의협제출용 룸 (연자 2시간 제한)' : '';
+        kmaIndicator.style.cssText = `position:absolute;top:2px;left:24px;font-size:0.8rem;cursor:help;${isKma ? '' : 'display:none;'}`;
+        roomHeader.appendChild(kmaIndicator);
 
         // 왼쪽 이동 버튼
         if (roomIndex > 0) {
@@ -131,16 +129,21 @@ window.createScheduleTable = function() {
     emptyCell.textContent = '담당';
     managerRow.appendChild(emptyCell);
     
-    // 각 룸의 담당자 선택
+    // 각 룸의 담당자 선택 + 의협제출 체크박스
     AppState.rooms.forEach((room, roomIndex) => {
         const managerCell = document.createElement('th');
         managerCell.style.cssText = 'background: #f5f5f5; padding: 2px 4px; height: 28px;';
         
+        // 컨테이너 (담당자 + 의협제출)
+        const container = document.createElement('div');
+        container.style.cssText = 'display: flex; align-items: center; gap: 4px; justify-content: space-between;';
+        
+        // 담당자 선택 드롭다운
         const managerSelect = document.createElement('select');
         managerSelect.id = `roomManager-${roomIndex}`;
         managerSelect.className = 'room-manager-select';
         managerSelect.dataset.room = room;
-        managerSelect.style.cssText = 'width: 100%; padding: 2px 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.7rem; background: white; cursor: pointer; text-align: center;';
+        managerSelect.style.cssText = 'flex: 1; min-width: 0; padding: 2px 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.7rem; background: white; cursor: pointer; text-align: center;';
         
         // 현재 담당자 가져오기
         const currentManager = (AppState.roomManagers || {})[room] || '';
@@ -156,7 +159,7 @@ window.createScheduleTable = function() {
             managerSelect.innerHTML += `<option value="${name}" ${selected}>${name}</option>`;
         });
         
-        // 변경 이벤트
+        // 담당자 변경 이벤트
         managerSelect.addEventListener('change', function() {
             const newManager = this.value;
             const oldManager = (AppState.roomManagers || {})[room] || '';
@@ -183,7 +186,64 @@ window.createScheduleTable = function() {
             }
         });
         
-        managerCell.appendChild(managerSelect);
+        container.appendChild(managerSelect);
+        
+        // 의협제출 체크박스
+        const kmaLabel = document.createElement('label');
+        kmaLabel.style.cssText = 'display: flex; align-items: center; gap: 2px; cursor: pointer; white-space: nowrap; font-size: 0.65rem; color: #666; padding: 2px 4px; border: 1px solid #ddd; border-radius: 4px; background: white;';
+        kmaLabel.title = '의협제출용 룸 (연자 2시간 제한 적용)';
+        
+        const kmaCheckbox = document.createElement('input');
+        kmaCheckbox.type = 'checkbox';
+        kmaCheckbox.className = 'kma-room-checkbox';
+        kmaCheckbox.dataset.room = room;
+        kmaCheckbox.style.cssText = 'margin: 0; cursor: pointer;';
+        
+        // 현재 의협제출 상태 확인
+        const isKmaRoom = isStarredRoom(room) || (AppState.kmaRooms && AppState.kmaRooms[AppState.currentDate]?.includes(room));
+        kmaCheckbox.checked = isKmaRoom;
+        
+        // 체크 상태에 따른 스타일
+        if (isKmaRoom) {
+            kmaLabel.style.background = '#FFF3E0';
+            kmaLabel.style.borderColor = '#FF9800';
+            kmaLabel.style.color = '#E65100';
+        }
+        
+        // 의협제출 변경 이벤트
+        kmaCheckbox.addEventListener('change', function() {
+            const isChecked = this.checked;
+            
+            // kmaRooms 초기화
+            if (!AppState.kmaRooms) AppState.kmaRooms = {};
+            if (!AppState.kmaRooms[AppState.currentDate]) AppState.kmaRooms[AppState.currentDate] = [];
+            
+            if (isChecked) {
+                // 추가
+                if (!AppState.kmaRooms[AppState.currentDate].includes(room)) {
+                    AppState.kmaRooms[AppState.currentDate].push(room);
+                }
+                kmaLabel.style.background = '#FFF3E0';
+                kmaLabel.style.borderColor = '#FF9800';
+                kmaLabel.style.color = '#E65100';
+            } else {
+                // 제거
+                AppState.kmaRooms[AppState.currentDate] = AppState.kmaRooms[AppState.currentDate].filter(r => r !== room);
+                kmaLabel.style.background = 'white';
+                kmaLabel.style.borderColor = '#ddd';
+                kmaLabel.style.color = '#666';
+            }
+            
+            // Firebase에 저장
+            saveKmaRooms();
+            console.log(`[의협제출] ${room}: ${isChecked ? '활성화' : '비활성화'}`);
+        });
+        
+        kmaLabel.appendChild(kmaCheckbox);
+        kmaLabel.appendChild(document.createTextNode('의협'));
+        container.appendChild(kmaLabel);
+        
+        managerCell.appendChild(container);
         managerRow.appendChild(managerCell);
     });
     
@@ -271,6 +331,12 @@ window.createScheduleTable = function() {
  * 시간표 디스플레이 업데이트
  */
 window.updateScheduleDisplay = function() {
+    // 방 이름 정규화 함수 (별표, 공백 등 제거하여 비교)
+    const normalizeRoomName = (name) => {
+        if (!name) return '';
+        return name.replace(/^[⭐★☆\s]+/, '').trim();
+    };
+    
     // 기존 강의 블록들 제거
     document.querySelectorAll('.scheduled-lecture').forEach(el => el.remove());
     document.querySelectorAll('.session-header-cell').forEach(el => el.remove());
@@ -295,7 +361,8 @@ window.updateScheduleDisplay = function() {
         }
 
         // 세션 헤더 표시
-        const session = AppState.sessions.find(s => s.time === time && s.room === room);
+        const normalizedCellRoom = normalizeRoomName(room);
+        const session = AppState.sessions.find(s => s.time === time && normalizeRoomName(s.room) === normalizedCellRoom);
         if (session) {
             cell.classList.add('has-session');
             if (addSessionBtn) addSessionBtn.style.display = 'none';
@@ -376,6 +443,7 @@ window.updateScheduleDisplay = function() {
     Object.entries(AppState.schedule).forEach(([key, lecture]) => {
         const startTime = key.substring(0, 5);
         const room = key.substring(6);
+        const normalizedScheduleRoom = normalizeRoomName(room);
 
         const startIndex = AppState.timeSlots.indexOf(startTime);
         if (startIndex === -1) return;
@@ -385,7 +453,9 @@ window.updateScheduleDisplay = function() {
 
         let startCell = null;
         document.querySelectorAll('.schedule-cell').forEach(cell => {
-            if (cell.dataset.time === startTime && cell.dataset.room === room) {
+            const cellRoom = cell.dataset.room;
+            const normalizedCellRoom = normalizeRoomName(cellRoom);
+            if (cell.dataset.time === startTime && normalizedCellRoom === normalizedScheduleRoom) {
                 startCell = cell;
             }
         });
@@ -403,7 +473,7 @@ window.updateScheduleDisplay = function() {
         const isPanelDiscussion = lecture.category === 'Panel Discussion' || lecture.isPanelDiscussion;
         
         // 같은 시간에 세션이 시작하는지 확인
-        const sessionAtSameTime = AppState.sessions.find(s => s.time === startTime && s.room === room);
+        const sessionAtSameTime = AppState.sessions.find(s => s.time === startTime && normalizeRoomName(s.room) === normalizedScheduleRoom);
         const sessionHeaderHeight = sessionAtSameTime ? 25 : 0; // 세션 헤더 높이
         
         // Lunch 카테고리인지 확인
@@ -492,12 +562,14 @@ window.updateScheduleDisplay = function() {
             // 런천강의 - 별표 + 파트너사 표시
             titleDisplay = `⭐ ${title}`;
             const sponsorInfo = lecture.companyName ? ` (${lecture.companyName})` : '';
-            metaDisplay = `<span class="speaker-name" style="color: #333;">${speaker || '미정'}${sponsorInfo}</span><span class="duration-badge">${timeRangeDisplay}</span>`;
+            const affiliationInfo = lecture.affiliation ? ` (${lecture.affiliation})` : '';
+            metaDisplay = `<span class="speaker-name" style="color: #333;">${speaker || '미정'}${affiliationInfo}${sponsorInfo}</span><span class="duration-badge">${timeRangeDisplay}</span>`;
         } else if (isBreak && !isPanelDiscussion) {
             metaDisplay = `<span class="duration-badge">${timeRangeDisplay}</span>`;
         } else {
-            // 일반 강의
-            metaDisplay = `<span class="speaker-name" style="color: #333;">${speaker || '미정'}</span><span class="duration-badge">${timeRangeDisplay}</span>`;
+            // 일반 강의 - 연자 (소속)
+            const affiliationInfo = lecture.affiliation ? ` (${lecture.affiliation})` : '';
+            metaDisplay = `<span class="speaker-name" style="color: #333;">${speaker || '미정'}${affiliationInfo}</span><span class="duration-badge">${timeRangeDisplay}</span>`;
         }
         
         // 파트너사/제품명 별도 줄로 표시
@@ -541,11 +613,12 @@ window.updateScheduleDisplay = function() {
  */
 function findBelongingSession(time, room) {
     const timeIndex = AppState.timeSlots.indexOf(time);
+    const normalizedRoom = normalizeRoomName(room);
     
     // 해당 시간 이전의 가장 가까운 세션 찾기
     for (let i = timeIndex; i >= 0; i--) {
         const checkTime = AppState.timeSlots[i];
-        const session = AppState.sessions.find(s => s.time === checkTime && s.room === room);
+        const session = AppState.sessions.find(s => s.time === checkTime && normalizeRoomName(s.room) === normalizedRoom);
         if (session) {
             // 세션 duration이 있으면 해당 범위 내인지 확인
             if (session.duration) {
@@ -568,6 +641,7 @@ function findBelongingSession(time, room) {
 function getSessionPanelInfo(time, room, session) {
     let sessionModerator = '';
     let sessionSpeakers = [];
+    const normalizedRoom = normalizeRoomName(room);
     
     if (session) {
         sessionModerator = session.moderator || '';
@@ -577,7 +651,8 @@ function getSessionPanelInfo(time, room, session) {
         
         // 세션 시작부터 Panel Discussion 시작 전까지의 강의 연자 수집
         Object.entries(AppState.schedule).forEach(([key, lecture]) => {
-            if (key.endsWith(`-${room}`) && !lecture.isBreak && lecture.category !== 'Panel Discussion') {
+            const keyRoom = key.substring(6);
+            if (normalizeRoomName(keyRoom) === normalizedRoom && !lecture.isBreak && lecture.category !== 'Panel Discussion') {
                 const lectureTime = key.substring(0, 5);
                 const lectureTimeIndex = AppState.timeSlots.indexOf(lectureTime);
                 
@@ -769,7 +844,9 @@ window.handleDrop = function(e) {
     if (AppState.draggedLecture) {
         const time = this.dataset.time;
         const room = this.dataset.room;
-        const key = `${time}-${room}`;
+        // 스케줄 키는 별표 없이 저장 (별표는 의협 제출용 표시일 뿐)
+        const normalizedRoom = window.normalizeRoomName ? window.normalizeRoomName(room) : room.replace(/^[⭐★☆\s]+/, '').trim();
+        const key = `${time}-${normalizedRoom}`;
         const isBreak = AppState.draggedIsBreak || AppState.draggedLecture.isBreak;
 
         // Break가 아닌 경우만 이미 배치된 강의인지 확인
@@ -807,7 +884,8 @@ window.handleDrop = function(e) {
             for (const [scheduleKey, scheduledLecture] of Object.entries(AppState.schedule)) {
                 if (scheduledLecture.category === 'Lunch') {
                     const [lunchTime, lunchRoom] = [scheduleKey.substring(0, 5), scheduleKey.substring(6)];
-                    if (lunchRoom !== room) continue;
+                    // 방 이름 정규화 비교
+                    if (normalizeRoomName(lunchRoom) !== normalizedRoom) continue;
                     
                     const lunchStartMin = timeToMinutes(lunchTime);
                     const lunchEndMin = lunchStartMin + (scheduledLecture.duration || 60);
@@ -921,13 +999,14 @@ window.handleDrop = function(e) {
         }
 
         // 세션 자동 할당
-        const sessionAtCell = AppState.sessions.find(s => s.time === time && s.room === room);
+        const normalizedRoomForSession = normalizeRoomName(room);
+        const sessionAtCell = AppState.sessions.find(s => s.time === time && normalizeRoomName(s.room) === normalizedRoomForSession);
         if (sessionAtCell) {
             newLecture.sessionId = sessionAtCell.id;
         } else {
             const timeIndex = AppState.timeSlots.indexOf(time);
             for (let i = timeIndex - 1; i >= 0; i--) {
-                const upperSession = AppState.sessions.find(s => s.time === AppState.timeSlots[i] && s.room === room);
+                const upperSession = AppState.sessions.find(s => s.time === AppState.timeSlots[i] && normalizeRoomName(s.room) === normalizedRoomForSession);
                 if (upperSession) {
                     newLecture.sessionId = upperSession.id;
                     break;
@@ -955,12 +1034,13 @@ window.handleDrop = function(e) {
         const time = this.dataset.time;
         const room = this.dataset.room;
 
-        if (AppState.draggedSession.time === time && AppState.draggedSession.room === room) {
+        const normalizedDropRoom = normalizeRoomName(room);
+        if (AppState.draggedSession.time === time && normalizeRoomName(AppState.draggedSession.room) === normalizedDropRoom) {
             AppState.draggedSession = null;
             return;
         }
 
-        const existingSession = AppState.sessions.find(s => s.time === time && s.room === room);
+        const existingSession = AppState.sessions.find(s => s.time === time && normalizeRoomName(s.room) === normalizedDropRoom);
         if (existingSession) {
             alert('이 위치에 이미 세션이 있습니다.');
             AppState.draggedSession = null;
@@ -969,7 +1049,8 @@ window.handleDrop = function(e) {
 
         saveStateForUndo();
         AppState.draggedSession.time = time;
-        AppState.draggedSession.room = room;
+        // 세션 룸도 정규화된 이름으로 저장
+        AppState.draggedSession.room = normalizedDropRoom;
 
         saveAndSync();
         updateScheduleDisplay();
@@ -1062,7 +1143,8 @@ window.checkSpeakerConflict = function(targetTime, targetRoom, lecture, excludeK
         const existingStartMin = timeToMinutes(existingTime);
         const existingEndMin = existingStartMin + existingDuration;
 
-        if (existingRoom === targetRoom) continue;
+        // 방 이름 정규화 비교 (별표 무시)
+        if (normalizeRoomName(existingRoom) === normalizeRoomName(targetRoom)) continue;
 
         const gapAfterExisting = targetStartMin - existingEndMin;
         const gapBeforeExisting = existingStartMin - targetEndMin;
@@ -1127,8 +1209,8 @@ window.checkModeratorConflict = function(targetTime, targetRoom, lecture, exclud
         
         console.log('⚠️ 좌장 매칭됨!', { sessionRoom: session.room, targetRoom });
 
-        // 같은 룸이면 스킵 (같은 룸에서는 좌장이 강의 가능)
-        if (session.room === targetRoom) {
+        // 같은 룸이면 스킵 (같은 룸에서는 좌장이 강의 가능) - 방 이름 정규화 비교
+        if (normalizeRoomName(session.room) === normalizeRoomName(targetRoom)) {
             console.log('⏭️ 같은 룸, 스킵');
             continue;
         }
@@ -1195,14 +1277,14 @@ function findSessionEndTime(session) {
     // 해당 세션의 룸에서 세션 시작 이후의 강의들 확인
     for (const [key, lecture] of Object.entries(AppState.schedule)) {
         const [lectureTime, lectureRoom] = [key.substring(0, 5), key.substring(6)];
-        if (lectureRoom !== session.room) continue;
+        if (normalizeRoomName(lectureRoom) !== normalizeRoomName(session.room)) continue;
 
         const lectureTimeIndex = AppState.timeSlots.indexOf(lectureTime);
         if (lectureTimeIndex < sessionTimeIndex) continue;
 
         // 다음 세션이 있으면 그 전까지만
         const nextSession = AppState.sessions.find(s => 
-            s.room === session.room && 
+            normalizeRoomName(s.room) === normalizeRoomName(session.room) && 
             s.id !== session.id && 
             AppState.timeSlots.indexOf(s.time) > sessionTimeIndex
         );
@@ -1296,10 +1378,11 @@ window.checkPanelSessionConflict = function(targetTime, targetRoom, targetDurati
  */
 function findBelongingSessionForConflict(time, room) {
     const timeIndex = AppState.timeSlots.indexOf(time);
+    const normalizedRoom = normalizeRoomName(room);
     
     for (let i = timeIndex; i >= 0; i--) {
         const checkTime = AppState.timeSlots[i];
-        const session = AppState.sessions.find(s => s.time === checkTime && s.room === room);
+        const session = AppState.sessions.find(s => s.time === checkTime && normalizeRoomName(s.room) === normalizedRoom);
         if (session) {
             if (session.duration) {
                 const sessionEndIndex = i + Math.ceil(session.duration / AppConfig.TIME_UNIT);
@@ -1381,37 +1464,32 @@ window.moveRoom = function(roomIndex, direction) {
 };
 
 /**
- * 룸 별표 토글
+ * 룸 의협제출 토글 (새 방식 - kmaRooms 사용)
+ * 기존 별표 방식은 호환성 유지
  */
 window.toggleRoomStar = function(roomIndex) {
     const room = AppState.rooms[roomIndex];
-    const oldName = room;
-    let newName;
     
-    // 별표가 있으면 제거, 없으면 추가
-    if (room.includes('⭐') || room.includes('★')) {
-        newName = room.replace(/[⭐★]\s*/g, '').trim();
+    // 새 방식: kmaRooms로 관리
+    if (!AppState.kmaRooms) AppState.kmaRooms = {};
+    if (!AppState.kmaRooms[AppState.currentDate]) AppState.kmaRooms[AppState.currentDate] = [];
+    
+    const isCurrentlyKma = isStarredRoom(room);
+    
+    if (isCurrentlyKma) {
+        // 제거
+        AppState.kmaRooms[AppState.currentDate] = AppState.kmaRooms[AppState.currentDate].filter(r => normalizeRoomName(r) !== normalizeRoomName(room));
     } else {
-        newName = '⭐ ' + room;
+        // 추가
+        if (!AppState.kmaRooms[AppState.currentDate].some(r => normalizeRoomName(r) === normalizeRoomName(room))) {
+            AppState.kmaRooms[AppState.currentDate].push(room);
+        }
     }
     
-    // 룸 이름 업데이트
-    updateRoomNameInData(oldName, newName);
-    AppState.rooms[roomIndex] = newName;
+    saveKmaRooms();
+    updateKmaCheckboxes();
     
-    // 담당자 정보도 룸 이름에 맞게 업데이트
-    if (AppState.roomManagers && AppState.roomManagers[oldName]) {
-        AppState.roomManagers[newName] = AppState.roomManagers[oldName];
-        delete AppState.roomManagers[oldName];
-        saveRoomManagers();
-    }
-    
-    saveRoomsToStorage();
-    saveAndSync();
-    createScheduleTable();
-    updateScheduleDisplay();
-    
-    console.log(`룸 별표 토글: ${oldName} → ${newName}`);
+    console.log(`[의협제출] ${room}: ${!isCurrentlyKma ? '활성화' : '비활성화'}`);
 };
 
 /**

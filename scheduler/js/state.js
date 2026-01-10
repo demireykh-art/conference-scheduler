@@ -81,6 +81,9 @@ window.AppState = {
     
     // 룸별 담당자
     roomManagers: {},
+    
+    // 의협제출용 룸 (날짜별)
+    kmaRooms: {},
 
     // 연자 데이터
     speakers: [],

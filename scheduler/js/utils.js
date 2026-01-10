@@ -3,6 +3,15 @@
  */
 
 /**
+ * 방 이름 정규화 (별표, 앞쪽 공백 제거)
+ * 별표는 의협 제출용 표시이므로 방 이름 비교 시 제거
+ */
+window.normalizeRoomName = function(name) {
+    if (!name) return '';
+    return name.replace(/^[⭐★☆\s]+/, '').trim();
+};
+
+/**
  * 시간을 분 단위로 변환
  */
 window.timeToMinutes = function(timeStr) {
@@ -227,11 +236,92 @@ document.addEventListener('keydown', function(e) {
 // ============================================
 
 /**
- * 룸이 별표(⭐) 룸인지 확인
+ * 룸이 의협제출용 룸인지 확인 (별표 또는 kmaRooms 설정)
  */
 window.isStarredRoom = function(roomName) {
     if (!roomName) return false;
-    return roomName.includes('⭐') || roomName.includes('★');
+    
+    // 기존 별표 방식 체크 (호환성 유지)
+    if (roomName.includes('⭐') || roomName.includes('★')) return true;
+    
+    // 새로운 kmaRooms 방식 체크
+    const normalizedRoom = normalizeRoomName(roomName);
+    const currentDate = AppState.currentDate;
+    const kmaRooms = AppState.kmaRooms?.[currentDate] || [];
+    
+    return kmaRooms.some(r => normalizeRoomName(r) === normalizedRoom);
+};
+
+/**
+ * 의협제출 룸 설정 저장
+ */
+window.saveKmaRooms = function() {
+    if (typeof firebase === 'undefined' || !firebase.database) {
+        console.log('Firebase 미연결 - kmaRooms 로컬 저장');
+        return;
+    }
+    
+    const database = firebase.database();
+    database.ref('/settings/kmaRooms').set(AppState.kmaRooms || {})
+        .then(() => console.log('✅ 의협제출 룸 설정 저장 완료'))
+        .catch(err => console.error('❌ 의협제출 룸 설정 저장 실패:', err));
+};
+
+/**
+ * 의협제출 룸 설정 로드
+ */
+window.loadKmaRooms = function() {
+    if (typeof firebase === 'undefined' || !firebase.database) {
+        console.log('Firebase 미연결 - kmaRooms 로드 스킵');
+        return;
+    }
+    
+    const database = firebase.database();
+    database.ref('/settings/kmaRooms').on('value', (snapshot) => {
+        if (snapshot.exists()) {
+            AppState.kmaRooms = snapshot.val();
+            console.log('[실시간] 의협제출 룸 설정 로드:', AppState.kmaRooms);
+            // 체크박스 상태 업데이트
+            updateKmaCheckboxes();
+        } else {
+            AppState.kmaRooms = {};
+        }
+    });
+};
+
+/**
+ * 의협제출 체크박스 및 헤더 아이콘 상태 업데이트
+ */
+window.updateKmaCheckboxes = function() {
+    // 체크박스 업데이트
+    document.querySelectorAll('.kma-room-checkbox').forEach(checkbox => {
+        const room = checkbox.dataset.room;
+        const isKma = isStarredRoom(room);
+        checkbox.checked = isKma;
+        
+        const label = checkbox.parentElement;
+        if (label) {
+            if (isKma) {
+                label.style.background = '#FFF3E0';
+                label.style.borderColor = '#FF9800';
+                label.style.color = '#E65100';
+            } else {
+                label.style.background = 'white';
+                label.style.borderColor = '#ddd';
+                label.style.color = '#666';
+            }
+        }
+    });
+    
+    // 헤더 아이콘 업데이트
+    document.querySelectorAll('.kma-indicator').forEach(indicator => {
+        const roomIndex = parseInt(indicator.dataset.roomIndex);
+        const room = AppState.rooms[roomIndex];
+        const isKma = isStarredRoom(room);
+        indicator.textContent = isKma ? '🏥' : '';
+        indicator.title = isKma ? '의협제출용 룸 (연자 2시간 제한)' : '';
+        indicator.style.display = isKma ? '' : 'none';
+    });
 };
 
 /**
