@@ -6,7 +6,8 @@
 window.leafletConfig = {
     leftKeyVisual: null,
     rightKeyVisual: null,
-    printFormat: 'schedule'  // 'schedule' 또는 'leaflet'
+    printFormat: 'schedule',
+    selectedPrintDate: null
 };
 
 // ============================================
@@ -15,25 +16,32 @@ window.leafletConfig = {
 const originalOpenPrintModal = window.openPrintModal;
 
 window.openPrintModal = function() {
-    // 기존 openPrintModal 호출 (있으면)
+    // 모달 표시
+    document.getElementById('printModal').style.display = 'flex';
+    
+    // 기존 openPrintModal 호출 (룸 체크박스 생성 등)
     if (typeof originalOpenPrintModal === 'function') {
         originalOpenPrintModal();
-    } else {
-        document.getElementById('printModal').style.display = 'flex';
     }
     
-    // 추가 초기화
-    initPrintModalExtras();
+    // 약간의 딜레이 후 추가 초기화 (AppState 로드 대기)
+    setTimeout(() => {
+        initPrintModalExtras();
+    }, 100);
 };
 
 function initPrintModalExtras() {
-    // 현재 날짜 가져오기
+    // 현재 날짜 가져오기 (시간표에서 선택된 날짜)
     const currentDate = window.AppState?.currentDate || window.AppState?.selectedDate;
+    window.leafletConfig.selectedPrintDate = currentDate;
+    
+    console.log('초기화 - 현재 날짜:', currentDate);
+    console.log('AppState.eventDates:', window.AppState?.eventDates);
     
     // 날짜 선택 버튼 렌더링
     renderPrintDateButtons(currentDate);
     
-    // 룸 체크박스 업데이트
+    // 룸 체크박스 업데이트 (강제)
     updatePrintRoomCheckboxes(currentDate);
     
     // 키비주얼 로드
@@ -53,8 +61,15 @@ function renderPrintDateButtons(currentDate) {
     
     const eventDates = window.AppState?.eventDates || [];
     
+    console.log('날짜 버튼 렌더링 - eventDates:', eventDates, 'currentDate:', currentDate);
+    
     if (eventDates.length === 0) {
-        dateLabelEl.innerHTML = `<span style="font-weight: bold;">📅 날짜 미등록</span>`;
+        // eventDates가 없으면 현재 날짜만 표시
+        if (currentDate) {
+            dateLabelEl.innerHTML = `<span style="font-weight: bold;">📅 ${currentDate}</span>`;
+        } else {
+            dateLabelEl.innerHTML = `<span style="font-weight: bold;">📅 날짜 미등록</span>`;
+        }
         return;
     }
     
@@ -96,6 +111,8 @@ function updatePrintRoomCheckboxes(currentDate) {
     
     let rooms = getRoomsForCurrentDate(currentDate);
     
+    console.log('룸 체크박스 업데이트 - 날짜:', currentDate, '룸:', rooms);
+    
     if (rooms.length === 0) {
         container.innerHTML = '<p style="color: #999; text-align: center; padding: 1rem;">등록된 룸이 없습니다.</p>';
         return;
@@ -108,7 +125,7 @@ function updatePrintRoomCheckboxes(currentDate) {
         </label>
         ${rooms.map(room => `
             <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #f5f5f5; border-radius: 6px; cursor: pointer;">
-                <input type="checkbox" class="room-checkbox" value="${room}" checked style="width: 18px; height: 18px; accent-color: #667eea;">
+                <input type="checkbox" class="print-room-checkbox" value="${room}" checked style="width: 18px; height: 18px; accent-color: #667eea;">
                 ${room}
             </label>
         `).join('')}
@@ -182,7 +199,7 @@ function selectPrintFormat(format) {
 // 전체 룸 선택/해제
 // ============================================
 function toggleAllPrintRooms(checked) {
-    const checkboxes = document.querySelectorAll('.room-checkbox');
+    const checkboxes = document.querySelectorAll('#printRoomCheckboxes .print-room-checkbox');
     checkboxes.forEach(cb => cb.checked = checked);
 }
 
@@ -192,16 +209,19 @@ function toggleAllPrintRooms(checked) {
 function executePrintWithFormat() {
     const format = window.leafletConfig.printFormat;
     
-    // 선택된 룸 가져오기 - printRoomCheckboxes 내의 체크박스만 확인
+    // 선택된 룸 가져오기 - print-room-checkbox 클래스 사용
     const selectedRooms = [];
-    const roomCheckboxes = document.querySelectorAll('#printRoomCheckboxes .room-checkbox:checked');
+    const roomCheckboxes = document.querySelectorAll('#printRoomCheckboxes .print-room-checkbox:checked');
+    
+    console.log('체크박스 개수:', roomCheckboxes.length);
+    
     roomCheckboxes.forEach(cb => {
         if (cb.value) {
             selectedRooms.push(cb.value);
         }
     });
     
-    console.log('선택된 룸:', selectedRooms); // 디버깅용
+    console.log('선택된 룸:', selectedRooms);
     
     if (selectedRooms.length === 0) {
         alert('출력할 룸을 선택해주세요.');
@@ -210,6 +230,8 @@ function executePrintWithFormat() {
     
     // 선택된 날짜 가져오기
     const selectedDate = window.leafletConfig.selectedPrintDate || window.AppState?.currentDate || window.AppState?.selectedDate;
+    
+    console.log('선택된 날짜:', selectedDate, '출력 형식:', format);
     
     if (format === 'leaflet') {
         // 리플렛 형식으로 출력
@@ -266,7 +288,7 @@ function executeSchedulePrint(selectedRooms) {
         window.originalExecutePrint(selectedRooms);
     } else if (typeof executePrint === 'function') {
         // 선택된 룸으로 인쇄
-        const checkboxes = document.querySelectorAll('#printRoomCheckboxes input[type="checkbox"]:not(#selectAllRooms)');
+        const checkboxes = document.querySelectorAll('#printRoomCheckboxes .print-room-checkbox');
         checkboxes.forEach(cb => {
             cb.checked = selectedRooms.includes(cb.value);
         });
@@ -331,24 +353,41 @@ function updateKeyVisualPreviews() {
 }
 
 function saveKeyVisualToFirebase(side, base64) {
-    if (!window.db) return;
+    if (!window.db) {
+        console.log('Firebase DB가 없어서 키비주얼을 저장할 수 없습니다.');
+        return;
+    }
     
     const path = `config/leaflet/keyVisual_${side}`;
-    window.db.ref(path).set(base64).catch(err => {
+    console.log('키비주얼 저장 중:', path);
+    
+    window.db.ref(path).set(base64).then(() => {
+        console.log('키비주얼 저장 완료:', side);
+    }).catch(err => {
         console.error('키비주얼 저장 실패:', err);
     });
 }
 
 function loadKeyVisualsFromFirebase() {
-    if (!window.db) return;
+    if (!window.db) {
+        console.log('Firebase DB가 없어서 키비주얼을 로드할 수 없습니다.');
+        return;
+    }
+    
+    console.log('키비주얼 로드 시도...');
     
     window.db.ref('config/leaflet').once('value').then(snapshot => {
         const data = snapshot.val();
+        console.log('키비주얼 데이터:', data);
+        
         if (data) {
             window.leafletConfig.leftKeyVisual = data.keyVisual_left || null;
             window.leafletConfig.rightKeyVisual = data.keyVisual_right || null;
-            updateKeyVisualPreviews();
+            console.log('키비주얼 로드 완료 - left:', !!data.keyVisual_left, 'right:', !!data.keyVisual_right);
+        } else {
+            console.log('저장된 키비주얼 없음');
         }
+        updateKeyVisualPreviews();
     }).catch(err => {
         console.error('키비주얼 로드 실패:', err);
     });
