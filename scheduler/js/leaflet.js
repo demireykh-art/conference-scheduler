@@ -1,149 +1,265 @@
 // ============================================
-// 리플렛 PDF 생성 모듈
+// 리플렛 PDF 생성 모듈 (통합 인쇄 모달 버전)
 // ============================================
 
-// 키비주얼 이미지 저장 (Firebase Storage 또는 Base64)
+// 키비주얼 이미지 저장
 window.leafletConfig = {
-    leftKeyVisual: null,   // 좌측 키비주얼 Base64
-    rightKeyVisual: null,  // 우측 키비주얼 Base64
-    selectedRooms: [],     // 선택된 룸 목록
-    selectedDate: null     // 선택된 날짜
+    leftKeyVisual: null,
+    rightKeyVisual: null,
+    printFormat: 'schedule'  // 'schedule' 또는 'leaflet'
 };
 
 // ============================================
-// 리플렛 모달 열기
+// 기존 openPrintModal 함수 오버라이드
 // ============================================
-function openLeafletModal() {
-    const modal = document.getElementById('leafletModal');
-    if (!modal) {
-        console.error('리플렛 모달이 없습니다. HTML에 추가해주세요.');
-        return;
-    }
+const originalOpenPrintModal = window.openPrintModal;
+
+window.openPrintModal = function() {
+    const modal = document.getElementById('printModal');
+    if (!modal) return;
     
     modal.style.display = 'flex';
     
-    // 날짜 선택 버튼 생성
-    renderLeafletDateButtons();
+    // 현재 선택된 날짜 가져오기
+    const currentDate = window.AppState?.currentDate || window.AppState?.selectedDate;
+    
+    // 룸 목록 가져오기
+    let rooms = getRoomsForCurrentDate(currentDate);
+    
+    // 모달 내용 업데이트
+    updatePrintModalContent(rooms, currentDate);
+    
+    // 키비주얼 로드
+    loadKeyVisualsFromFirebase();
+};
+
+// ============================================
+// 현재 날짜의 룸 목록 가져오기
+// ============================================
+function getRoomsForCurrentDate(currentDate) {
+    let rooms = [];
+    
+    // 방법 1: dateConfigs에서 가져오기
+    if (window.AppState?.dateConfigs?.[currentDate]?.rooms) {
+        rooms = window.AppState.dateConfigs[currentDate].rooms;
+    }
+    // 방법 2: 전역 rooms 배열
+    else if (window.AppState?.rooms?.length > 0) {
+        rooms = window.AppState.rooms;
+    }
+    // 방법 3: 스케줄에서 추출
+    else if (window.AppState?.schedules?.[currentDate]) {
+        rooms = Object.keys(window.AppState.schedules[currentDate]);
+    }
+    // 방법 4: 강의에서 추출
+    else {
+        const lectures = window.AppState?.lectures || [];
+        const roomSet = new Set();
+        lectures.forEach(l => {
+            if (l.date === currentDate && l.room) {
+                roomSet.add(l.room);
+            }
+        });
+        rooms = Array.from(roomSet);
+    }
+    
+    return rooms;
+}
+
+// ============================================
+// 인쇄 모달 내용 업데이트
+// ============================================
+function updatePrintModalContent(rooms, currentDate) {
+    const modalContent = document.querySelector('#printModal .modal-content');
+    if (!modalContent) return;
+    
+    // 현재 날짜 라벨
+    const dateInfo = window.AppState?.eventDates?.find(d => d.date === currentDate);
+    const dateLabel = dateInfo?.label || currentDate || '날짜 미선택';
+    
+    modalContent.innerHTML = `
+        <div class="modal-header">
+            <h2>🖨️ 인쇄 설정</h2>
+            <button class="modal-close" onclick="closePrintModal()">×</button>
+        </div>
+        <div style="padding: 1rem;">
+            <!-- 현재 날짜 표시 -->
+            <div style="margin-bottom: 1rem; padding: 0.5rem; background: #E8F4FD; border-radius: 6px; text-align: center;">
+                <span style="font-weight: bold;">📅 ${dateLabel}</span>
+            </div>
+            
+            <!-- 출력 형식 선택 -->
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label style="font-weight: bold; margin-bottom: 0.75rem; display: block;">📋 출력 형식</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                    <label class="print-format-option" id="formatSchedule" onclick="selectPrintFormat('schedule')" style="display: flex; flex-direction: column; align-items: center; padding: 1rem; border: 2px solid #667eea; border-radius: 8px; cursor: pointer; background: #f0f4ff;">
+                        <span style="font-size: 2rem; margin-bottom: 0.5rem;">📊</span>
+                        <span style="font-weight: bold;">시간표</span>
+                        <span style="font-size: 0.75rem; color: #666;">기존 형식</span>
+                    </label>
+                    <label class="print-format-option" id="formatLeaflet" onclick="selectPrintFormat('leaflet')" style="display: flex; flex-direction: column; align-items: center; padding: 1rem; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: #f5f5f5;">
+                        <span style="font-size: 2rem; margin-bottom: 0.5rem;">📄</span>
+                        <span style="font-weight: bold;">리플렛</span>
+                        <span style="font-size: 0.75rem; color: #666;">학술대회 양식</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- 키비주얼 업로드 (리플렛 선택 시에만 표시) -->
+            <div id="keyVisualSection" style="display: none; margin-bottom: 1.5rem; padding: 1rem; background: #fafafa; border-radius: 8px; border: 1px dashed #ddd;">
+                <label style="font-weight: bold; margin-bottom: 0.75rem; display: block;">🖼️ 키비주얼 이미지</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <!-- 좌측 키비주얼 -->
+                    <div style="text-align: center;">
+                        <p style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">좌측</p>
+                        <div id="leftKeyVisualPreview" style="min-height: 80px; display: flex; align-items: center; justify-content: center; background: #eee; border-radius: 6px; margin-bottom: 0.5rem;">
+                            <span style="color: #999; font-size: 0.75rem;">미등록</span>
+                        </div>
+                        <button class="btn btn-secondary btn-small" onclick="uploadKeyVisual('left')" style="font-size: 0.75rem;">📤 업로드</button>
+                    </div>
+                    <!-- 우측 키비주얼 -->
+                    <div style="text-align: center;">
+                        <p style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">우측</p>
+                        <div id="rightKeyVisualPreview" style="min-height: 80px; display: flex; align-items: center; justify-content: center; background: #eee; border-radius: 6px; margin-bottom: 0.5rem;">
+                            <span style="color: #999; font-size: 0.75rem;">미등록</span>
+                        </div>
+                        <button class="btn btn-secondary btn-small" onclick="uploadKeyVisual('right')" style="font-size: 0.75rem;">📤 업로드</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 출력 언어 (리플렛 선택 시에만 표시) -->
+            <div id="languageSection" style="display: none; margin-bottom: 1.5rem;">
+                <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">🌐 출력 언어</label>
+                <div style="display: flex; gap: 1rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="radio" name="printLanguage" value="ko" checked style="width: 16px; height: 16px;">
+                        <span>한글</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="radio" name="printLanguage" value="en" style="width: 16px; height: 16px;">
+                        <span>English</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- 룸 선택 -->
+            <div class="form-group">
+                <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">🏠 출력할 룸 선택</label>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 300px; overflow-y: auto;" id="printRoomCheckboxes">
+                    ${rooms.length > 0 ? `
+                        <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #E8F4FD; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                            <input type="checkbox" id="selectAllRooms" onchange="toggleAllPrintRooms(this.checked)" checked style="width: 18px; height: 18px; accent-color: #667eea;">
+                            전체 룸 선택
+                        </label>
+                        ${rooms.map(room => `
+                            <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #f5f5f5; border-radius: 6px; cursor: pointer;">
+                                <input type="checkbox" class="room-checkbox" value="${room}" checked style="width: 18px; height: 18px; accent-color: #667eea;">
+                                ${room}
+                            </label>
+                        `).join('')}
+                    ` : '<p style="color: #999; text-align: center; padding: 1rem;">등록된 룸이 없습니다.</p>'}
+                </div>
+            </div>
+            
+            <!-- 인쇄 버튼 -->
+            <div style="margin-top: 1.5rem;">
+                <button class="btn btn-primary" onclick="executePrintWithFormat()" style="width: 100%; padding: 0.75rem; font-size: 1rem;">
+                    🖨️ 인쇄/PDF
+                </button>
+            </div>
+        </div>
+    `;
     
     // 키비주얼 미리보기 업데이트
     updateKeyVisualPreviews();
-    
-    // 룸 체크박스 생성
-    renderLeafletRoomCheckboxes();
-}
-
-function closeLeafletModal() {
-    document.getElementById('leafletModal').style.display = 'none';
 }
 
 // ============================================
-// 날짜 선택 버튼 렌더링
+// 출력 형식 선택
 // ============================================
-function renderLeafletDateButtons() {
-    const container = document.getElementById('leafletDateButtons');
-    if (!container) return;
+function selectPrintFormat(format) {
+    window.leafletConfig.printFormat = format;
     
-    const eventDates = window.AppState?.eventDates || [];
+    // UI 업데이트
+    const scheduleOption = document.getElementById('formatSchedule');
+    const leafletOption = document.getElementById('formatLeaflet');
+    const keyVisualSection = document.getElementById('keyVisualSection');
+    const languageSection = document.getElementById('languageSection');
     
-    if (eventDates.length === 0) {
-        container.innerHTML = '<p style="color:#999;">등록된 행사 날짜가 없습니다.</p>';
-        return;
-    }
-    
-    container.innerHTML = eventDates.map((dateInfo, index) => {
-        const date = new Date(dateInfo.date);
-        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-        const dayName = dayNames[date.getDay()];
-        const label = dateInfo.label || `${date.getMonth() + 1}/${date.getDate()}(${dayName})`;
-        const isSelected = window.leafletConfig.selectedDate === dateInfo.date;
-        
-        return `
-            <button class="btn btn-small ${isSelected ? 'btn-primary' : 'btn-secondary'}" 
-                    onclick="selectLeafletDate('${dateInfo.date}')"
-                    style="${isSelected ? '' : 'opacity: 0.7;'}">
-                ${label}
-            </button>
-        `;
-    }).join('');
-    
-    // 첫 날짜 자동 선택
-    if (!window.leafletConfig.selectedDate && eventDates.length > 0) {
-        selectLeafletDate(eventDates[0].date);
-    }
-}
-
-function selectLeafletDate(date) {
-    window.leafletConfig.selectedDate = date;
-    renderLeafletDateButtons();
-    renderLeafletRoomCheckboxes();
-}
-
-// ============================================
-// 룸 체크박스 렌더링
-// ============================================
-function renderLeafletRoomCheckboxes() {
-    const container = document.getElementById('leafletRoomCheckboxes');
-    if (!container) return;
-    
-    const selectedDate = window.leafletConfig.selectedDate;
-    if (!selectedDate) {
-        container.innerHTML = '<p style="color:#999;">먼저 날짜를 선택하세요.</p>';
-        return;
-    }
-    
-    // 해당 날짜의 룸 목록 가져오기
-    const dateConfig = window.AppState?.dateConfigs?.[selectedDate];
-    const rooms = dateConfig?.rooms || [];
-    
-    if (rooms.length === 0) {
-        container.innerHTML = '<p style="color:#999;">해당 날짜에 등록된 룸이 없습니다.</p>';
-        return;
-    }
-    
-    // 전체 선택/해제 버튼
-    container.innerHTML = `
-        <div style="margin-bottom: 0.5rem; display: flex; gap: 0.5rem;">
-            <button class="btn btn-small btn-secondary" onclick="selectAllLeafletRooms()">전체 선택</button>
-            <button class="btn btn-small btn-secondary" onclick="deselectAllLeafletRooms()">전체 해제</button>
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.5rem;">
-            ${rooms.map((room, index) => {
-                const isChecked = window.leafletConfig.selectedRooms.includes(room);
-                return `
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.5rem; background: ${isChecked ? '#E3F2FD' : '#f5f5f5'}; border-radius: 6px; border: 1px solid ${isChecked ? '#2196F3' : '#ddd'};">
-                        <input type="checkbox" 
-                               ${isChecked ? 'checked' : ''} 
-                               onchange="toggleLeafletRoom('${room}')"
-                               style="width: 18px; height: 18px; accent-color: #2196F3;">
-                        <span style="font-size: 0.85rem;">${room}</span>
-                    </label>
-                `;
-            }).join('')}
-        </div>
-    `;
-}
-
-function toggleLeafletRoom(room) {
-    const index = window.leafletConfig.selectedRooms.indexOf(room);
-    if (index > -1) {
-        window.leafletConfig.selectedRooms.splice(index, 1);
+    if (format === 'schedule') {
+        scheduleOption.style.border = '2px solid #667eea';
+        scheduleOption.style.background = '#f0f4ff';
+        leafletOption.style.border = '2px solid #ddd';
+        leafletOption.style.background = '#f5f5f5';
+        keyVisualSection.style.display = 'none';
+        languageSection.style.display = 'none';
     } else {
-        window.leafletConfig.selectedRooms.push(room);
+        scheduleOption.style.border = '2px solid #ddd';
+        scheduleOption.style.background = '#f5f5f5';
+        leafletOption.style.border = '2px solid #667eea';
+        leafletOption.style.background = '#f0f4ff';
+        keyVisualSection.style.display = 'block';
+        languageSection.style.display = 'block';
+        updateKeyVisualPreviews();
     }
-    renderLeafletRoomCheckboxes();
 }
 
-function selectAllLeafletRooms() {
-    const selectedDate = window.leafletConfig.selectedDate;
-    const dateConfig = window.AppState?.dateConfigs?.[selectedDate];
-    const rooms = dateConfig?.rooms || [];
-    window.leafletConfig.selectedRooms = [...rooms];
-    renderLeafletRoomCheckboxes();
+// ============================================
+// 전체 룸 선택/해제
+// ============================================
+function toggleAllPrintRooms(checked) {
+    const checkboxes = document.querySelectorAll('.room-checkbox');
+    checkboxes.forEach(cb => cb.checked = checked);
 }
 
-function deselectAllLeafletRooms() {
-    window.leafletConfig.selectedRooms = [];
-    renderLeafletRoomCheckboxes();
+// ============================================
+// 형식에 따른 인쇄 실행
+// ============================================
+function executePrintWithFormat() {
+    const format = window.leafletConfig.printFormat;
+    
+    // 선택된 룸 가져오기
+    const selectedRooms = [];
+    document.querySelectorAll('.room-checkbox:checked').forEach(cb => {
+        selectedRooms.push(cb.value);
+    });
+    
+    if (selectedRooms.length === 0) {
+        alert('출력할 룸을 선택해주세요.');
+        return;
+    }
+    
+    if (format === 'leaflet') {
+        // 리플렛 형식으로 출력
+        const language = document.querySelector('input[name="printLanguage"]:checked')?.value || 'ko';
+        generateLeafletPDF(selectedRooms, language);
+    } else {
+        // 기존 시간표 형식으로 출력
+        executeSchedulePrint(selectedRooms);
+    }
+    
+    closePrintModal();
+}
+
+// ============================================
+// 기존 시간표 인쇄 (기존 executePrint 로직)
+// ============================================
+function executeSchedulePrint(selectedRooms) {
+    // 기존 executePrint 함수 호출 또는 로직 실행
+    if (typeof window.originalExecutePrint === 'function') {
+        window.originalExecutePrint(selectedRooms);
+    } else if (typeof executePrint === 'function') {
+        // 선택된 룸으로 인쇄
+        const checkboxes = document.querySelectorAll('#printRoomCheckboxes input[type="checkbox"]:not(#selectAllRooms)');
+        checkboxes.forEach(cb => {
+            cb.checked = selectedRooms.includes(cb.value);
+        });
+        executePrint();
+    } else {
+        // fallback: 직접 인쇄
+        window.print();
+    }
 }
 
 // ============================================
@@ -167,7 +283,7 @@ function uploadKeyVisual(side) {
                 window.leafletConfig.rightKeyVisual = base64;
             }
             
-            // Firebase에 저장 (선택적)
+            // Firebase에 저장
             saveKeyVisualToFirebase(side, base64);
             
             // 미리보기 업데이트
@@ -184,17 +300,17 @@ function updateKeyVisualPreviews() {
     
     if (leftPreview) {
         if (window.leafletConfig.leftKeyVisual) {
-            leftPreview.innerHTML = `<img src="${window.leafletConfig.leftKeyVisual}" style="max-width: 100%; max-height: 200px; border-radius: 8px;">`;
+            leftPreview.innerHTML = `<img src="${window.leafletConfig.leftKeyVisual}" style="max-width: 100%; max-height: 80px; border-radius: 4px;">`;
         } else {
-            leftPreview.innerHTML = '<p style="color:#999; text-align: center;">이미지를 업로드하세요</p>';
+            leftPreview.innerHTML = '<span style="color: #999; font-size: 0.75rem;">미등록</span>';
         }
     }
     
     if (rightPreview) {
         if (window.leafletConfig.rightKeyVisual) {
-            rightPreview.innerHTML = `<img src="${window.leafletConfig.rightKeyVisual}" style="max-width: 100%; max-height: 200px; border-radius: 8px;">`;
+            rightPreview.innerHTML = `<img src="${window.leafletConfig.rightKeyVisual}" style="max-width: 100%; max-height: 80px; border-radius: 4px;">`;
         } else {
-            rightPreview.innerHTML = '<p style="color:#999; text-align: center;">이미지를 업로드하세요</p>';
+            rightPreview.innerHTML = '<span style="color: #999; font-size: 0.75rem;">미등록</span>';
         }
     }
 }
@@ -226,11 +342,10 @@ function loadKeyVisualsFromFirebase() {
 // ============================================
 // 리플렛 PDF 생성
 // ============================================
-async function generateLeafletPDF() {
-    const selectedDate = window.leafletConfig.selectedDate;
-    const selectedRooms = window.leafletConfig.selectedRooms;
+function generateLeafletPDF(selectedRooms, language) {
+    const currentDate = window.AppState?.currentDate || window.AppState?.selectedDate;
     
-    if (!selectedDate) {
+    if (!currentDate) {
         alert('날짜를 선택해주세요.');
         return;
     }
@@ -240,23 +355,16 @@ async function generateLeafletPDF() {
         return;
     }
     
-    // 로딩 표시
-    const generateBtn = document.getElementById('generateLeafletBtn');
-    if (generateBtn) {
-        generateBtn.disabled = true;
-        generateBtn.innerHTML = '⏳ 생성 중...';
-    }
-    
     try {
         // HTML 기반 리플렛 생성
-        const leafletHTML = generateLeafletHTML(selectedDate, selectedRooms);
+        const leafletHTML = generateLeafletHTML(currentDate, selectedRooms, language);
         
         // 새 창에서 열기 (인쇄용)
         const printWindow = window.open('', '_blank');
         printWindow.document.write(leafletHTML);
         printWindow.document.close();
         
-        // 인쇄 다이얼로그 (PDF 저장 가능)
+        // 인쇄 다이얼로그
         setTimeout(() => {
             printWindow.print();
         }, 500);
@@ -264,22 +372,15 @@ async function generateLeafletPDF() {
     } catch (error) {
         console.error('리플렛 생성 오류:', error);
         alert('리플렛 생성 중 오류가 발생했습니다.');
-    } finally {
-        if (generateBtn) {
-            generateBtn.disabled = false;
-            generateBtn.innerHTML = '📄 리플렛 PDF 생성';
-        }
     }
 }
 
 // ============================================
 // 리플렛 HTML 생성 (PDF용)
 // ============================================
-function generateLeafletHTML(selectedDate, selectedRooms) {
-    const dateConfig = window.AppState?.dateConfigs?.[selectedDate];
+function generateLeafletHTML(selectedDate, selectedRooms, language) {
     const lectures = window.AppState?.lectures || [];
     const sessions = window.AppState?.sessions || [];
-    const language = window.AppState?.language || 'ko';
     
     // 날짜 포맷
     const date = new Date(selectedDate);
@@ -295,10 +396,6 @@ function generateLeafletHTML(selectedDate, selectedRooms) {
         };
     });
     
-    // 컬럼 개수에 따른 너비 계산
-    const columnCount = selectedRooms.length;
-    const hasKeyVisuals = window.leafletConfig.leftKeyVisual || window.leafletConfig.rightKeyVisual;
-    
     return `
 <!DOCTYPE html>
 <html lang="ko">
@@ -308,7 +405,7 @@ function generateLeafletHTML(selectedDate, selectedRooms) {
     <style>
         @page {
             size: A3 landscape;
-            margin: 10mm;
+            margin: 8mm;
         }
         
         * {
@@ -319,8 +416,8 @@ function generateLeafletHTML(selectedDate, selectedRooms) {
         
         body {
             font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
-            font-size: 8pt;
-            line-height: 1.3;
+            font-size: 7pt;
+            line-height: 1.25;
             background: white;
         }
         
@@ -331,13 +428,13 @@ function generateLeafletHTML(selectedDate, selectedRooms) {
         }
         
         .key-visual {
-            width: 60px;
+            width: 55px;
             flex-shrink: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #1a237e;
-            padding: 10px 5px;
+            background: linear-gradient(180deg, #1a237e 0%, #3949ab 50%, #5c6bc0 100%);
+            padding: 8px 4px;
         }
         
         .key-visual img {
@@ -347,78 +444,85 @@ function generateLeafletHTML(selectedDate, selectedRooms) {
         }
         
         .key-visual.placeholder {
-            background: linear-gradient(180deg, #1a237e 0%, #3949ab 100%);
             color: white;
-            font-size: 14pt;
+            font-size: 11pt;
             font-weight: bold;
             writing-mode: vertical-rl;
             text-orientation: mixed;
+            letter-spacing: 2px;
         }
         
         .schedule-columns {
             flex: 1;
             display: flex;
             gap: 2px;
-            padding: 5px;
-            background: #f5f5f5;
+            padding: 4px;
+            background: #f0f0f0;
         }
         
         .room-column {
             flex: 1;
             background: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
             overflow: hidden;
+            min-width: 0;
         }
         
         .room-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 8px;
+            padding: 6px 4px;
             text-align: center;
-            font-weight: bold;
-            font-size: 9pt;
         }
         
-        .room-date {
-            font-size: 7pt;
+        .room-header .room-date {
+            font-size: 6pt;
             opacity: 0.9;
         }
         
+        .room-header .room-name {
+            font-weight: bold;
+            font-size: 7pt;
+            margin-top: 2px;
+        }
+        
         .room-content {
-            padding: 5px;
+            padding: 4px;
         }
         
         .session-block {
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             border-left: 3px solid #3498db;
-            padding-left: 6px;
+            padding-left: 4px;
+            background: #fafafa;
+            border-radius: 0 3px 3px 0;
         }
         
         .session-header {
-            background: #e3f2fd;
-            padding: 4px 6px;
-            margin-bottom: 4px;
-            border-radius: 3px;
+            background: linear-gradient(90deg, #e3f2fd, transparent);
+            padding: 3px 4px;
+            margin-bottom: 2px;
+            border-radius: 2px;
         }
         
         .session-title {
             font-weight: bold;
-            font-size: 8pt;
+            font-size: 7pt;
             color: #1565c0;
         }
         
         .session-moderator {
-            font-size: 7pt;
+            font-size: 5.5pt;
             color: #666;
-            margin-top: 2px;
+            margin-top: 1px;
         }
         
         .lecture-item {
             display: flex;
-            padding: 3px 0;
-            border-bottom: 1px dotted #eee;
-            font-size: 7pt;
+            padding: 2px 0;
+            border-bottom: 1px dotted #e0e0e0;
+            font-size: 6pt;
         }
         
         .lecture-item:last-child {
@@ -426,39 +530,45 @@ function generateLeafletHTML(selectedDate, selectedRooms) {
         }
         
         .lecture-time {
-            width: 70px;
+            width: 55px;
             flex-shrink: 0;
             color: #333;
             font-weight: 500;
+            font-size: 5.5pt;
         }
         
         .lecture-info {
             flex: 1;
+            min-width: 0;
         }
         
         .lecture-title {
             color: #333;
-            margin-bottom: 1px;
+            font-size: 6pt;
+            line-height: 1.2;
+            word-break: keep-all;
         }
         
         .lecture-speaker {
-            color: #666;
-            font-size: 6.5pt;
+            color: #555;
+            font-size: 5.5pt;
+            font-weight: 500;
         }
         
         .lecture-affiliation {
-            color: #999;
-            font-size: 6pt;
+            color: #888;
+            font-size: 5pt;
         }
         
         .coffee-break, .lunch-break {
             background: #fff8e1;
-            padding: 4px 8px;
+            padding: 3px 6px;
             text-align: center;
-            font-size: 7pt;
+            font-size: 6pt;
             color: #f57c00;
-            margin: 4px 0;
-            border-radius: 3px;
+            margin: 3px 0;
+            border-radius: 2px;
+            font-weight: bold;
         }
         
         .lunch-break {
@@ -468,16 +578,21 @@ function generateLeafletHTML(selectedDate, selectedRooms) {
         
         .panel-discussion {
             background: #f3e5f5;
-            padding: 3px 6px;
-            font-size: 6.5pt;
+            padding: 2px 4px;
+            font-size: 5.5pt;
             color: #7b1fa2;
             border-radius: 2px;
             margin-top: 2px;
         }
         
         @media print {
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .leaflet-container { page-break-inside: avoid; }
+            body { 
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact; 
+            }
+            .leaflet-container { 
+                page-break-inside: avoid; 
+            }
         }
     </style>
 </head>
@@ -485,7 +600,7 @@ function generateLeafletHTML(selectedDate, selectedRooms) {
     <div class="leaflet-container">
         ${window.leafletConfig.leftKeyVisual ? 
             `<div class="key-visual"><img src="${window.leafletConfig.leftKeyVisual}" alt="Key Visual"></div>` :
-            `<div class="key-visual placeholder">ASLS KOREA</div>`
+            `<div class="key-visual placeholder">ASLS KOREA 2026</div>`
         }
         
         <div class="schedule-columns">
@@ -494,7 +609,7 @@ function generateLeafletHTML(selectedDate, selectedRooms) {
         
         ${window.leafletConfig.rightKeyVisual ? 
             `<div class="key-visual"><img src="${window.leafletConfig.rightKeyVisual}" alt="Key Visual"></div>` :
-            `<div class="key-visual placeholder">ASLS KOREA</div>`
+            `<div class="key-visual placeholder">ASLS KOREA 2026</div>`
         }
     </div>
 </body>
@@ -508,14 +623,20 @@ function generateLeafletHTML(selectedDate, selectedRooms) {
 function generateRoomColumnHTML(data, dateLabel) {
     const { room, sessions } = data;
     
+    // 룸 이름에서 (토) (일) 등 제거하여 간결하게
+    const cleanRoomName = room.replace(/^\([토일월화수목금]\)/, '').trim();
+    
     return `
         <div class="room-column">
             <div class="room-header">
                 <div class="room-date">${dateLabel}</div>
-                <div>${room}</div>
+                <div class="room-name">${cleanRoomName}</div>
             </div>
             <div class="room-content">
-                ${sessions.map(session => generateSessionBlockHTML(session)).join('')}
+                ${sessions.length > 0 ? 
+                    sessions.map(session => generateSessionBlockHTML(session)).join('') :
+                    '<p style="text-align: center; color: #999; padding: 1rem; font-size: 6pt;">등록된 세션이 없습니다</p>'
+                }
             </div>
         </div>
     `;
@@ -533,25 +654,26 @@ function generateSessionBlockHTML(session) {
         return `<div class="lunch-break">🍽️ Lunch</div>`;
     }
     
-    const lecturesHTML = session.lectures.map(lecture => `
-        <div class="lecture-item">
-            <div class="lecture-time">${lecture.startTime}~${lecture.endTime}</div>
-            <div class="lecture-info">
-                <div class="lecture-title">${lecture.title}</div>
-                <div class="lecture-speaker">${lecture.speaker}</div>
-                ${lecture.affiliation ? `<div class="lecture-affiliation">${lecture.affiliation}</div>` : ''}
+    const lecturesHTML = session.lectures && session.lectures.length > 0 ? 
+        session.lectures.map(lecture => `
+            <div class="lecture-item">
+                <div class="lecture-time">${lecture.startTime}~${lecture.endTime}</div>
+                <div class="lecture-info">
+                    <div class="lecture-title">${lecture.title || ''}</div>
+                    <div class="lecture-speaker">${lecture.speaker || ''}</div>
+                    ${lecture.affiliation ? `<div class="lecture-affiliation">${lecture.affiliation}</div>` : ''}
+                </div>
             </div>
-        </div>
-    `).join('');
+        `).join('') : '';
     
-    // 패널 토의 (세션 끝에 연자들 이름만 나열)
+    // 패널 토의
     const panelHTML = session.panelDiscussion ? 
         `<div class="panel-discussion">📋 ${session.panelDiscussion}</div>` : '';
     
     return `
         <div class="session-block" style="border-left-color: ${session.color || '#3498db'};">
             <div class="session-header">
-                <div class="session-title">${session.name}</div>
+                <div class="session-title">${session.name || '세션'}</div>
                 ${session.moderator ? `<div class="session-moderator">Moderator: ${session.moderator}</div>` : ''}
             </div>
             ${lecturesHTML}
@@ -567,65 +689,85 @@ function getSessionsForRoom(date, room, allSessions, allLectures, language) {
     const result = [];
     
     // 해당 날짜/룸의 세션 필터링
-    const roomSessions = allSessions.filter(s => s.date === date && s.room === room);
+    const roomSessions = (allSessions || []).filter(s => s.date === date && s.room === room);
     
     // 해당 날짜/룸의 강의 필터링
-    const roomLectures = allLectures.filter(l => l.date === date && l.room === room && l.startTime);
+    const roomLectures = (allLectures || []).filter(l => l.date === date && l.room === room && l.startTime);
     
     // 시간순 정렬
     roomSessions.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
     roomLectures.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
     
-    // 세션별로 그룹화
-    roomSessions.forEach(session => {
-        const sessionStartTime = session.startTime;
-        const sessionEndTime = session.endTime || calculateEndTime(sessionStartTime, session.duration || 60);
-        
-        // 런치/커피 브레이크 확인
-        const sessionNameLower = (session.name || '').toLowerCase();
-        if (sessionNameLower.includes('lunch') || sessionNameLower.includes('런치') || sessionNameLower.includes('점심')) {
-            result.push({ type: 'lunch', startTime: sessionStartTime });
-            return;
-        }
-        if (sessionNameLower.includes('coffee') || sessionNameLower.includes('휴식') || sessionNameLower.includes('break')) {
-            result.push({ type: 'coffee', startTime: sessionStartTime });
-            return;
-        }
-        
-        // 세션 내 강의 수집
-        const sessionLectures = roomLectures.filter(l => {
-            const lectureTime = l.startTime;
-            return lectureTime >= sessionStartTime && lectureTime < sessionEndTime;
-        });
-        
-        // 패널 토의 (세션 끝부분에 연자들 이름 나열)
-        let panelDiscussion = null;
-        if (sessionLectures.length >= 2) {
-            const speakers = sessionLectures.map(l => {
-                return language === 'en' ? (l.speakerEn || l.speaker) : l.speaker;
-            }).filter(s => s && s !== '미정');
-            if (speakers.length >= 2) {
-                panelDiscussion = speakers.join(', ');
+    // 세션이 있는 경우
+    if (roomSessions.length > 0) {
+        roomSessions.forEach(session => {
+            const sessionStartTime = session.startTime;
+            const sessionEndTime = session.endTime || calculateEndTime(sessionStartTime, session.duration || 60);
+            
+            // 런치/커피 브레이크 확인
+            const sessionNameLower = (session.name || '').toLowerCase();
+            if (sessionNameLower.includes('lunch') || sessionNameLower.includes('런치') || sessionNameLower.includes('점심')) {
+                result.push({ type: 'lunch', startTime: sessionStartTime });
+                return;
             }
-        }
-        
+            if (sessionNameLower.includes('coffee') || sessionNameLower.includes('휴식') || sessionNameLower.includes('break')) {
+                result.push({ type: 'coffee', startTime: sessionStartTime });
+                return;
+            }
+            
+            // 세션 내 강의 수집
+            const sessionLectures = roomLectures.filter(l => {
+                const lectureTime = l.startTime;
+                return lectureTime >= sessionStartTime && lectureTime < sessionEndTime;
+            });
+            
+            // 패널 토의 (세션 끝부분에 연자들 이름 나열)
+            let panelDiscussion = null;
+            if (sessionLectures.length >= 2) {
+                const speakers = sessionLectures.map(l => {
+                    return language === 'en' ? (l.speakerEn || l.speaker) : l.speaker;
+                }).filter(s => s && s !== '미정');
+                if (speakers.length >= 2) {
+                    panelDiscussion = speakers.join(', ');
+                }
+            }
+            
+            result.push({
+                type: 'session',
+                name: language === 'en' ? (session.nameEn || session.name) : session.name,
+                moderator: session.moderator ? 
+                    `${language === 'en' ? (session.moderatorEn || session.moderator) : session.moderator} ${session.moderatorAffiliation || ''}`.trim() : null,
+                color: session.color || '#3498db',
+                startTime: sessionStartTime,
+                lectures: sessionLectures.map(l => ({
+                    startTime: l.startTime,
+                    endTime: calculateEndTime(l.startTime, l.duration || 15),
+                    title: language === 'en' ? (l.titleEn || l.titleKo || l.title) : (l.titleKo || l.title),
+                    speaker: language === 'en' ? (l.speakerEn || l.speaker) : l.speaker,
+                    affiliation: l.affiliation || ''
+                })),
+                panelDiscussion: panelDiscussion
+            });
+        });
+    } 
+    // 세션이 없고 강의만 있는 경우
+    else if (roomLectures.length > 0) {
         result.push({
             type: 'session',
-            name: language === 'en' ? (session.nameEn || session.name) : session.name,
-            moderator: session.moderator ? 
-                `${language === 'en' ? (session.moderatorEn || session.moderator) : session.moderator} ${session.moderatorAffiliation || ''}` : null,
-            color: session.color || '#3498db',
-            startTime: sessionStartTime,
-            lectures: sessionLectures.map(l => ({
+            name: room,
+            moderator: null,
+            color: '#3498db',
+            startTime: roomLectures[0].startTime,
+            lectures: roomLectures.map(l => ({
                 startTime: l.startTime,
                 endTime: calculateEndTime(l.startTime, l.duration || 15),
                 title: language === 'en' ? (l.titleEn || l.titleKo || l.title) : (l.titleKo || l.title),
                 speaker: language === 'en' ? (l.speakerEn || l.speaker) : l.speaker,
                 affiliation: l.affiliation || ''
             })),
-            panelDiscussion: panelDiscussion
+            panelDiscussion: null
         });
-    });
+    }
     
     // 시간순 정렬
     result.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
@@ -653,11 +795,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // 전역 함수 등록
-window.openLeafletModal = openLeafletModal;
-window.closeLeafletModal = closeLeafletModal;
 window.uploadKeyVisual = uploadKeyVisual;
+window.selectPrintFormat = selectPrintFormat;
+window.toggleAllPrintRooms = toggleAllPrintRooms;
+window.executePrintWithFormat = executePrintWithFormat;
 window.generateLeafletPDF = generateLeafletPDF;
-window.selectLeafletDate = selectLeafletDate;
-window.toggleLeafletRoom = toggleLeafletRoom;
-window.selectAllLeafletRooms = selectAllLeafletRooms;
-window.deselectAllLeafletRooms = deselectAllLeafletRooms;
