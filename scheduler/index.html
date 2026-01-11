@@ -99,14 +99,13 @@
                 <button class="btn btn-secondary btn-small" onclick="openSponsorManagementModal()" title="파트너사 강의 관리">🏢파트너사</button>
             </div>
             
-            <!-- 버튼 그룹 4: 출력 (리플렛 추가됨) -->
+            <!-- 버튼 그룹 4: 출력 -->
             <div class="btn-group" style="display: flex; gap: 0.2rem; padding: 0.2rem; background: rgba(255,255,255,0.1); border-radius: 6px;">
                 <div class="dropdown" style="position: relative;">
                     <button class="btn btn-secondary btn-small" onclick="toggleExportDropdown()" title="출력">🖨️출력▼</button>
                     <div class="dropdown-menu" id="exportDropdown" style="display: none; position: absolute; top: 100%; right: 0; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 180px; z-index: 1000;">
                         <button class="dropdown-item" onclick="openPrintModal()">🖨️ 인쇄/PDF</button>
                         <button class="dropdown-item" onclick="exportToExcel()">📊 엑셀로 내보내기</button>
-                        <button class="dropdown-item" onclick="openLeafletModal()">📄 리플렛 PDF</button>
                     </div>
                 </div>
             </div>
@@ -988,105 +987,6 @@
                         <button class="btn btn-secondary" onclick="clearUploadPreview()">취소</button>
                         <button class="btn btn-primary" onclick="confirmUpload()">✅ 업로드 확정</button>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============================================ -->
-    <!-- 리플렛 PDF 생성 모달 (NEW) -->
-    <!-- ============================================ -->
-    <div class="modal" id="leafletModal">
-        <div class="modal-content" style="max-width: 800px; max-height: 90vh;">
-            <div class="modal-header">
-                <h2>📄 리플렛 PDF 생성</h2>
-                <button class="modal-close" onclick="closeLeafletModal()">×</button>
-            </div>
-            
-            <div style="padding: 1rem; overflow-y: auto; max-height: calc(90vh - 120px);">
-                <!-- 안내 -->
-                <div style="background: #E3F2FD; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #2196F3;">
-                    <p style="margin: 0; font-size: 0.9rem;">
-                        📋 학술대회 리플렛 양식으로 PDF를 생성합니다.
-                    </p>
-                    <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: #666;">
-                        좌우측에 키비주얼, 가운데에 선택한 룸의 강의 목록이 표시됩니다.
-                    </p>
-                </div>
-                
-                <!-- 키비주얼 업로드 -->
-                <div style="margin-bottom: 1.5rem;">
-                    <label style="font-weight: bold; display: block; margin-bottom: 0.75rem;">
-                        🖼️ 키비주얼 이미지 (좌/우측)
-                    </label>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                        <!-- 좌측 키비주얼 -->
-                        <div style="border: 2px dashed #ddd; border-radius: 8px; padding: 1rem; text-align: center; background: #fafafa;">
-                            <p style="font-size: 0.85rem; color: #666; margin-bottom: 0.5rem;">좌측 키비주얼</p>
-                            <div id="leftKeyVisualPreview" style="min-height: 120px; display: flex; align-items: center; justify-content: center; margin-bottom: 0.5rem;">
-                                <p style="color:#999; text-align: center;">이미지를 업로드하세요</p>
-                            </div>
-                            <button class="btn btn-secondary btn-small" onclick="uploadKeyVisual('left')">
-                                📤 이미지 선택
-                            </button>
-                        </div>
-                        
-                        <!-- 우측 키비주얼 -->
-                        <div style="border: 2px dashed #ddd; border-radius: 8px; padding: 1rem; text-align: center; background: #fafafa;">
-                            <p style="font-size: 0.85rem; color: #666; margin-bottom: 0.5rem;">우측 키비주얼</p>
-                            <div id="rightKeyVisualPreview" style="min-height: 120px; display: flex; align-items: center; justify-content: center; margin-bottom: 0.5rem;">
-                                <p style="color:#999; text-align: center;">이미지를 업로드하세요</p>
-                            </div>
-                            <button class="btn btn-secondary btn-small" onclick="uploadKeyVisual('right')">
-                                📤 이미지 선택
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 날짜 선택 -->
-                <div style="margin-bottom: 1.5rem;">
-                    <label style="font-weight: bold; display: block; margin-bottom: 0.5rem;">
-                        📅 날짜 선택
-                    </label>
-                    <div id="leafletDateButtons" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <!-- 동적 생성 -->
-                    </div>
-                </div>
-                
-                <!-- 룸 선택 -->
-                <div style="margin-bottom: 1.5rem;">
-                    <label style="font-weight: bold; display: block; margin-bottom: 0.5rem;">
-                        🏠 출력할 룸 선택
-                    </label>
-                    <div id="leafletRoomCheckboxes">
-                        <p style="color:#999;">먼저 날짜를 선택하세요.</p>
-                    </div>
-                </div>
-                
-                <!-- 언어 선택 -->
-                <div style="margin-bottom: 1.5rem;">
-                    <label style="font-weight: bold; display: block; margin-bottom: 0.5rem;">
-                        🌐 출력 언어
-                    </label>
-                    <div style="display: flex; gap: 1rem;">
-                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="radio" name="leafletLanguage" value="ko" checked style="width: 18px; height: 18px;">
-                            <span>한글</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="radio" name="leafletLanguage" value="en" style="width: 18px; height: 18px;">
-                            <span>English</span>
-                        </label>
-                    </div>
-                </div>
-                
-                <!-- 생성 버튼 -->
-                <div style="display: flex; gap: 0.5rem; justify-content: flex-end; padding-top: 1rem; border-top: 1px solid #eee;">
-                    <button class="btn btn-secondary" onclick="closeLeafletModal()">취소</button>
-                    <button class="btn btn-primary" id="generateLeafletBtn" onclick="generateLeafletPDF()">
-                        📄 리플렛 PDF 생성
-                    </button>
                 </div>
             </div>
         </div>
