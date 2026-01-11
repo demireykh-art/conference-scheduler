@@ -30,19 +30,11 @@ function initPrintModalExtras() {
     // 현재 날짜 가져오기
     const currentDate = window.AppState?.currentDate || window.AppState?.selectedDate;
     
-    // 날짜 라벨 업데이트
-    const dateInfo = window.AppState?.eventDates?.find(d => d.date === currentDate);
-    const dateLabel = dateInfo?.label || currentDate || '날짜 미선택';
-    const dateLabelEl = document.getElementById('printDateLabel');
-    if (dateLabelEl) {
-        dateLabelEl.innerHTML = `<span style="font-weight: bold;">📅 ${dateLabel}</span>`;
-    }
+    // 날짜 선택 버튼 렌더링
+    renderPrintDateButtons(currentDate);
     
-    // 룸 체크박스 업데이트 (기존 함수가 이미 처리했을 수 있으므로 확인)
-    const roomContainer = document.getElementById('printRoomCheckboxes');
-    if (roomContainer && !roomContainer.querySelector('.room-checkbox')) {
-        updatePrintRoomCheckboxes(currentDate);
-    }
+    // 룸 체크박스 업데이트
+    updatePrintRoomCheckboxes(currentDate);
     
     // 키비주얼 로드
     loadKeyVisualsFromFirebase();
@@ -50,6 +42,52 @@ function initPrintModalExtras() {
     // 기본 형식 선택 (시간표)
     window.leafletConfig.printFormat = 'schedule';
     selectPrintFormat('schedule');
+}
+
+// ============================================
+// 날짜 선택 버튼 렌더링
+// ============================================
+function renderPrintDateButtons(currentDate) {
+    const dateLabelEl = document.getElementById('printDateLabel');
+    if (!dateLabelEl) return;
+    
+    const eventDates = window.AppState?.eventDates || [];
+    
+    if (eventDates.length === 0) {
+        dateLabelEl.innerHTML = `<span style="font-weight: bold;">📅 날짜 미등록</span>`;
+        return;
+    }
+    
+    // 날짜 버튼들 생성
+    dateLabelEl.innerHTML = `
+        <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+            ${eventDates.map(dateInfo => {
+                const isSelected = dateInfo.date === currentDate;
+                const label = dateInfo.label || dateInfo.date;
+                return `
+                    <button class="btn btn-small ${isSelected ? 'btn-primary' : 'btn-secondary'}" 
+                            onclick="selectPrintDate('${dateInfo.date}')"
+                            style="padding: 0.5rem 1rem; ${isSelected ? '' : 'opacity: 0.7;'}">
+                        📅 ${label}
+                    </button>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+
+// ============================================
+// 날짜 선택 시 처리
+// ============================================
+function selectPrintDate(date) {
+    // 선택된 날짜 저장
+    window.leafletConfig.selectedPrintDate = date;
+    
+    // 날짜 버튼 UI 업데이트
+    renderPrintDateButtons(date);
+    
+    // 룸 체크박스 업데이트
+    updatePrintRoomCheckboxes(date);
 }
 
 function updatePrintRoomCheckboxes(currentDate) {
@@ -154,27 +192,69 @@ function toggleAllPrintRooms(checked) {
 function executePrintWithFormat() {
     const format = window.leafletConfig.printFormat;
     
-    // 선택된 룸 가져오기
+    // 선택된 룸 가져오기 - printRoomCheckboxes 내의 체크박스만 확인
     const selectedRooms = [];
-    document.querySelectorAll('.room-checkbox:checked').forEach(cb => {
-        selectedRooms.push(cb.value);
+    const roomCheckboxes = document.querySelectorAll('#printRoomCheckboxes .room-checkbox:checked');
+    roomCheckboxes.forEach(cb => {
+        if (cb.value) {
+            selectedRooms.push(cb.value);
+        }
     });
+    
+    console.log('선택된 룸:', selectedRooms); // 디버깅용
     
     if (selectedRooms.length === 0) {
         alert('출력할 룸을 선택해주세요.');
         return;
     }
     
+    // 선택된 날짜 가져오기
+    const selectedDate = window.leafletConfig.selectedPrintDate || window.AppState?.currentDate || window.AppState?.selectedDate;
+    
     if (format === 'leaflet') {
         // 리플렛 형식으로 출력
         const language = document.querySelector('input[name="printLanguage"]:checked')?.value || 'ko';
-        generateLeafletPDF(selectedRooms, language);
+        generateLeafletPDFWithDate(selectedRooms, language, selectedDate);
     } else {
         // 기존 시간표 형식으로 출력
         executeSchedulePrint(selectedRooms);
     }
     
     closePrintModal();
+}
+
+// ============================================
+// 리플렛 PDF 생성 (날짜 포함)
+// ============================================
+function generateLeafletPDFWithDate(selectedRooms, language, selectedDate) {
+    if (!selectedDate) {
+        alert('날짜를 선택해주세요.');
+        return;
+    }
+    
+    if (selectedRooms.length === 0) {
+        alert('출력할 룸을 선택해주세요.');
+        return;
+    }
+    
+    try {
+        // HTML 기반 리플렛 생성
+        const leafletHTML = generateLeafletHTML(selectedDate, selectedRooms, language);
+        
+        // 새 창에서 열기 (인쇄용)
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(leafletHTML);
+        printWindow.document.close();
+        
+        // 인쇄 다이얼로그
+        setTimeout(() => {
+            printWindow.print();
+        }, 500);
+        
+    } catch (error) {
+        console.error('리플렛 생성 오류:', error);
+        alert('리플렛 생성 중 오류가 발생했습니다.');
+    }
 }
 
 // ============================================
@@ -735,3 +815,4 @@ window.selectPrintFormat = selectPrintFormat;
 window.toggleAllPrintRooms = toggleAllPrintRooms;
 window.executePrintWithFormat = executePrintWithFormat;
 window.generateLeafletPDF = generateLeafletPDF;
+window.selectPrintDate = selectPrintDate;
