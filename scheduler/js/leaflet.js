@@ -10,28 +10,72 @@ window.leafletConfig = {
 };
 
 // ============================================
-// 기존 openPrintModal 함수 오버라이드
+// 기존 openPrintModal 함수 확장 (호출 후 초기화 추가)
 // ============================================
 const originalOpenPrintModal = window.openPrintModal;
 
 window.openPrintModal = function() {
-    const modal = document.getElementById('printModal');
-    if (!modal) return;
+    // 기존 openPrintModal 호출 (있으면)
+    if (typeof originalOpenPrintModal === 'function') {
+        originalOpenPrintModal();
+    } else {
+        document.getElementById('printModal').style.display = 'flex';
+    }
     
-    modal.style.display = 'flex';
-    
-    // 현재 선택된 날짜 가져오기
+    // 추가 초기화
+    initPrintModalExtras();
+};
+
+function initPrintModalExtras() {
+    // 현재 날짜 가져오기
     const currentDate = window.AppState?.currentDate || window.AppState?.selectedDate;
     
-    // 룸 목록 가져오기
-    let rooms = getRoomsForCurrentDate(currentDate);
+    // 날짜 라벨 업데이트
+    const dateInfo = window.AppState?.eventDates?.find(d => d.date === currentDate);
+    const dateLabel = dateInfo?.label || currentDate || '날짜 미선택';
+    const dateLabelEl = document.getElementById('printDateLabel');
+    if (dateLabelEl) {
+        dateLabelEl.innerHTML = `<span style="font-weight: bold;">📅 ${dateLabel}</span>`;
+    }
     
-    // 모달 내용 업데이트
-    updatePrintModalContent(rooms, currentDate);
+    // 룸 체크박스 업데이트 (기존 함수가 이미 처리했을 수 있으므로 확인)
+    const roomContainer = document.getElementById('printRoomCheckboxes');
+    if (roomContainer && !roomContainer.querySelector('.room-checkbox')) {
+        updatePrintRoomCheckboxes(currentDate);
+    }
     
     // 키비주얼 로드
     loadKeyVisualsFromFirebase();
-};
+    
+    // 기본 형식 선택 (시간표)
+    window.leafletConfig.printFormat = 'schedule';
+    selectPrintFormat('schedule');
+}
+
+function updatePrintRoomCheckboxes(currentDate) {
+    const container = document.getElementById('printRoomCheckboxes');
+    if (!container) return;
+    
+    let rooms = getRoomsForCurrentDate(currentDate);
+    
+    if (rooms.length === 0) {
+        container.innerHTML = '<p style="color: #999; text-align: center; padding: 1rem;">등록된 룸이 없습니다.</p>';
+        return;
+    }
+    
+    container.innerHTML = `
+        <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #E8F4FD; border-radius: 6px; cursor: pointer; font-weight: bold;">
+            <input type="checkbox" id="selectAllRooms" onchange="toggleAllPrintRooms(this.checked)" checked style="width: 18px; height: 18px; accent-color: #667eea;">
+            전체 룸 선택
+        </label>
+        ${rooms.map(room => `
+            <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #f5f5f5; border-radius: 6px; cursor: pointer;">
+                <input type="checkbox" class="room-checkbox" value="${room}" checked style="width: 18px; height: 18px; accent-color: #667eea;">
+                ${room}
+            </label>
+        `).join('')}
+    `;
+}
 
 // ============================================
 // 현재 날짜의 룸 목록 가져오기
@@ -64,115 +108,6 @@ function getRoomsForCurrentDate(currentDate) {
     }
     
     return rooms;
-}
-
-// ============================================
-// 인쇄 모달 내용 업데이트
-// ============================================
-function updatePrintModalContent(rooms, currentDate) {
-    const modalContent = document.querySelector('#printModal .modal-content');
-    if (!modalContent) return;
-    
-    // 현재 날짜 라벨
-    const dateInfo = window.AppState?.eventDates?.find(d => d.date === currentDate);
-    const dateLabel = dateInfo?.label || currentDate || '날짜 미선택';
-    
-    modalContent.innerHTML = `
-        <div class="modal-header">
-            <h2>🖨️ 인쇄 설정</h2>
-            <button class="modal-close" onclick="closePrintModal()">×</button>
-        </div>
-        <div style="padding: 1rem;">
-            <!-- 현재 날짜 표시 -->
-            <div style="margin-bottom: 1rem; padding: 0.5rem; background: #E8F4FD; border-radius: 6px; text-align: center;">
-                <span style="font-weight: bold;">📅 ${dateLabel}</span>
-            </div>
-            
-            <!-- 출력 형식 선택 -->
-            <div class="form-group" style="margin-bottom: 1.5rem;">
-                <label style="font-weight: bold; margin-bottom: 0.75rem; display: block;">📋 출력 형식</label>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-                    <label class="print-format-option" id="formatSchedule" onclick="selectPrintFormat('schedule')" style="display: flex; flex-direction: column; align-items: center; padding: 1rem; border: 2px solid #667eea; border-radius: 8px; cursor: pointer; background: #f0f4ff;">
-                        <span style="font-size: 2rem; margin-bottom: 0.5rem;">📊</span>
-                        <span style="font-weight: bold;">시간표</span>
-                        <span style="font-size: 0.75rem; color: #666;">기존 형식</span>
-                    </label>
-                    <label class="print-format-option" id="formatLeaflet" onclick="selectPrintFormat('leaflet')" style="display: flex; flex-direction: column; align-items: center; padding: 1rem; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: #f5f5f5;">
-                        <span style="font-size: 2rem; margin-bottom: 0.5rem;">📄</span>
-                        <span style="font-weight: bold;">리플렛</span>
-                        <span style="font-size: 0.75rem; color: #666;">학술대회 양식</span>
-                    </label>
-                </div>
-            </div>
-            
-            <!-- 키비주얼 업로드 (리플렛 선택 시에만 표시) -->
-            <div id="keyVisualSection" style="display: none; margin-bottom: 1.5rem; padding: 1rem; background: #fafafa; border-radius: 8px; border: 1px dashed #ddd;">
-                <label style="font-weight: bold; margin-bottom: 0.75rem; display: block;">🖼️ 키비주얼 이미지</label>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <!-- 좌측 키비주얼 -->
-                    <div style="text-align: center;">
-                        <p style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">좌측</p>
-                        <div id="leftKeyVisualPreview" style="min-height: 80px; display: flex; align-items: center; justify-content: center; background: #eee; border-radius: 6px; margin-bottom: 0.5rem;">
-                            <span style="color: #999; font-size: 0.75rem;">미등록</span>
-                        </div>
-                        <button class="btn btn-secondary btn-small" onclick="uploadKeyVisual('left')" style="font-size: 0.75rem;">📤 업로드</button>
-                    </div>
-                    <!-- 우측 키비주얼 -->
-                    <div style="text-align: center;">
-                        <p style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">우측</p>
-                        <div id="rightKeyVisualPreview" style="min-height: 80px; display: flex; align-items: center; justify-content: center; background: #eee; border-radius: 6px; margin-bottom: 0.5rem;">
-                            <span style="color: #999; font-size: 0.75rem;">미등록</span>
-                        </div>
-                        <button class="btn btn-secondary btn-small" onclick="uploadKeyVisual('right')" style="font-size: 0.75rem;">📤 업로드</button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 출력 언어 (리플렛 선택 시에만 표시) -->
-            <div id="languageSection" style="display: none; margin-bottom: 1.5rem;">
-                <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">🌐 출력 언어</label>
-                <div style="display: flex; gap: 1rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="radio" name="printLanguage" value="ko" checked style="width: 16px; height: 16px;">
-                        <span>한글</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="radio" name="printLanguage" value="en" style="width: 16px; height: 16px;">
-                        <span>English</span>
-                    </label>
-                </div>
-            </div>
-            
-            <!-- 룸 선택 -->
-            <div class="form-group">
-                <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">🏠 출력할 룸 선택</label>
-                <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 300px; overflow-y: auto;" id="printRoomCheckboxes">
-                    ${rooms.length > 0 ? `
-                        <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #E8F4FD; border-radius: 6px; cursor: pointer; font-weight: bold;">
-                            <input type="checkbox" id="selectAllRooms" onchange="toggleAllPrintRooms(this.checked)" checked style="width: 18px; height: 18px; accent-color: #667eea;">
-                            전체 룸 선택
-                        </label>
-                        ${rooms.map(room => `
-                            <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #f5f5f5; border-radius: 6px; cursor: pointer;">
-                                <input type="checkbox" class="room-checkbox" value="${room}" checked style="width: 18px; height: 18px; accent-color: #667eea;">
-                                ${room}
-                            </label>
-                        `).join('')}
-                    ` : '<p style="color: #999; text-align: center; padding: 1rem;">등록된 룸이 없습니다.</p>'}
-                </div>
-            </div>
-            
-            <!-- 인쇄 버튼 -->
-            <div style="margin-top: 1.5rem;">
-                <button class="btn btn-primary" onclick="executePrintWithFormat()" style="width: 100%; padding: 0.75rem; font-size: 1rem;">
-                    🖨️ 인쇄/PDF
-                </button>
-            </div>
-        </div>
-    `;
-    
-    // 키비주얼 미리보기 업데이트
-    updateKeyVisualPreviews();
 }
 
 // ============================================
