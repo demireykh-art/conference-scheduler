@@ -36,10 +36,9 @@ function initPrintModalExtras() {
     window.leafletConfig.selectedPrintDate = currentDate;
     
     console.log('초기화 - 현재 날짜:', currentDate);
-    console.log('AppState.eventDates:', window.AppState?.eventDates);
     
-    // 날짜 선택 버튼 렌더링
-    renderPrintDateButtons(currentDate);
+    // 날짜 선택 버튼 렌더링 (DOM에서 직접 가져오기)
+    renderPrintDateButtonsFromDOM(currentDate);
     
     // 키비주얼 로드
     loadKeyVisualsFromFirebase();
@@ -47,40 +46,65 @@ function initPrintModalExtras() {
     // 기본 형식 선택 (시간표)
     window.leafletConfig.printFormat = 'schedule';
     selectPrintFormat('schedule');
-    
-    // eventDates가 아직 로드되지 않았으면 재시도
-    if (!window.AppState?.eventDates || window.AppState.eventDates.length === 0) {
-        console.log('eventDates 로드 대기 중... 1초 후 재시도');
-        setTimeout(() => {
-            const retryDate = window.AppState?.currentDate || window.AppState?.selectedDate;
-            renderPrintDateButtons(retryDate);
-        }, 1000);
-    }
 }
 
 // ============================================
-// 날짜 선택 버튼 렌더링
+// 날짜 선택 버튼 렌더링 (DOM에서 직접 가져오기)
 // ============================================
-function renderPrintDateButtons(currentDate) {
+function renderPrintDateButtonsFromDOM(currentDate) {
     const dateLabelEl = document.getElementById('printDateLabel');
     if (!dateLabelEl) return;
     
-    const eventDates = window.AppState?.eventDates || [];
+    // 시간표의 날짜 버튼들에서 정보 추출
+    const dateSelectorBtns = document.getElementById('dateSelectorBtns');
+    const existingButtons = dateSelectorBtns?.querySelectorAll('button') || [];
     
-    console.log('날짜 버튼 렌더링 - eventDates:', eventDates.length, 'currentDate:', currentDate);
+    console.log('DOM에서 날짜 버튼 찾기:', existingButtons.length, '개');
     
-    // eventDates가 없으면 현재 날짜 정보로 버튼 생성
-    if (eventDates.length === 0) {
+    // 날짜 정보 수집
+    const dateInfoList = [];
+    existingButtons.forEach(btn => {
+        // 버튼의 onclick에서 날짜 추출 또는 data 속성 사용
+        const onclickStr = btn.getAttribute('onclick') || '';
+        const dateMatch = onclickStr.match(/selectDate\(['"]([^'"]+)['"]\)/);
+        const btnDate = dateMatch ? dateMatch[1] : null;
+        const btnLabel = btn.textContent.trim();
+        
+        if (btnDate || btnLabel) {
+            dateInfoList.push({
+                date: btnDate || btnLabel,
+                label: btnLabel,
+                isActive: btn.classList.contains('btn-primary') || btn.classList.contains('active')
+            });
+        }
+    });
+    
+    console.log('추출된 날짜 정보:', dateInfoList);
+    
+    // 날짜 버튼이 없으면 AppState.eventDates 시도
+    if (dateInfoList.length === 0 && window.AppState?.eventDates?.length > 0) {
+        window.AppState.eventDates.forEach(d => {
+            dateInfoList.push({
+                date: d.date,
+                label: d.label || d.date,
+                isActive: d.date === currentDate
+            });
+        });
+    }
+    
+    // 그래도 없으면 현재 날짜만 표시
+    if (dateInfoList.length === 0) {
         if (currentDate) {
             const date = new Date(currentDate);
             const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
             const dayName = dayNames[date.getDay()];
-            const dateStr = `${date.getMonth() + 1}/${date.getDate()}(${dayName})`;
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
             
             dateLabelEl.innerHTML = `
-                <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+                <div style="display: flex; gap: 0.5rem; justify-content: center;">
                     <button class="btn btn-small btn-primary" style="padding: 0.5rem 1rem;">
-                        📅 ${dateStr}
+                        📅 ${month}/${day}(${dayName})
                     </button>
                 </div>
             `;
@@ -93,14 +117,13 @@ function renderPrintDateButtons(currentDate) {
     // 날짜 버튼들 생성
     dateLabelEl.innerHTML = `
         <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
-            ${eventDates.map(dateInfo => {
-                const isSelected = dateInfo.date === currentDate;
-                const label = dateInfo.label || dateInfo.date;
+            ${dateInfoList.map(info => {
+                const isSelected = info.date === currentDate || info.isActive;
                 return `
                     <button class="btn btn-small ${isSelected ? 'btn-primary' : 'btn-secondary'}" 
-                            onclick="selectPrintDate('${dateInfo.date}')"
+                            onclick="selectPrintDate('${info.date}')"
                             style="padding: 0.5rem 1rem; ${isSelected ? '' : 'opacity: 0.7;'}">
-                        📅 ${label}
+                        📅 ${info.label}
                     </button>
                 `;
             }).join('')}
@@ -116,10 +139,9 @@ function selectPrintDate(date) {
     window.leafletConfig.selectedPrintDate = date;
     
     // 날짜 버튼 UI 업데이트
-    renderPrintDateButtons(date);
+    renderPrintDateButtonsFromDOM(date);
     
-    // 룸 체크박스 업데이트
-    updatePrintRoomCheckboxes(date);
+    // 룸 체크박스는 업데이트하지 않음 (이미 모달에 있음)
 }
 
 function updatePrintRoomCheckboxes(currentDate) {
