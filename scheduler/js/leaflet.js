@@ -24,10 +24,10 @@ window.openPrintModal = function() {
         originalOpenPrintModal();
     }
     
-    // 약간의 딜레이 후 추가 초기화 (AppState 로드 대기)
+    // 딜레이 후 추가 초기화 (AppState 로드 대기)
     setTimeout(() => {
         initPrintModalExtras();
-    }, 100);
+    }, 300);
 };
 
 function initPrintModalExtras() {
@@ -41,15 +41,21 @@ function initPrintModalExtras() {
     // 날짜 선택 버튼 렌더링
     renderPrintDateButtons(currentDate);
     
-    // 룸 체크박스 업데이트 (강제)
-    updatePrintRoomCheckboxes(currentDate);
-    
     // 키비주얼 로드
     loadKeyVisualsFromFirebase();
     
     // 기본 형식 선택 (시간표)
     window.leafletConfig.printFormat = 'schedule';
     selectPrintFormat('schedule');
+    
+    // eventDates가 아직 로드되지 않았으면 재시도
+    if (!window.AppState?.eventDates || window.AppState.eventDates.length === 0) {
+        console.log('eventDates 로드 대기 중... 1초 후 재시도');
+        setTimeout(() => {
+            const retryDate = window.AppState?.currentDate || window.AppState?.selectedDate;
+            renderPrintDateButtons(retryDate);
+        }, 1000);
+    }
 }
 
 // ============================================
@@ -199,7 +205,11 @@ function selectPrintFormat(format) {
 // 전체 룸 선택/해제
 // ============================================
 function toggleAllPrintRooms(checked) {
-    const checkboxes = document.querySelectorAll('#printRoomCheckboxes .print-room-checkbox');
+    // 여러 class 지원
+    let checkboxes = document.querySelectorAll('#printRoomCheckboxes .print-room-checkbox');
+    if (checkboxes.length === 0) {
+        checkboxes = document.querySelectorAll('#printRoomCheckboxes input[type="checkbox"]:not(#selectAllRooms)');
+    }
     checkboxes.forEach(cb => cb.checked = checked);
 }
 
@@ -209,14 +219,19 @@ function toggleAllPrintRooms(checked) {
 function executePrintWithFormat() {
     const format = window.leafletConfig.printFormat;
     
-    // 선택된 룸 가져오기 - print-room-checkbox 클래스 사용
+    // 선택된 룸 가져오기 - 여러 class 지원
     const selectedRooms = [];
-    const roomCheckboxes = document.querySelectorAll('#printRoomCheckboxes .print-room-checkbox:checked');
+    
+    // print-room-checkbox 또는 room-checkbox 모두 찾기
+    let roomCheckboxes = document.querySelectorAll('#printRoomCheckboxes .print-room-checkbox:checked');
+    if (roomCheckboxes.length === 0) {
+        roomCheckboxes = document.querySelectorAll('#printRoomCheckboxes input[type="checkbox"]:checked:not(#selectAllRooms)');
+    }
     
     console.log('체크박스 개수:', roomCheckboxes.length);
     
     roomCheckboxes.forEach(cb => {
-        if (cb.value) {
+        if (cb.value && cb.value !== 'on') {
             selectedRooms.push(cb.value);
         }
     });
