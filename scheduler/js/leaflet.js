@@ -67,14 +67,25 @@ function renderPrintDateButtons(currentDate) {
     
     const eventDates = window.AppState?.eventDates || [];
     
-    console.log('날짜 버튼 렌더링 - eventDates:', eventDates, 'currentDate:', currentDate);
+    console.log('날짜 버튼 렌더링 - eventDates:', eventDates.length, 'currentDate:', currentDate);
     
+    // eventDates가 없으면 현재 날짜 정보로 버튼 생성
     if (eventDates.length === 0) {
-        // eventDates가 없으면 현재 날짜만 표시
         if (currentDate) {
-            dateLabelEl.innerHTML = `<span style="font-weight: bold;">📅 ${currentDate}</span>`;
+            const date = new Date(currentDate);
+            const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+            const dayName = dayNames[date.getDay()];
+            const dateStr = `${date.getMonth() + 1}/${date.getDate()}(${dayName})`;
+            
+            dateLabelEl.innerHTML = `
+                <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+                    <button class="btn btn-small btn-primary" style="padding: 0.5rem 1rem;">
+                        📅 ${dateStr}
+                    </button>
+                </div>
+            `;
         } else {
-            dateLabelEl.innerHTML = `<span style="font-weight: bold;">📅 날짜 미등록</span>`;
+            dateLabelEl.innerHTML = `<span style="font-weight: bold; color: #999;">📅 날짜 정보 없음</span>`;
         }
         return;
     }
@@ -451,6 +462,12 @@ function generateLeafletHTML(selectedDate, selectedRooms, language) {
     const lectures = window.AppState?.lectures || [];
     const sessions = window.AppState?.sessions || [];
     
+    console.log('=== 리플렛 생성 시작 ===');
+    console.log('선택된 날짜:', selectedDate);
+    console.log('선택된 룸:', selectedRooms);
+    console.log('전체 강의 수:', lectures.length);
+    console.log('전체 세션 수:', sessions.length);
+    
     // 날짜 포맷
     const date = new Date(selectedDate);
     const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
@@ -459,11 +476,15 @@ function generateLeafletHTML(selectedDate, selectedRooms, language) {
     
     // 각 룸별 강의/세션 데이터 수집
     const roomData = selectedRooms.map(room => {
+        const roomSessions = getSessionsForRoom(selectedDate, room, sessions, lectures, language);
+        console.log(`룸 "${room}" 세션 수:`, roomSessions.length);
         return {
             room: room,
-            sessions: getSessionsForRoom(selectedDate, room, sessions, lectures, language)
+            sessions: roomSessions
         };
     });
+    
+    console.log('=== 리플렛 생성 완료 ===');
     
     return `
 <!DOCTYPE html>
@@ -757,11 +778,23 @@ function generateSessionBlockHTML(session) {
 function getSessionsForRoom(date, room, allSessions, allLectures, language) {
     const result = [];
     
-    // 해당 날짜/룸의 세션 필터링
-    const roomSessions = (allSessions || []).filter(s => s.date === date && s.room === room);
+    // 룸 이름 정규화 (비교용)
+    const normalizeRoom = (r) => (r || '').replace(/^\([토일월화수목금]\)/, '').trim();
+    const targetRoom = normalizeRoom(room);
     
-    // 해당 날짜/룸의 강의 필터링
-    const roomLectures = (allLectures || []).filter(l => l.date === date && l.room === room && l.startTime);
+    // 해당 날짜/룸의 세션 필터링 (정규화된 이름으로 비교)
+    const roomSessions = (allSessions || []).filter(s => {
+        const sessionRoom = normalizeRoom(s.room);
+        return s.date === date && (s.room === room || sessionRoom === targetRoom);
+    });
+    
+    // 해당 날짜/룸의 강의 필터링 (정규화된 이름으로 비교)
+    const roomLectures = (allLectures || []).filter(l => {
+        const lectureRoom = normalizeRoom(l.room);
+        return l.date === date && (l.room === room || lectureRoom === targetRoom) && l.startTime;
+    });
+    
+    console.log(`[${room}] 세션 ${roomSessions.length}개, 강의 ${roomLectures.length}개 발견`);
     
     // 시간순 정렬
     roomSessions.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
