@@ -37,8 +37,8 @@ function initPrintModalExtras() {
     
     console.log('초기화 - 현재 날짜:', currentDate);
     
-    // 날짜 선택 버튼 렌더링 (DOM에서 직접 가져오기)
-    renderPrintDateButtonsFromDOM(currentDate);
+    // 날짜 표시 (선택 없이 현재 날짜만 표시)
+    displayCurrentDate(currentDate);
     
     // 키비주얼 로드
     loadKeyVisualsFromFirebase();
@@ -49,100 +49,32 @@ function initPrintModalExtras() {
 }
 
 // ============================================
-// 날짜 선택 버튼 렌더링 (DOM에서 직접 가져오기)
+// 현재 날짜 표시 (선택 기능 없음)
 // ============================================
-function renderPrintDateButtonsFromDOM(currentDate) {
+function displayCurrentDate(currentDate) {
     const dateLabelEl = document.getElementById('printDateLabel');
     if (!dateLabelEl) return;
     
-    // 시간표의 날짜 버튼들에서 정보 추출
-    const dateSelectorBtns = document.getElementById('dateSelectorBtns');
-    const existingButtons = dateSelectorBtns?.querySelectorAll('button') || [];
-    
-    console.log('DOM에서 날짜 버튼 찾기:', existingButtons.length, '개');
-    
-    // 날짜 정보 수집
-    const dateInfoList = [];
-    existingButtons.forEach(btn => {
-        // 버튼의 onclick에서 날짜 추출 또는 data 속성 사용
-        const onclickStr = btn.getAttribute('onclick') || '';
-        const dateMatch = onclickStr.match(/selectDate\(['"]([^'"]+)['"]\)/);
-        const btnDate = dateMatch ? dateMatch[1] : null;
-        const btnLabel = btn.textContent.trim();
+    if (currentDate) {
+        const date = new Date(currentDate);
+        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+        const dayName = dayNames[date.getDay()];
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
         
-        if (btnDate || btnLabel) {
-            dateInfoList.push({
-                date: btnDate || btnLabel,
-                label: btnLabel,
-                isActive: btn.classList.contains('btn-primary') || btn.classList.contains('active')
-            });
-        }
-    });
-    
-    console.log('추출된 날짜 정보:', dateInfoList);
-    
-    // 날짜 버튼이 없으면 AppState.eventDates 시도
-    if (dateInfoList.length === 0 && window.AppState?.eventDates?.length > 0) {
-        window.AppState.eventDates.forEach(d => {
-            dateInfoList.push({
-                date: d.date,
-                label: d.label || d.date,
-                isActive: d.date === currentDate
-            });
-        });
+        // 라벨 찾기 (eventDates에서)
+        const eventInfo = window.AppState?.eventDates?.find(e => e.date === currentDate);
+        const label = eventInfo?.label || `${month}/${day}(${dayName})`;
+        
+        dateLabelEl.innerHTML = `
+            <span style="font-weight: bold;">📅 ${label}</span>
+        `;
+    } else {
+        dateLabelEl.innerHTML = `<span style="font-weight: bold; color: #999;">📅 날짜를 선택해주세요</span>`;
     }
-    
-    // 그래도 없으면 현재 날짜만 표시
-    if (dateInfoList.length === 0) {
-        if (currentDate) {
-            const date = new Date(currentDate);
-            const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-            const dayName = dayNames[date.getDay()];
-            const month = date.getMonth() + 1;
-            const day = date.getDate();
-            
-            dateLabelEl.innerHTML = `
-                <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                    <button class="btn btn-small btn-primary" style="padding: 0.5rem 1rem;">
-                        📅 ${month}/${day}(${dayName})
-                    </button>
-                </div>
-            `;
-        } else {
-            dateLabelEl.innerHTML = `<span style="font-weight: bold; color: #999;">📅 날짜 정보 없음</span>`;
-        }
-        return;
-    }
-    
-    // 날짜 버튼들 생성
-    dateLabelEl.innerHTML = `
-        <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
-            ${dateInfoList.map(info => {
-                const isSelected = info.date === currentDate || info.isActive;
-                return `
-                    <button class="btn btn-small ${isSelected ? 'btn-primary' : 'btn-secondary'}" 
-                            onclick="selectPrintDate('${info.date}')"
-                            style="padding: 0.5rem 1rem; ${isSelected ? '' : 'opacity: 0.7;'}">
-                        📅 ${info.label}
-                    </button>
-                `;
-            }).join('')}
-        </div>
-    `;
 }
 
-// ============================================
-// 날짜 선택 시 처리
-// ============================================
-function selectPrintDate(date) {
-    // 선택된 날짜 저장
-    window.leafletConfig.selectedPrintDate = date;
-    
-    // 날짜 버튼 UI 업데이트
-    renderPrintDateButtonsFromDOM(date);
-    
-    // 룸 체크박스는 업데이트하지 않음 (이미 모달에 있음)
-}
+// selectPrintDate 함수 제거됨 - 날짜는 시간표에서 선택된 것 자동 사용
 
 function updatePrintRoomCheckboxes(currentDate) {
     const container = document.getElementById('printRoomCheckboxes');
@@ -909,6 +841,140 @@ function calculateEndTime(startTime, durationMinutes) {
 }
 
 // ============================================
+// 엑셀(XLSX) 출력 기능
+// ============================================
+function exportToExcel() {
+    const currentDate = window.AppState?.currentDate || window.AppState?.selectedDate;
+    const lectures = window.AppState?.lectures || [];
+    const rooms = window.AppState?.rooms || getRoomsForCurrentDate(currentDate);
+    
+    if (lectures.length === 0) {
+        alert('내보낼 강의 데이터가 없습니다.');
+        return;
+    }
+    
+    // 현재 날짜의 강의만 필터링
+    const filteredLectures = currentDate 
+        ? lectures.filter(l => l.date === currentDate)
+        : lectures;
+    
+    // SheetJS 라이브러리 로드 확인
+    if (typeof XLSX === 'undefined') {
+        // 동적으로 SheetJS 로드
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        script.onload = () => createExcelFile(filteredLectures, rooms, currentDate);
+        script.onerror = () => {
+            alert('엑셀 라이브러리를 로드할 수 없습니다. CSV로 내보냅니다.');
+            exportToCSV(filteredLectures, rooms, currentDate);
+        };
+        document.head.appendChild(script);
+    } else {
+        createExcelFile(filteredLectures, rooms, currentDate);
+    }
+}
+
+function createExcelFile(lectures, rooms, currentDate) {
+    try {
+        // 워크북 생성
+        const wb = XLSX.utils.book_new();
+        
+        // 시간 슬롯 생성 (08:00 ~ 19:00, 5분 단위)
+        const timeSlots = [];
+        for (let h = 8; h <= 19; h++) {
+            for (let m = 0; m < 60; m += 5) {
+                timeSlots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+            }
+        }
+        
+        // 헤더 행 생성
+        const headers = ['시간', ...rooms];
+        
+        // 데이터 행 생성
+        const data = [headers];
+        
+        timeSlots.forEach(time => {
+            const row = [time];
+            rooms.forEach(room => {
+                // 해당 시간, 해당 룸의 강의 찾기
+                const lecture = lectures.find(l => 
+                    l.room === room && 
+                    l.startTime === time
+                );
+                
+                if (lecture) {
+                    const title = lecture.titleKo || lecture.title || '';
+                    const speaker = lecture.speaker || '';
+                    const affiliation = lecture.affiliation || '';
+                    row.push(`${title} (${speaker})`);
+                } else {
+                    row.push('');
+                }
+            });
+            data.push(row);
+        });
+        
+        // 워크시트 생성
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        
+        // 열 너비 설정
+        const colWidths = [{ wch: 8 }]; // 시간 열
+        rooms.forEach(() => colWidths.push({ wch: 40 })); // 룸 열들
+        ws['!cols'] = colWidths;
+        
+        // 워크시트를 워크북에 추가
+        const sheetName = currentDate ? `${currentDate} 시간표` : '시간표';
+        XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31)); // 시트명 31자 제한
+        
+        // 파일 다운로드
+        const fileName = currentDate 
+            ? `${currentDate}_시간표.xlsx`
+            : `시간표_${new Date().toISOString().split('T')[0]}.xlsx`;
+        
+        XLSX.writeFile(wb, fileName);
+        
+        console.log('엑셀 파일 생성 완료:', fileName);
+        
+    } catch (error) {
+        console.error('엑셀 생성 오류:', error);
+        alert('엑셀 파일 생성 중 오류가 발생했습니다.');
+    }
+}
+
+function exportToCSV(lectures, rooms, currentDate) {
+    // CSV 폴백
+    const timeSlots = [];
+    for (let h = 8; h <= 19; h++) {
+        for (let m = 0; m < 60; m += 5) {
+            timeSlots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+        }
+    }
+    
+    let csv = '\uFEFF'; // BOM for UTF-8
+    csv += '시간,' + rooms.map(r => `"${r}"`).join(',') + '\n';
+    
+    timeSlots.forEach(time => {
+        const row = [`"${time}"`];
+        rooms.forEach(room => {
+            const lecture = lectures.find(l => l.room === room && l.startTime === time);
+            if (lecture) {
+                const content = `${lecture.titleKo || lecture.title || ''} (${lecture.speaker || ''})`.replace(/"/g, '""');
+                row.push(`"${content}"`);
+            } else {
+                row.push('""');
+            }
+        });
+        csv += row.join(',') + '\n';
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = currentDate ? `${currentDate}_시간표.csv` : '시간표.csv';
+    link.click();
+}
+
+// ============================================
 // 초기화
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
@@ -924,4 +990,4 @@ window.selectPrintFormat = selectPrintFormat;
 window.toggleAllPrintRooms = toggleAllPrintRooms;
 window.executePrintWithFormat = executePrintWithFormat;
 window.generateLeafletPDF = generateLeafletPDF;
-window.selectPrintDate = selectPrintDate;
+window.exportToExcel = exportToExcel;
