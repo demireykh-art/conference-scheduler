@@ -841,11 +841,12 @@ function calculateEndTime(startTime, durationMinutes) {
 }
 
 // ============================================
-// 엑셀(XLSX) 출력 기능
+// 엑셀(XLSX) 출력 기능 - 룸별 시트 형식
 // ============================================
 function exportToExcel() {
     const currentDate = window.AppState?.currentDate || window.AppState?.selectedDate;
     const lectures = window.AppState?.lectures || [];
+    const sessions = window.AppState?.sessions || [];
     const rooms = window.AppState?.rooms || getRoomsForCurrentDate(currentDate);
     
     if (lectures.length === 0) {
@@ -853,125 +854,175 @@ function exportToExcel() {
         return;
     }
     
-    // 현재 날짜의 강의만 필터링
+    // 현재 날짜의 데이터만 필터링
     const filteredLectures = currentDate 
         ? lectures.filter(l => l.date === currentDate)
         : lectures;
+    const filteredSessions = currentDate
+        ? sessions.filter(s => s.date === currentDate)
+        : sessions;
     
     // SheetJS 라이브러리 로드 확인
     if (typeof XLSX === 'undefined') {
-        // 동적으로 SheetJS 로드
         const script = document.createElement('script');
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-        script.onload = () => createExcelFile(filteredLectures, rooms, currentDate);
+        script.onload = () => createRoomBasedExcel(filteredLectures, filteredSessions, rooms, currentDate);
         script.onerror = () => {
-            alert('엑셀 라이브러리를 로드할 수 없습니다. CSV로 내보냅니다.');
-            exportToCSV(filteredLectures, rooms, currentDate);
+            alert('엑셀 라이브러리를 로드할 수 없습니다.');
         };
         document.head.appendChild(script);
     } else {
-        createExcelFile(filteredLectures, rooms, currentDate);
+        createRoomBasedExcel(filteredLectures, filteredSessions, rooms, currentDate);
     }
 }
 
-function createExcelFile(lectures, rooms, currentDate) {
+function createRoomBasedExcel(lectures, sessions, rooms, currentDate) {
     try {
-        // 워크북 생성
         const wb = XLSX.utils.book_new();
         
-        // 시간 슬롯 생성 (08:00 ~ 19:00, 5분 단위)
-        const timeSlots = [];
-        for (let h = 8; h <= 19; h++) {
-            for (let m = 0; m < 60; m += 5) {
-                timeSlots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+        rooms.forEach((room, index) => {
+            // 해당 룸의 강의와 세션 필터링
+            const roomLectures = lectures.filter(l => l.room === room);
+            const roomSessions = sessions.filter(s => s.room === room);
+            
+            // 시트 데이터 생성
+            const sheetData = generateRoomSheetData(room, roomLectures, roomSessions);
+            
+            // 워크시트 생성
+            const ws = XLSX.utils.aoa_to_sheet(sheetData.data);
+            
+            // 열 너비 설정
+            ws['!cols'] = [
+                { wch: 12 },  // 시간
+                { wch: 60 },  // 강의 정보
+                { wch: 15 },  // 카테고리
+            ];
+            
+            // 행 병합 (세션 헤더용)
+            if (sheetData.merges.length > 0) {
+                ws['!merges'] = sheetData.merges;
             }
-        }
-        
-        // 헤더 행 생성
-        const headers = ['시간', ...rooms];
-        
-        // 데이터 행 생성
-        const data = [headers];
-        
-        timeSlots.forEach(time => {
-            const row = [time];
-            rooms.forEach(room => {
-                // 해당 시간, 해당 룸의 강의 찾기
-                const lecture = lectures.find(l => 
-                    l.room === room && 
-                    l.startTime === time
-                );
-                
-                if (lecture) {
-                    const title = lecture.titleKo || lecture.title || '';
-                    const speaker = lecture.speaker || '';
-                    const affiliation = lecture.affiliation || '';
-                    row.push(`${title} (${speaker})`);
-                } else {
-                    row.push('');
-                }
-            });
-            data.push(row);
+            
+            // 시트 이름 (31자 제한, 특수문자 제거)
+            let sheetName = room.replace(/[*?:/\\[\]]/g, '').substring(0, 31);
+            if (sheetName.length === 0) sheetName = `룸${index + 1}`;
+            
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
         });
-        
-        // 워크시트 생성
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        
-        // 열 너비 설정
-        const colWidths = [{ wch: 8 }]; // 시간 열
-        rooms.forEach(() => colWidths.push({ wch: 40 })); // 룸 열들
-        ws['!cols'] = colWidths;
-        
-        // 워크시트를 워크북에 추가
-        const sheetName = currentDate ? `${currentDate} 시간표` : '시간표';
-        XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31)); // 시트명 31자 제한
         
         // 파일 다운로드
         const fileName = currentDate 
-            ? `${currentDate}_시간표.xlsx`
-            : `시간표_${new Date().toISOString().split('T')[0]}.xlsx`;
+            ? `${currentDate}_시간표_룸별.xlsx`
+            : `시간표_룸별_${new Date().toISOString().split('T')[0]}.xlsx`;
         
         XLSX.writeFile(wb, fileName);
-        
         console.log('엑셀 파일 생성 완료:', fileName);
         
     } catch (error) {
         console.error('엑셀 생성 오류:', error);
-        alert('엑셀 파일 생성 중 오류가 발생했습니다.');
+        alert('엑셀 파일 생성 중 오류가 발생했습니다: ' + error.message);
     }
 }
 
-function exportToCSV(lectures, rooms, currentDate) {
-    // CSV 폴백
-    const timeSlots = [];
-    for (let h = 8; h <= 19; h++) {
-        for (let m = 0; m < 60; m += 5) {
-            timeSlots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-        }
+function generateRoomSheetData(room, lectures, sessions) {
+    const data = [];
+    const merges = [];
+    let rowIndex = 0;
+    
+    // 룸 제목
+    data.push([`🏠 ${room}`]);
+    merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 2 } });
+    rowIndex++;
+    
+    // 빈 행
+    data.push([]);
+    rowIndex++;
+    
+    // 헤더
+    data.push(['시간', '강의 정보', '카테고리']);
+    rowIndex++;
+    
+    // 세션별로 강의 그룹화
+    if (sessions.length > 0) {
+        // 세션 시간순 정렬
+        sessions.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+        
+        sessions.forEach(session => {
+            // 세션 헤더
+            const sessionName = session.name || '세션';
+            const sessionNameEn = session.nameEn || '';
+            const sessionHeader = sessionNameEn ? `📌 ${sessionName} ${sessionNameEn}` : `📌 ${sessionName}`;
+            
+            data.push([sessionHeader]);
+            merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 2 } });
+            rowIndex++;
+            
+            // 좌장 정보
+            if (session.moderator) {
+                data.push([`    좌장: ${session.moderator} ${session.moderatorAffiliation || ''}`]);
+                merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 2 } });
+                rowIndex++;
+            }
+            
+            // 세션에 속한 강의 필터링
+            const sessionStart = session.startTime || '00:00';
+            const sessionEnd = session.endTime || '23:59';
+            const sessionLectures = lectures.filter(l => {
+                const lectureTime = l.startTime || '';
+                return lectureTime >= sessionStart && lectureTime < sessionEnd;
+            }).sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+            
+            // 강의 추가
+            sessionLectures.forEach(lecture => {
+                const timeStr = `${lecture.startTime || ''}~${calculateEndTime(lecture.startTime, lecture.duration || 15)}`;
+                const title = lecture.titleKo || lecture.title || '';
+                const titleEn = lecture.titleEn || '';
+                const speaker = lecture.speaker || '';
+                const affiliation = lecture.affiliation || '';
+                const category = lecture.category || '';
+                
+                // 강의 정보 조합
+                let lectureInfo = title;
+                if (titleEn && titleEn !== title) {
+                    lectureInfo += `\n${titleEn}`;
+                }
+                lectureInfo += `\n👤 ${speaker}`;
+                if (affiliation) {
+                    lectureInfo += ` (${affiliation})`;
+                }
+                lectureInfo += `\n⏱️ ${lecture.duration || 15}분`;
+                
+                data.push([timeStr, lectureInfo, category]);
+                rowIndex++;
+            });
+            
+            // 세션 간 빈 행
+            data.push([]);
+            rowIndex++;
+        });
+    } else {
+        // 세션이 없으면 강의만 시간순으로
+        lectures.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+        
+        lectures.forEach(lecture => {
+            const timeStr = `${lecture.startTime || ''}~${calculateEndTime(lecture.startTime, lecture.duration || 15)}`;
+            const title = lecture.titleKo || lecture.title || '';
+            const speaker = lecture.speaker || '';
+            const affiliation = lecture.affiliation || '';
+            const category = lecture.category || '';
+            
+            let lectureInfo = title;
+            lectureInfo += `\n👤 ${speaker}`;
+            if (affiliation) {
+                lectureInfo += ` (${affiliation})`;
+            }
+            
+            data.push([timeStr, lectureInfo, category]);
+            rowIndex++;
+        });
     }
     
-    let csv = '\uFEFF'; // BOM for UTF-8
-    csv += '시간,' + rooms.map(r => `"${r}"`).join(',') + '\n';
-    
-    timeSlots.forEach(time => {
-        const row = [`"${time}"`];
-        rooms.forEach(room => {
-            const lecture = lectures.find(l => l.room === room && l.startTime === time);
-            if (lecture) {
-                const content = `${lecture.titleKo || lecture.title || ''} (${lecture.speaker || ''})`.replace(/"/g, '""');
-                row.push(`"${content}"`);
-            } else {
-                row.push('""');
-            }
-        });
-        csv += row.join(',') + '\n';
-    });
-    
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = currentDate ? `${currentDate}_시간표.csv` : '시간표.csv';
-    link.click();
+    return { data, merges };
 }
 
 // ============================================
