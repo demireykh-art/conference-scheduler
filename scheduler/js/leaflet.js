@@ -6,8 +6,7 @@
 window.leafletConfig = {
     leftKeyVisual: null,
     rightKeyVisual: null,
-    printFormat: 'schedule',
-    selectedPrintDate: null
+    printFormat: 'schedule'  // 'schedule' 또는 'leaflet'
 };
 
 // ============================================
@@ -16,29 +15,26 @@ window.leafletConfig = {
 const originalOpenPrintModal = window.openPrintModal;
 
 window.openPrintModal = function() {
-    // 모달 표시
-    document.getElementById('printModal').style.display = 'flex';
-    
-    // 기존 openPrintModal 호출 (룸 체크박스 생성 등)
+    // 기존 openPrintModal 호출 (있으면)
     if (typeof originalOpenPrintModal === 'function') {
         originalOpenPrintModal();
+    } else {
+        document.getElementById('printModal').style.display = 'flex';
     }
     
-    // 딜레이 후 추가 초기화 (AppState 로드 대기)
-    setTimeout(() => {
-        initPrintModalExtras();
-    }, 300);
+    // 추가 초기화
+    initPrintModalExtras();
 };
 
 function initPrintModalExtras() {
-    // 현재 날짜 가져오기 (시간표에서 선택된 날짜)
+    // 현재 날짜 가져오기
     const currentDate = window.AppState?.currentDate || window.AppState?.selectedDate;
-    window.leafletConfig.selectedPrintDate = currentDate;
     
-    console.log('초기화 - 현재 날짜:', currentDate);
+    // 날짜 선택 버튼 렌더링
+    renderPrintDateButtons(currentDate);
     
-    // 날짜 표시 (선택 없이 현재 날짜만 표시)
-    displayCurrentDate(currentDate);
+    // 룸 체크박스 업데이트
+    updatePrintRoomCheckboxes(currentDate);
     
     // 키비주얼 로드
     loadKeyVisualsFromFirebase();
@@ -49,40 +45,56 @@ function initPrintModalExtras() {
 }
 
 // ============================================
-// 현재 날짜 표시 (선택 기능 없음)
+// 날짜 선택 버튼 렌더링
 // ============================================
-function displayCurrentDate(currentDate) {
+function renderPrintDateButtons(currentDate) {
     const dateLabelEl = document.getElementById('printDateLabel');
     if (!dateLabelEl) return;
     
-    if (currentDate) {
-        const date = new Date(currentDate);
-        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-        const dayName = dayNames[date.getDay()];
-        const month = date.getMonth() + 1;
-        const day = date.getDate();
-        
-        // 라벨 찾기 (eventDates에서)
-        const eventInfo = window.AppState?.eventDates?.find(e => e.date === currentDate);
-        const label = eventInfo?.label || `${month}/${day}(${dayName})`;
-        
-        dateLabelEl.innerHTML = `
-            <span style="font-weight: bold;">📅 ${label}</span>
-        `;
-    } else {
-        dateLabelEl.innerHTML = `<span style="font-weight: bold; color: #999;">📅 날짜를 선택해주세요</span>`;
+    const eventDates = window.AppState?.eventDates || [];
+    
+    if (eventDates.length === 0) {
+        dateLabelEl.innerHTML = `<span style="font-weight: bold;">📅 날짜 미등록</span>`;
+        return;
     }
+    
+    // 날짜 버튼들 생성
+    dateLabelEl.innerHTML = `
+        <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+            ${eventDates.map(dateInfo => {
+                const isSelected = dateInfo.date === currentDate;
+                const label = dateInfo.label || dateInfo.date;
+                return `
+                    <button class="btn btn-small ${isSelected ? 'btn-primary' : 'btn-secondary'}" 
+                            onclick="selectPrintDate('${dateInfo.date}')"
+                            style="padding: 0.5rem 1rem; ${isSelected ? '' : 'opacity: 0.7;'}">
+                        📅 ${label}
+                    </button>
+                `;
+            }).join('')}
+        </div>
+    `;
 }
 
-// selectPrintDate 함수 제거됨 - 날짜는 시간표에서 선택된 것 자동 사용
+// ============================================
+// 날짜 선택 시 처리
+// ============================================
+function selectPrintDate(date) {
+    // 선택된 날짜 저장
+    window.leafletConfig.selectedPrintDate = date;
+    
+    // 날짜 버튼 UI 업데이트
+    renderPrintDateButtons(date);
+    
+    // 룸 체크박스 업데이트
+    updatePrintRoomCheckboxes(date);
+}
 
 function updatePrintRoomCheckboxes(currentDate) {
     const container = document.getElementById('printRoomCheckboxes');
     if (!container) return;
     
     let rooms = getRoomsForCurrentDate(currentDate);
-    
-    console.log('룸 체크박스 업데이트 - 날짜:', currentDate, '룸:', rooms);
     
     if (rooms.length === 0) {
         container.innerHTML = '<p style="color: #999; text-align: center; padding: 1rem;">등록된 룸이 없습니다.</p>';
@@ -96,7 +108,7 @@ function updatePrintRoomCheckboxes(currentDate) {
         </label>
         ${rooms.map(room => `
             <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #f5f5f5; border-radius: 6px; cursor: pointer;">
-                <input type="checkbox" class="print-room-checkbox" value="${room}" checked style="width: 18px; height: 18px; accent-color: #667eea;">
+                <input type="checkbox" class="room-checkbox" value="${room}" checked style="width: 18px; height: 18px; accent-color: #667eea;">
                 ${room}
             </label>
         `).join('')}
@@ -170,11 +182,7 @@ function selectPrintFormat(format) {
 // 전체 룸 선택/해제
 // ============================================
 function toggleAllPrintRooms(checked) {
-    // 여러 class 지원
-    let checkboxes = document.querySelectorAll('#printRoomCheckboxes .print-room-checkbox');
-    if (checkboxes.length === 0) {
-        checkboxes = document.querySelectorAll('#printRoomCheckboxes input[type="checkbox"]:not(#selectAllRooms)');
-    }
+    const checkboxes = document.querySelectorAll('.room-checkbox');
     checkboxes.forEach(cb => cb.checked = checked);
 }
 
@@ -184,24 +192,16 @@ function toggleAllPrintRooms(checked) {
 function executePrintWithFormat() {
     const format = window.leafletConfig.printFormat;
     
-    // 선택된 룸 가져오기 - 여러 class 지원
+    // 선택된 룸 가져오기 - printRoomCheckboxes 내의 체크박스만 확인
     const selectedRooms = [];
-    
-    // print-room-checkbox 또는 room-checkbox 모두 찾기
-    let roomCheckboxes = document.querySelectorAll('#printRoomCheckboxes .print-room-checkbox:checked');
-    if (roomCheckboxes.length === 0) {
-        roomCheckboxes = document.querySelectorAll('#printRoomCheckboxes input[type="checkbox"]:checked:not(#selectAllRooms)');
-    }
-    
-    console.log('체크박스 개수:', roomCheckboxes.length);
-    
+    const roomCheckboxes = document.querySelectorAll('#printRoomCheckboxes .room-checkbox:checked');
     roomCheckboxes.forEach(cb => {
-        if (cb.value && cb.value !== 'on') {
+        if (cb.value) {
             selectedRooms.push(cb.value);
         }
     });
     
-    console.log('선택된 룸:', selectedRooms);
+    console.log('선택된 룸:', selectedRooms); // 디버깅용
     
     if (selectedRooms.length === 0) {
         alert('출력할 룸을 선택해주세요.');
@@ -210,8 +210,6 @@ function executePrintWithFormat() {
     
     // 선택된 날짜 가져오기
     const selectedDate = window.leafletConfig.selectedPrintDate || window.AppState?.currentDate || window.AppState?.selectedDate;
-    
-    console.log('선택된 날짜:', selectedDate, '출력 형식:', format);
     
     if (format === 'leaflet') {
         // 리플렛 형식으로 출력
@@ -268,7 +266,7 @@ function executeSchedulePrint(selectedRooms) {
         window.originalExecutePrint(selectedRooms);
     } else if (typeof executePrint === 'function') {
         // 선택된 룸으로 인쇄
-        const checkboxes = document.querySelectorAll('#printRoomCheckboxes .print-room-checkbox');
+        const checkboxes = document.querySelectorAll('#printRoomCheckboxes input[type="checkbox"]:not(#selectAllRooms)');
         checkboxes.forEach(cb => {
             cb.checked = selectedRooms.includes(cb.value);
         });
@@ -333,41 +331,24 @@ function updateKeyVisualPreviews() {
 }
 
 function saveKeyVisualToFirebase(side, base64) {
-    if (!window.db) {
-        console.log('Firebase DB가 없어서 키비주얼을 저장할 수 없습니다.');
-        return;
-    }
+    if (!window.db) return;
     
     const path = `config/leaflet/keyVisual_${side}`;
-    console.log('키비주얼 저장 중:', path);
-    
-    window.db.ref(path).set(base64).then(() => {
-        console.log('키비주얼 저장 완료:', side);
-    }).catch(err => {
+    window.db.ref(path).set(base64).catch(err => {
         console.error('키비주얼 저장 실패:', err);
     });
 }
 
 function loadKeyVisualsFromFirebase() {
-    if (!window.db) {
-        console.log('Firebase DB가 없어서 키비주얼을 로드할 수 없습니다.');
-        return;
-    }
-    
-    console.log('키비주얼 로드 시도...');
+    if (!window.db) return;
     
     window.db.ref('config/leaflet').once('value').then(snapshot => {
         const data = snapshot.val();
-        console.log('키비주얼 데이터:', data);
-        
         if (data) {
             window.leafletConfig.leftKeyVisual = data.keyVisual_left || null;
             window.leafletConfig.rightKeyVisual = data.keyVisual_right || null;
-            console.log('키비주얼 로드 완료 - left:', !!data.keyVisual_left, 'right:', !!data.keyVisual_right);
-        } else {
-            console.log('저장된 키비주얼 없음');
+            updateKeyVisualPreviews();
         }
-        updateKeyVisualPreviews();
     }).catch(err => {
         console.error('키비주얼 로드 실패:', err);
     });
@@ -416,12 +397,6 @@ function generateLeafletHTML(selectedDate, selectedRooms, language) {
     const lectures = window.AppState?.lectures || [];
     const sessions = window.AppState?.sessions || [];
     
-    console.log('=== 리플렛 생성 시작 ===');
-    console.log('선택된 날짜:', selectedDate);
-    console.log('선택된 룸:', selectedRooms);
-    console.log('전체 강의 수:', lectures.length);
-    console.log('전체 세션 수:', sessions.length);
-    
     // 날짜 포맷
     const date = new Date(selectedDate);
     const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
@@ -430,15 +405,11 @@ function generateLeafletHTML(selectedDate, selectedRooms, language) {
     
     // 각 룸별 강의/세션 데이터 수집
     const roomData = selectedRooms.map(room => {
-        const roomSessions = getSessionsForRoom(selectedDate, room, sessions, lectures, language);
-        console.log(`룸 "${room}" 세션 수:`, roomSessions.length);
         return {
             room: room,
-            sessions: roomSessions
+            sessions: getSessionsForRoom(selectedDate, room, sessions, lectures, language)
         };
     });
-    
-    console.log('=== 리플렛 생성 완료 ===');
     
     return `
 <!DOCTYPE html>
@@ -732,23 +703,11 @@ function generateSessionBlockHTML(session) {
 function getSessionsForRoom(date, room, allSessions, allLectures, language) {
     const result = [];
     
-    // 룸 이름 정규화 (비교용)
-    const normalizeRoom = (r) => (r || '').replace(/^\([토일월화수목금]\)/, '').trim();
-    const targetRoom = normalizeRoom(room);
+    // 해당 날짜/룸의 세션 필터링
+    const roomSessions = (allSessions || []).filter(s => s.date === date && s.room === room);
     
-    // 해당 날짜/룸의 세션 필터링 (정규화된 이름으로 비교)
-    const roomSessions = (allSessions || []).filter(s => {
-        const sessionRoom = normalizeRoom(s.room);
-        return s.date === date && (s.room === room || sessionRoom === targetRoom);
-    });
-    
-    // 해당 날짜/룸의 강의 필터링 (정규화된 이름으로 비교)
-    const roomLectures = (allLectures || []).filter(l => {
-        const lectureRoom = normalizeRoom(l.room);
-        return l.date === date && (l.room === room || lectureRoom === targetRoom) && l.startTime;
-    });
-    
-    console.log(`[${room}] 세션 ${roomSessions.length}개, 강의 ${roomLectures.length}개 발견`);
+    // 해당 날짜/룸의 강의 필터링
+    const roomLectures = (allLectures || []).filter(l => l.date === date && l.room === room && l.startTime);
     
     // 시간순 정렬
     roomSessions.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
@@ -841,191 +800,6 @@ function calculateEndTime(startTime, durationMinutes) {
 }
 
 // ============================================
-// 엑셀(XLSX) 출력 기능 - 룸별 시트 형식
-// ============================================
-function exportToExcel() {
-    const currentDate = window.AppState?.currentDate || window.AppState?.selectedDate;
-    const lectures = window.AppState?.lectures || [];
-    const sessions = window.AppState?.sessions || [];
-    const rooms = window.AppState?.rooms || getRoomsForCurrentDate(currentDate);
-    
-    if (lectures.length === 0) {
-        alert('내보낼 강의 데이터가 없습니다.');
-        return;
-    }
-    
-    // 현재 날짜의 데이터만 필터링
-    const filteredLectures = currentDate 
-        ? lectures.filter(l => l.date === currentDate)
-        : lectures;
-    const filteredSessions = currentDate
-        ? sessions.filter(s => s.date === currentDate)
-        : sessions;
-    
-    // SheetJS 라이브러리 로드 확인
-    if (typeof XLSX === 'undefined') {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-        script.onload = () => createRoomBasedExcel(filteredLectures, filteredSessions, rooms, currentDate);
-        script.onerror = () => {
-            alert('엑셀 라이브러리를 로드할 수 없습니다.');
-        };
-        document.head.appendChild(script);
-    } else {
-        createRoomBasedExcel(filteredLectures, filteredSessions, rooms, currentDate);
-    }
-}
-
-function createRoomBasedExcel(lectures, sessions, rooms, currentDate) {
-    try {
-        const wb = XLSX.utils.book_new();
-        
-        rooms.forEach((room, index) => {
-            // 해당 룸의 강의와 세션 필터링
-            const roomLectures = lectures.filter(l => l.room === room);
-            const roomSessions = sessions.filter(s => s.room === room);
-            
-            // 시트 데이터 생성
-            const sheetData = generateRoomSheetData(room, roomLectures, roomSessions);
-            
-            // 워크시트 생성
-            const ws = XLSX.utils.aoa_to_sheet(sheetData.data);
-            
-            // 열 너비 설정
-            ws['!cols'] = [
-                { wch: 12 },  // 시간
-                { wch: 60 },  // 강의 정보
-                { wch: 15 },  // 카테고리
-            ];
-            
-            // 행 병합 (세션 헤더용)
-            if (sheetData.merges.length > 0) {
-                ws['!merges'] = sheetData.merges;
-            }
-            
-            // 시트 이름 (31자 제한, 특수문자 제거)
-            let sheetName = room.replace(/[*?:/\\[\]]/g, '').substring(0, 31);
-            if (sheetName.length === 0) sheetName = `룸${index + 1}`;
-            
-            XLSX.utils.book_append_sheet(wb, ws, sheetName);
-        });
-        
-        // 파일 다운로드
-        const fileName = currentDate 
-            ? `${currentDate}_시간표_룸별.xlsx`
-            : `시간표_룸별_${new Date().toISOString().split('T')[0]}.xlsx`;
-        
-        XLSX.writeFile(wb, fileName);
-        console.log('엑셀 파일 생성 완료:', fileName);
-        
-    } catch (error) {
-        console.error('엑셀 생성 오류:', error);
-        alert('엑셀 파일 생성 중 오류가 발생했습니다: ' + error.message);
-    }
-}
-
-function generateRoomSheetData(room, lectures, sessions) {
-    const data = [];
-    const merges = [];
-    let rowIndex = 0;
-    
-    // 룸 제목
-    data.push([`🏠 ${room}`]);
-    merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 2 } });
-    rowIndex++;
-    
-    // 빈 행
-    data.push([]);
-    rowIndex++;
-    
-    // 헤더
-    data.push(['시간', '강의 정보', '카테고리']);
-    rowIndex++;
-    
-    // 세션별로 강의 그룹화
-    if (sessions.length > 0) {
-        // 세션 시간순 정렬
-        sessions.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
-        
-        sessions.forEach(session => {
-            // 세션 헤더
-            const sessionName = session.name || '세션';
-            const sessionNameEn = session.nameEn || '';
-            const sessionHeader = sessionNameEn ? `📌 ${sessionName} ${sessionNameEn}` : `📌 ${sessionName}`;
-            
-            data.push([sessionHeader]);
-            merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 2 } });
-            rowIndex++;
-            
-            // 좌장 정보
-            if (session.moderator) {
-                data.push([`    좌장: ${session.moderator} ${session.moderatorAffiliation || ''}`]);
-                merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 2 } });
-                rowIndex++;
-            }
-            
-            // 세션에 속한 강의 필터링
-            const sessionStart = session.startTime || '00:00';
-            const sessionEnd = session.endTime || '23:59';
-            const sessionLectures = lectures.filter(l => {
-                const lectureTime = l.startTime || '';
-                return lectureTime >= sessionStart && lectureTime < sessionEnd;
-            }).sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
-            
-            // 강의 추가
-            sessionLectures.forEach(lecture => {
-                const timeStr = `${lecture.startTime || ''}~${calculateEndTime(lecture.startTime, lecture.duration || 15)}`;
-                const title = lecture.titleKo || lecture.title || '';
-                const titleEn = lecture.titleEn || '';
-                const speaker = lecture.speaker || '';
-                const affiliation = lecture.affiliation || '';
-                const category = lecture.category || '';
-                
-                // 강의 정보 조합
-                let lectureInfo = title;
-                if (titleEn && titleEn !== title) {
-                    lectureInfo += `\n${titleEn}`;
-                }
-                lectureInfo += `\n👤 ${speaker}`;
-                if (affiliation) {
-                    lectureInfo += ` (${affiliation})`;
-                }
-                lectureInfo += `\n⏱️ ${lecture.duration || 15}분`;
-                
-                data.push([timeStr, lectureInfo, category]);
-                rowIndex++;
-            });
-            
-            // 세션 간 빈 행
-            data.push([]);
-            rowIndex++;
-        });
-    } else {
-        // 세션이 없으면 강의만 시간순으로
-        lectures.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
-        
-        lectures.forEach(lecture => {
-            const timeStr = `${lecture.startTime || ''}~${calculateEndTime(lecture.startTime, lecture.duration || 15)}`;
-            const title = lecture.titleKo || lecture.title || '';
-            const speaker = lecture.speaker || '';
-            const affiliation = lecture.affiliation || '';
-            const category = lecture.category || '';
-            
-            let lectureInfo = title;
-            lectureInfo += `\n👤 ${speaker}`;
-            if (affiliation) {
-                lectureInfo += ` (${affiliation})`;
-            }
-            
-            data.push([timeStr, lectureInfo, category]);
-            rowIndex++;
-        });
-    }
-    
-    return { data, merges };
-}
-
-// ============================================
 // 초기화
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
@@ -1041,4 +815,4 @@ window.selectPrintFormat = selectPrintFormat;
 window.toggleAllPrintRooms = toggleAllPrintRooms;
 window.executePrintWithFormat = executePrintWithFormat;
 window.generateLeafletPDF = generateLeafletPDF;
-window.exportToExcel = exportToExcel;
+window.selectPrintDate = selectPrintDate;

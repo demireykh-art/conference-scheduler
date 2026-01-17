@@ -922,35 +922,100 @@ window.executePrint = function() {
         return;
     }
     
+    // 언어 선택 확인
+    const languageRadio = document.querySelector('input[name="printLanguage"]:checked');
+    const language = languageRadio ? languageRadio.value : 'ko';
+    
     closePrintModal();
     
     // 선택된 룸들의 시간표를 생성하여 인쇄
-    printSelectedRooms(selectedRooms);
+    printSelectedRooms(selectedRooms, language);
 };
 
-window.printSelectedRooms = function(roomIndices) {
-    // 룸별 상세 보기 포맷으로 인쇄용 HTML 생성
+// executePrintWithFormat은 executePrint로 연결
+window.executePrintWithFormat = function() {
+    // 출력 형식 확인 (schedule 또는 leaflet)
+    const formatSchedule = document.getElementById('formatSchedule');
+    const isScheduleFormat = formatSchedule && formatSchedule.style.borderColor === 'rgb(102, 126, 234)';
+    
+    if (!isScheduleFormat) {
+        // 리플렛 형식인 경우 기존 리플렛 출력 함수 호출
+        if (typeof window.generateLeafletPDF === 'function') {
+            window.generateLeafletPDF();
+            return;
+        }
+    }
+    
+    // 시간표 형식인 경우
+    window.executePrint();
+};
+
+window.printSelectedRooms = function(roomIndices, language = 'ko') {
+    const isEnglish = language === 'en';
+    const dateLabel = AppState.currentDate === '2026-04-11' ? (isEnglish ? 'Saturday' : '토요일') : (isEnglish ? 'Sunday' : '일요일');
+    const dateShort = AppState.currentDate === '2026-04-11' ? (isEnglish ? 'Sat' : '토') : (isEnglish ? 'Sun' : '일');
+    
+    // 1안 형식 스타일
     let printContent = `
         <html>
         <head>
-            <title>${AppState.currentDate} 시간표</title>
+            <title>${AppState.currentDate} ${isEnglish ? 'Schedule' : '시간표'}</title>
             <style>
-                @page { margin: 1cm; }
-                body { font-family: 'Malgun Gothic', sans-serif; font-size: 11pt; }
+                @page { margin: 1.5cm; }
+                body { font-family: 'Malgun Gothic', 'Arial', sans-serif; font-size: 10pt; line-height: 1.4; }
                 .room-section { page-break-after: always; margin-bottom: 2rem; }
                 .room-section:last-child { page-break-after: avoid; }
-                .room-title { font-size: 16pt; font-weight: bold; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #333; }
-                table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
-                th { background: #663399; color: white; }
-                .session-row { background: #f0e6ff; font-weight: bold; }
-                .session-row td { border-left: 4px solid #663399; }
-                .time-cell { width: 80px; text-align: center; font-weight: 500; }
-                .category-badge { display: inline-block; background: #9c27b0; color: white; padding: 2px 8px; border-radius: 12px; font-size: 9pt; float: right; }
-                .lecture-title { font-weight: 600; margin-bottom: 4px; }
-                .lecture-meta { font-size: 10pt; color: #666; }
-                .coffee-break { background: #fff3e0; }
-                .lunch-break { background: #ffebee; }
+                .room-title { 
+                    font-size: 14pt; 
+                    font-weight: bold; 
+                    padding: 0.75rem 1rem;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border-radius: 8px;
+                    margin-bottom: 1.5rem;
+                }
+                .session-block { margin-bottom: 1.5rem; }
+                .session-header {
+                    font-size: 11pt;
+                    font-weight: bold;
+                    padding: 0.5rem 0;
+                    border-bottom: 2px solid #667eea;
+                    margin-bottom: 0.75rem;
+                    color: #333;
+                }
+                .session-time { color: #667eea; }
+                .lecture-item {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    padding: 0.4rem 0;
+                    border-bottom: 1px dotted #ddd;
+                }
+                .lecture-item:last-child { border-bottom: none; }
+                .lecture-title { 
+                    flex: 1; 
+                    padding-right: 1rem;
+                    color: #333;
+                }
+                .lecture-speaker {
+                    text-align: right;
+                    white-space: nowrap;
+                    color: #555;
+                    min-width: 150px;
+                }
+                .break-item {
+                    padding: 0.5rem;
+                    margin: 0.5rem 0;
+                    background: #fff3e0;
+                    border-radius: 4px;
+                    text-align: center;
+                    color: #e65100;
+                    font-weight: 500;
+                }
+                .lunch-item {
+                    background: #ffebee;
+                    color: #c62828;
+                }
             </style>
         </head>
         <body>
@@ -958,7 +1023,7 @@ window.printSelectedRooms = function(roomIndices) {
     
     roomIndices.forEach((roomIndex, idx) => {
         const room = AppState.rooms[roomIndex];
-        printContent += generateRoomPrintContent(room, roomIndex);
+        printContent += generateRoomPrintContent(room, roomIndex, isEnglish, dateShort);
     });
     
     printContent += '</body></html>';
@@ -973,20 +1038,10 @@ window.printSelectedRooms = function(roomIndices) {
     }, 500);
 };
 
-function generateRoomPrintContent(room, roomIndex) {
-    const dateLabel = AppState.currentDate === '2026-04-11' ? '토요일' : '일요일';
-    
+function generateRoomPrintContent(room, roomIndex, isEnglish, dateShort) {
     let html = `
         <div class="room-section">
-            <div class="room-title">🏠 (${dateLabel})${room}</div>
-            <table>
-                <thead>
-                    <tr>
-                        <th class="time-cell">시간</th>
-                        <th>강의 정보</th>
-                    </tr>
-                </thead>
-                <tbody>
+            <div class="room-title">(${dateShort}) ${room}</div>
     `;
     
     // 해당 룸의 세션들
@@ -1003,59 +1058,133 @@ function generateRoomPrintContent(room, roomIndex) {
         }))
         .sort((a, b) => a.time.localeCompare(b.time));
     
-    // 시간순 정렬하여 출력
-    const allItems = [];
-    
-    roomSessions.forEach(session => {
-        allItems.push({ type: 'session', time: session.time, data: session });
-    });
-    
-    roomLectures.forEach(lecture => {
-        allItems.push({ type: 'lecture', time: lecture.time, data: lecture });
-    });
-    
-    allItems.sort((a, b) => a.time.localeCompare(b.time));
-    
-    allItems.forEach(item => {
-        if (item.type === 'session') {
-            const session = item.data;
-            const sessionName = session.name || '';
-            const moderator = session.moderator ? `좌장: ${session.moderator}` : '';
-            html += `
-                <tr class="session-row">
-                    <td class="time-cell"></td>
-                    <td>📌 ${sessionName} ${moderator ? `<span style="font-weight:normal; font-size:10pt;">(${moderator})</span>` : ''}</td>
-                </tr>
-            `;
-        } else {
-            const lecture = item.data;
-            const duration = lecture.duration || 15;
-            const endTime = addMinutesToTime(item.time, duration);
+    // 세션별로 그룹화
+    roomSessions.forEach((session, sessionIdx) => {
+        const sessionStartTime = session.time;
+        const sessionDuration = session.duration || 60;
+        const sessionEndMinutes = timeToMinutes(sessionStartTime) + sessionDuration;
+        
+        // 다음 세션 시작 시간 (또는 세션 끝 시간)
+        const nextSession = roomSessions[sessionIdx + 1];
+        const nextSessionStart = nextSession ? timeToMinutes(nextSession.time) : sessionEndMinutes;
+        
+        // 세션에 속하는 강의들 찾기
+        const sessionLectures = roomLectures.filter(lecture => {
+            const lectureMinutes = timeToMinutes(lecture.time);
+            return lectureMinutes >= timeToMinutes(sessionStartTime) && lectureMinutes < nextSessionStart;
+        });
+        
+        const sessionName = session.name || '';
+        
+        html += `
+            <div class="session-block">
+                <div class="session-header">
+                    <span class="session-time">${sessionStartTime}</span> - ${sessionName}
+                </div>
+        `;
+        
+        sessionLectures.forEach(lecture => {
             const category = lecture.category || '';
-            const title = lecture.titleKo || '';
-            const speaker = lecture.speakerKo || '미정';
-            const affiliation = lecture.affiliation || '';
-            
             const isBreak = lecture.isBreak || (AppConfig.BREAK_TYPES || []).includes(category);
-            const rowClass = category === 'Coffee Break' ? 'coffee-break' : (category === 'Lunch' ? 'lunch-break' : '');
             
-            const categoryColor = AppConfig.categoryColors[category] || '#9c27b0';
-            
-            html += `
-                <tr class="${rowClass}">
-                    <td class="time-cell">${item.time}<br><span style="font-size:9pt;color:#999;">~${endTime}</span></td>
-                    <td>
-                        <span class="category-badge" style="background:${categoryColor};">${category}</span>
-                        <div class="lecture-title">${title}</div>
-                        <div class="lecture-meta">👤 ${speaker}${affiliation ? ` (${affiliation})` : ''} | ⏱️ ${duration}분</div>
-                    </td>
-                </tr>
-            `;
-        }
+            if (isBreak) {
+                // Coffee Break, Lunch 등
+                const breakClass = category === 'Lunch' ? 'break-item lunch-item' : 'break-item';
+                const breakTitle = isEnglish ? (lecture.titleEn || lecture.titleKo) : lecture.titleKo;
+                html += `<div class="${breakClass}">${breakTitle || category}</div>`;
+            } else {
+                // 일반 강의
+                const title = isEnglish ? (lecture.titleEn || lecture.titleKo) : lecture.titleKo;
+                const speakerDisplay = getSpeakerDisplay(lecture, isEnglish);
+                
+                html += `
+                    <div class="lecture-item">
+                        <span class="lecture-title">${title}</span>
+                        <span class="lecture-speaker">${speakerDisplay}</span>
+                    </div>
+                `;
+            }
+        });
+        
+        html += `</div>`;
     });
     
-    html += '</tbody></table></div>';
+    // 세션에 속하지 않는 강의들 (맨 앞 부분)
+    const firstSessionTime = roomSessions.length > 0 ? timeToMinutes(roomSessions[0].time) : Infinity;
+    const orphanLectures = roomLectures.filter(lecture => {
+        const lectureMinutes = timeToMinutes(lecture.time);
+        return lectureMinutes < firstSessionTime;
+    });
+    
+    if (orphanLectures.length > 0 && roomSessions.length === 0) {
+        // 세션이 없는 경우 모든 강의 출력
+        html += `<div class="session-block">`;
+        roomLectures.forEach(lecture => {
+            const category = lecture.category || '';
+            const isBreak = lecture.isBreak || (AppConfig.BREAK_TYPES || []).includes(category);
+            
+            if (isBreak) {
+                const breakClass = category === 'Lunch' ? 'break-item lunch-item' : 'break-item';
+                const breakTitle = isEnglish ? (lecture.titleEn || lecture.titleKo) : lecture.titleKo;
+                html += `<div class="${breakClass}">${breakTitle || category}</div>`;
+            } else {
+                const title = isEnglish ? (lecture.titleEn || lecture.titleKo) : lecture.titleKo;
+                const speakerDisplay = getSpeakerDisplay(lecture, isEnglish);
+                
+                html += `
+                    <div class="lecture-item">
+                        <span class="lecture-title">${title}</span>
+                        <span class="lecture-speaker">${speakerDisplay}</span>
+                    </div>
+                `;
+            }
+        });
+        html += `</div>`;
+    }
+    
+    html += `</div>`;
     return html;
+}
+
+// 연자 표시 생성 함수
+function getSpeakerDisplay(lecture, isEnglish) {
+    if (isEnglish) {
+        // 영문: 영문이름 (국가)
+        const speakerEn = lecture.speakerEn || lecture.speakerKo || '';
+        const speakerKo = lecture.speakerKo || '';
+        
+        // 한글 이름인지 확인 (한글이 포함되어 있으면 한국인으로 간주)
+        const isKorean = /[가-힣]/.test(speakerKo);
+        
+        let country = 'Korea';
+        if (!isKorean && lecture.affiliation) {
+            // 외국인의 경우 소속에서 국가 추출 시도
+            country = lecture.affiliation;
+        } else if (lecture.affiliationEn) {
+            country = lecture.affiliationEn;
+        } else if (!isKorean) {
+            country = lecture.affiliation || '';
+        }
+        
+        // 한국인이면 무조건 Korea
+        if (isKorean) {
+            country = 'Korea';
+        }
+        
+        const displayName = speakerEn || speakerKo;
+        return displayName ? `${displayName} (${country})` : '';
+    } else {
+        // 한글: 연자명 (소속)
+        const speaker = lecture.speakerKo || '';
+        const affiliation = lecture.affiliation || '';
+        return speaker ? `${speaker}${affiliation ? ` (${affiliation})` : ''}` : '';
+    }
+}
+
+function timeToMinutes(time) {
+    if (!time) return 0;
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
 }
 
 // ============================================
