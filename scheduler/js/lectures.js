@@ -1,5 +1,9 @@
 /**
  * lectures.js - 강의 CRUD 및 관리
+ * 수정사항:
+ * 1. openEditModal에서 ID 타입 비교 문제 해결 (== 사용)
+ * 2. 수정 모달에 연자 자동완성 기능 추가
+ * 3. schedule에서 직접 강의를 찾는 로직 추가
  */
 
 /**
@@ -451,17 +455,35 @@ window.addLectureToList = function() {
 };
 
 /**
- * 강의 수정 모달 열기
+ * 강의 수정 모달 열기 - 수정됨
+ * 1. ID 타입 비교 문제 해결 (== 사용)
+ * 2. schedule에서도 강의 검색
+ * 3. 연자 자동완성 기능 설정
  */
 window.openEditModal = function(lectureId) {
-    const lecture = AppState.lectures.find(l => l.id === lectureId);
-    if (!lecture) return;
+    // 1. 먼저 lectures 배열에서 찾기 (== 로 타입 무관 비교)
+    let lecture = AppState.lectures.find(l => l.id == lectureId);
+    
+    // 2. lectures에 없으면 schedule에서 찾기 (초기 데이터나 schedule에만 있는 강의)
+    if (!lecture) {
+        const scheduleEntry = Object.entries(AppState.schedule).find(([key, val]) => val.id == lectureId);
+        if (scheduleEntry) {
+            lecture = scheduleEntry[1];
+            console.log('schedule에서 강의 찾음:', lecture.titleKo);
+        }
+    }
+    
+    if (!lecture) {
+        console.error('강의를 찾을 수 없습니다. ID:', lectureId);
+        alert('강의 정보를 찾을 수 없습니다.');
+        return;
+    }
 
     document.getElementById('editLectureId').value = lecture.id;
-    document.getElementById('editCategory').value = lecture.category;
-    document.getElementById('editTitleKo').value = lecture.titleKo;
+    document.getElementById('editCategory').value = lecture.category || '';
+    document.getElementById('editTitleKo').value = lecture.titleKo || '';
     document.getElementById('editTitleEn').value = lecture.titleEn || '';
-    document.getElementById('editSpeakerKo').value = lecture.speakerKo;
+    document.getElementById('editSpeakerKo').value = lecture.speakerKo || '';
     document.getElementById('editSpeakerEn').value = lecture.speakerEn || '';
     document.getElementById('editAffiliation').value = lecture.affiliation || '';
     document.getElementById('editDuration').value = lecture.duration || 15;
@@ -488,30 +510,140 @@ window.openEditModal = function(lectureId) {
     }
     if (editProductName) editProductName.value = lecture.productName || '';
 
+    // 연자 자동완성 설정
+    setupEditSpeakerAutocomplete();
+
     document.getElementById('editModal').classList.add('active');
 };
+
+/**
+ * 수정 모달 연자 자동완성 설정 - 새로 추가
+ */
+function setupEditSpeakerAutocomplete() {
+    const speakerInput = document.getElementById('editSpeakerKo');
+    const speakerEnInput = document.getElementById('editSpeakerEn');
+    const affiliationInput = document.getElementById('editAffiliation');
+    
+    if (!speakerInput) return;
+    
+    // 기존 자동완성 리스트가 없으면 생성
+    let autocompleteList = document.getElementById('editAutocompleteList');
+    if (!autocompleteList) {
+        autocompleteList = document.createElement('div');
+        autocompleteList.id = 'editAutocompleteList';
+        autocompleteList.className = 'autocomplete-list';
+        autocompleteList.style.cssText = 'position: absolute; background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 200px; overflow-y: auto; z-index: 1000; width: 100%; display: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15);';
+        speakerInput.parentElement.style.position = 'relative';
+        speakerInput.parentElement.appendChild(autocompleteList);
+    }
+    
+    // 이전 이벤트 리스너 제거 (중복 방지)
+    const newInput = speakerInput.cloneNode(true);
+    speakerInput.parentNode.replaceChild(newInput, speakerInput);
+    
+    // 새 이벤트 리스너 추가
+    newInput.addEventListener('input', function() {
+        const value = this.value.trim().toLowerCase();
+        
+        if (value.length < 1) {
+            autocompleteList.style.display = 'none';
+            return;
+        }
+        
+        // 연자 목록에서 검색
+        const matches = (AppState.speakers || []).filter(s => {
+            const name = (s.name || '').toLowerCase();
+            const nameEn = (s.nameEn || '').toLowerCase();
+            return name.includes(value) || nameEn.includes(value);
+        }).slice(0, 10); // 최대 10개
+        
+        if (matches.length === 0) {
+            autocompleteList.style.display = 'none';
+            return;
+        }
+        
+        autocompleteList.innerHTML = matches.map(speaker => `
+            <div class="autocomplete-item" style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.85rem;" 
+                 data-name="${speaker.name || ''}" 
+                 data-name-en="${speaker.nameEn || ''}" 
+                 data-affiliation="${speaker.affiliation || ''}">
+                <div style="font-weight: 500;">${speaker.name || ''}</div>
+                <div style="font-size: 0.75rem; color: #666;">
+                    ${speaker.nameEn ? speaker.nameEn + ' | ' : ''}${speaker.affiliation || ''}
+                </div>
+            </div>
+        `).join('');
+        
+        autocompleteList.style.display = 'block';
+        
+        // 클릭 이벤트
+        autocompleteList.querySelectorAll('.autocomplete-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const speakerKoInput = document.getElementById('editSpeakerKo');
+                const speakerEnInput = document.getElementById('editSpeakerEn');
+                const affiliationInput = document.getElementById('editAffiliation');
+                
+                if (speakerKoInput) speakerKoInput.value = this.dataset.name || '';
+                if (speakerEnInput) speakerEnInput.value = this.dataset.nameEn || '';
+                if (affiliationInput) affiliationInput.value = this.dataset.affiliation || '';
+                
+                autocompleteList.style.display = 'none';
+            });
+            
+            item.addEventListener('mouseenter', function() {
+                this.style.background = '#f5f5f5';
+            });
+            item.addEventListener('mouseleave', function() {
+                this.style.background = 'white';
+            });
+        });
+    });
+    
+    // 외부 클릭 시 닫기
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#editSpeakerKo') && !e.target.closest('#editAutocompleteList')) {
+            autocompleteList.style.display = 'none';
+        }
+    });
+}
 
 /**
  * 강의 수정 모달 닫기
  */
 window.closeEditModal = function() {
     document.getElementById('editModal').classList.remove('active');
+    
+    // 자동완성 리스트 숨기기
+    const autocompleteList = document.getElementById('editAutocompleteList');
+    if (autocompleteList) {
+        autocompleteList.style.display = 'none';
+    }
 };
 
 /**
  * 강의 삭제 (모달에서)
  */
 window.deleteLectureFromModal = function() {
-    const lectureId = parseInt(document.getElementById('editLectureId').value);
-    const lecture = AppState.lectures.find(l => l.id === lectureId);
+    const lectureId = document.getElementById('editLectureId').value;
+    // == 로 타입 무관 비교
+    const lecture = AppState.lectures.find(l => l.id == lectureId);
 
-    if (!lecture) return;
+    // schedule에서도 찾기
+    let lectureTitle = lecture ? lecture.titleKo : '';
+    if (!lectureTitle) {
+        const scheduleEntry = Object.entries(AppState.schedule).find(([key, val]) => val.id == lectureId);
+        if (scheduleEntry) {
+            lectureTitle = scheduleEntry[1].titleKo;
+        }
+    }
 
-    if (confirm(`"${lecture.titleKo}" 강의를 삭제하시겠습니까?\n\n시간표에서도 삭제됩니다.`)) {
-        AppState.lectures = AppState.lectures.filter(l => l.id !== lectureId);
+    if (confirm(`"${lectureTitle || '이 강의'}"를 삭제하시겠습니까?\n\n시간표에서도 삭제됩니다.`)) {
+        // lectures 배열에서 삭제
+        AppState.lectures = AppState.lectures.filter(l => l.id != lectureId);
 
+        // schedule에서 삭제
         Object.keys(AppState.schedule).forEach(key => {
-            if (AppState.schedule[key].id === lectureId) {
+            if (AppState.schedule[key].id == lectureId) {
                 delete AppState.schedule[key];
             }
         });
@@ -524,11 +656,11 @@ window.deleteLectureFromModal = function() {
 };
 
 /**
- * 강의 수정 저장
+ * 강의 수정 저장 - 수정됨
  */
 window.saveEditedLecture = function() {
-    const lectureId = parseInt(document.getElementById('editLectureId').value);
-    const lectureIndex = AppState.lectures.findIndex(l => l.id === lectureId);
+    const lectureId = document.getElementById('editLectureId').value;
+    const lectureIndex = AppState.lectures.findIndex(l => l.id == lectureId);
     const category = document.getElementById('editCategory').value;
     const editIsLuncheonCheckbox = document.getElementById('editIsLuncheon');
     const isLuncheon = editIsLuncheonCheckbox ? editIsLuncheonCheckbox.checked : false;
@@ -546,42 +678,49 @@ window.saveEditedLecture = function() {
         companyName = '학회강의';
     }
 
-    if (lectureIndex !== -1) {
-        const updatedLecture = {
-            id: lectureId,
-            category: category,
-            titleKo: document.getElementById('editTitleKo').value,
-            titleEn: document.getElementById('editTitleEn').value,
-            speakerKo: document.getElementById('editSpeakerKo').value,
-            speakerEn: document.getElementById('editSpeakerEn').value,
-            affiliation: document.getElementById('editAffiliation').value,
-            duration: parseInt(document.getElementById('editDuration').value) || 15,
-            isLuncheon: isLuncheon,
-            isAcademicLecture: isAcademicLecture,
-            companyName: companyName.trim(),
-            productName: productName.trim()
-        };
-        
-        // 회사명이 있고 목록에 없으면 자동 추가
-        if (updatedLecture.companyName && !AppState.companies.includes(updatedLecture.companyName)) {
-            AppState.companies.push(updatedLecture.companyName);
-            AppState.companies.sort((a, b) => a.localeCompare(b, 'ko'));
-        }
-
-        AppState.lectures[lectureIndex] = updatedLecture;
-
-        // 시간표의 강의도 업데이트
-        Object.keys(AppState.schedule).forEach(key => {
-            if (AppState.schedule[key].id === lectureId) {
-                AppState.schedule[key] = { ...updatedLecture };
-            }
-        });
-
-        saveAndSync();
-        updateLectureList();
-        updateScheduleDisplay();
-        closeEditModal();
+    const updatedLecture = {
+        id: lectureId.includes('-') ? lectureId : parseInt(lectureId) || lectureId, // ID 형식 유지
+        category: category,
+        titleKo: document.getElementById('editTitleKo').value,
+        titleEn: document.getElementById('editTitleEn').value,
+        speakerKo: document.getElementById('editSpeakerKo').value,
+        speakerEn: document.getElementById('editSpeakerEn').value,
+        affiliation: document.getElementById('editAffiliation').value,
+        duration: parseInt(document.getElementById('editDuration').value) || 15,
+        isLuncheon: isLuncheon,
+        isAcademicLecture: isAcademicLecture,
+        companyName: companyName.trim(),
+        productName: productName.trim()
+    };
+    
+    // 회사명이 있고 목록에 없으면 자동 추가
+    if (updatedLecture.companyName && !AppState.companies.includes(updatedLecture.companyName)) {
+        AppState.companies.push(updatedLecture.companyName);
+        AppState.companies.sort((a, b) => a.localeCompare(b, 'ko'));
     }
+
+    // lectures 배열에 있으면 업데이트
+    if (lectureIndex !== -1) {
+        AppState.lectures[lectureIndex] = updatedLecture;
+    } else {
+        // lectures에 없으면 추가 (schedule에만 있던 강의)
+        AppState.lectures.push(updatedLecture);
+        console.log('강의 목록에 추가됨:', updatedLecture.titleKo);
+    }
+
+    // 시간표의 강의도 업데이트
+    Object.keys(AppState.schedule).forEach(key => {
+        if (AppState.schedule[key].id == lectureId) {
+            AppState.schedule[key] = { ...updatedLecture };
+        }
+    });
+
+    saveAndSync();
+    updateLectureList();
+    updateScheduleDisplay();
+    closeEditModal();
+    
+    console.log('강의 수정 완료:', updatedLecture.titleKo);
 };
 
 /**
@@ -860,4 +999,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-console.log('✅ lectures.js 로드 완료');
+console.log('✅ lectures.js 로드 완료 (수정본 - ID 타입 문제 해결 + 연자 자동완성 추가)');
