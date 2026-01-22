@@ -108,6 +108,11 @@ window.startRealtimeListeners = function() {
 
             loadDateData(AppState.currentDate);
 
+            // speakers가 부족하면 자동 생성
+            if (AppState.speakers.length < 20) {
+                generateSpeakersFromLectures();
+            }
+
             updateLectureList();
             updateScheduleDisplay();
             updateCategoryDropdowns();
@@ -1951,3 +1956,98 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 console.log('✅ app.js 로드 완료');
+
+// ============================================
+// 연자 목록 자동 생성 (강의 데이터에서 추출)
+// ============================================
+
+/**
+ * 강의 데이터에서 연자 목록 자동 생성
+ * speakers가 부족할 때 호출됨
+ */
+window.generateSpeakersFromLectures = function() {
+    const speakerMap = {};
+    
+    // 1. 기본 연자 데이터 추가
+    SPEAKERS_DATA.forEach(speaker => {
+        if (speaker.name) {
+            speakerMap[speaker.name] = speaker;
+        }
+    });
+    
+    // 2. 현재 lectures에서 추출
+    (AppState.lectures || []).forEach(lecture => {
+        if (lecture.speakerKo && lecture.speakerKo !== '미정' && lecture.speakerKo.trim()) {
+            const name = lecture.speakerKo.trim();
+            if (!speakerMap[name]) {
+                speakerMap[name] = {
+                    name: name,
+                    nameEn: lecture.speakerEn || '',
+                    affiliation: lecture.affiliation || ''
+                };
+            }
+        }
+    });
+    
+    // 3. schedule에서도 추출
+    Object.values(AppState.schedule || {}).forEach(lecture => {
+        if (lecture.speakerKo && lecture.speakerKo !== '미정' && lecture.speakerKo.trim()) {
+            const name = lecture.speakerKo.trim();
+            if (!speakerMap[name]) {
+                speakerMap[name] = {
+                    name: name,
+                    nameEn: lecture.speakerEn || '',
+                    affiliation: lecture.affiliation || ''
+                };
+            }
+        }
+    });
+    
+    // 4. 모든 날짜 데이터에서도 추출
+    Object.values(AppState.dataByDate || {}).forEach(dateData => {
+        // lectures에서
+        (dateData.lectures || []).forEach(lecture => {
+            if (lecture.speakerKo && lecture.speakerKo !== '미정' && lecture.speakerKo.trim()) {
+                const name = lecture.speakerKo.trim();
+                if (!speakerMap[name]) {
+                    speakerMap[name] = {
+                        name: name,
+                        nameEn: lecture.speakerEn || '',
+                        affiliation: lecture.affiliation || ''
+                    };
+                }
+            }
+        });
+        
+        // schedule에서
+        Object.values(dateData.schedule || {}).forEach(lecture => {
+            if (lecture.speakerKo && lecture.speakerKo !== '미정' && lecture.speakerKo.trim()) {
+                const name = lecture.speakerKo.trim();
+                if (!speakerMap[name]) {
+                    speakerMap[name] = {
+                        name: name,
+                        nameEn: lecture.speakerEn || '',
+                        affiliation: lecture.affiliation || ''
+                    };
+                }
+            }
+        });
+    });
+    
+    const newSpeakers = Object.values(speakerMap);
+    
+    // 20명 이상이면 업데이트
+    if (newSpeakers.length > AppState.speakers.length) {
+        AppState.speakers = newSpeakers;
+        console.log(`✅ 연자 목록 자동 생성: ${newSpeakers.length}명`);
+        
+        // Firebase에도 저장
+        if (typeof database !== 'undefined' && canEdit()) {
+            database.ref('/data/speakers').set(newSpeakers)
+                .then(() => console.log('✅ 연자 목록 Firebase 저장 완료'))
+                .catch(err => console.error('연자 목록 저장 실패:', err));
+        }
+    }
+    
+    return newSpeakers;
+};
