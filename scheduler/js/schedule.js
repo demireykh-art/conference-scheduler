@@ -24,7 +24,7 @@ window.createScheduleTable = function() {
     headerRow.appendChild(timeHeader);
 
     // 각 룸의 폭 계산 (균등)
-    const roomWidth = 290; // 고정 폭
+    const roomWidth = 360; // 고정 폭 (25% 증가)
 
     AppState.rooms.forEach((room, roomIndex) => {
         const roomHeader = document.createElement('th');
@@ -504,7 +504,7 @@ window.updateScheduleDisplay = function() {
             lectureDiv.style.borderLeft = `4px solid ${color}`;
         }
 
-        const cellHeight = 27; // CSS height 26px + border-spacing 1px
+        const cellHeight = 34; // CSS height 33px + border-spacing 1px (25% 증가)
         const totalHeight = slotsSpan * cellHeight;
         // 세션 헤더가 있으면 강의를 아래로 내리고 높이 조정
         lectureDiv.style.height = `${totalHeight - sessionHeaderHeight - 2}px`; // 2px 여백
