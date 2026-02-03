@@ -1337,15 +1337,20 @@ document.addEventListener('DOMContentLoaded', function() {
  * 모든 활성 모달 닫기
  */
 window.closeAllModals = function() {
-    // 모든 활성 모달 찾기
     const activeModals = document.querySelectorAll('.modal.active');
     
     if (activeModals.length === 0) return;
     
-    // 가장 위에 있는 모달만 닫기 (z-index가 높은 것)
+    // 가장 위에 있는 모달 확인
     const topModal = activeModals[activeModals.length - 1];
-    topModal.classList.remove('active');
     
+    // data-lock="true"인 모달은 ESC로 닫지 않음 (수정완료/취소 버튼으로만 닫기)
+    if (topModal.dataset.lock === 'true') {
+        Toast.info('수정 완료 또는 취소 버튼을 눌러주세요.');
+        return;
+    }
+    
+    topModal.classList.remove('active');
     console.log('ESC: 모달 닫힘');
 };
 

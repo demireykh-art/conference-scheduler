@@ -336,6 +336,13 @@ window.closeCellSessionModal = function() {
 };
 
 /**
+ * 세션 수정 모달 닫기 확인 (수정사항 유실 방지)
+ */
+window.confirmCloseCellSessionModal = function() {
+    closeCellSessionModal();
+};
+
+/**
  * 세션 저장
  */
 window.saveCellSession = function() {

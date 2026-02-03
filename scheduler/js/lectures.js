@@ -621,6 +621,13 @@ window.closeEditModal = function() {
 };
 
 /**
+ * 강의 수정 모달 닫기 확인 (수정사항 유실 방지)
+ */
+window.confirmCloseEditModal = function() {
+    closeEditModal();
+};
+
+/**
  * 강의 삭제 (모달에서)
  */
 window.deleteLectureFromModal = function() {
