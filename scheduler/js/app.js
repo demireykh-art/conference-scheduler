@@ -65,6 +65,8 @@ window.startRealtimeListeners = function() {
         }
     });
 
+    // /data 리스너 - debounce 적용으로 불필요한 렌더링 방지
+    let dataDebounceTimer = null;
     database.ref('/data').on('value', (snapshot) => {
         const data = snapshot.val();
         if (data) {
@@ -94,8 +96,19 @@ window.startRealtimeListeners = function() {
                     }
                 });
             }
+            // ── speakers 로드 (v3 강화) ──
             if (data.speakers && data.speakers.length > 0) {
-                AppState.speakers = data.speakers;
+                // DB에 speakers 존재 → 정상 로드
+                if (data.speakers.length >= AppState.speakers.length || AppState.speakers.length < 20) {
+                    AppState.speakers = data.speakers;
+                    console.log(`[speakers] Firebase → ${data.speakers.length}명 로드`);
+                } else {
+                    console.warn(`⚠️ Firebase speakers(${data.speakers.length}명)가 현재(${AppState.speakers.length}명)보다 적음 - 무시`);
+                }
+            } else if (AppState.speakers.length === 0) {
+                // DB도 비어있고 로컬도 비어있음 → 최초 설치
+                console.log('[speakers] 최초 설치 감지 → SPEAKERS_DATA 시드 + 강의 기반 생성');
+                AppState.speakers = [...SPEAKERS_DATA];
             }
             if (data.companies && data.companies.length > 0) {
                 AppState.companies = data.companies;
@@ -113,9 +126,13 @@ window.startRealtimeListeners = function() {
                 generateSpeakersFromLectures();
             }
 
-            updateLectureList();
-            updateScheduleDisplay();
-            updateCategoryDropdowns();
+            // debounce: UI 업데이트를 100ms 지연하여 연속 수신 시 1회만 렌더링
+            clearTimeout(dataDebounceTimer);
+            dataDebounceTimer = setTimeout(() => {
+                updateLectureList();
+                updateScheduleDisplay();
+                updateCategoryDropdowns();
+            }, 100);
 
             updateSyncStatus('synced', '동기화됨');
             console.log('실시간 데이터 수신');
@@ -188,24 +205,62 @@ window.saveToFirebase = function() {
         sessions: AppState.sessions
     };
 
-    // update()를 사용하여 특정 경로만 업데이트 (전체 덮어쓰기 방지)
     const updates = {};
     updates['/data/dataByDate'] = AppState.dataByDate;
-    updates['/data/speakers'] = AppState.speakers;
     updates['/data/companies'] = AppState.companies;
     updates['/data/categories'] = AppState.categories;
     updates['/data/lastModified'] = firebase.database.ServerValue.TIMESTAMP;
     updates['/data/lastModifiedBy'] = AppState.currentUser ? AppState.currentUser.email : 'unknown';
 
-    database.ref().update(updates)
-        .then(() => {
-            updateSyncStatus('synced', '저장됨');
-            console.log('Firebase 저장 완료');
-        })
-        .catch((error) => {
-            updateSyncStatus('offline', '저장 실패');
-            console.error('Firebase 저장 실패:', error);
-        });
+    // ── speakers 보호 (v3): DB 실시간 비교 후 저장 결정 ──
+    // 1단계: 절대 최소 기준 (20명 미만이면 무조건 저장 차단)
+    if (AppState.speakers.length < 20) {
+        console.warn(`⚠️ [speakers 보호] 저장 차단: 현재 ${AppState.speakers.length}명 (최소 20명 필요)`);
+        // speakers 빼고 나머지만 저장
+        database.ref().update(updates)
+            .then(() => { updateSyncStatus('synced', '저장됨 (speakers 제외)'); })
+            .catch((error) => { updateSyncStatus('offline', '저장 실패'); console.error('Firebase 저장 실패:', error); });
+        return;
+    }
+
+    // 2단계: DB 현재 값과 비교 (50% 이상 감소 시 차단)
+    database.ref('/data/speakers').once('value').then((snapshot) => {
+        const dbSpeakers = snapshot.val();
+        const dbCount = Array.isArray(dbSpeakers) ? dbSpeakers.length : 0;
+        const localCount = AppState.speakers.length;
+
+        if (dbCount > 0 && localCount < dbCount * 0.5) {
+            // DB 대비 50% 이상 감소 → 비정상 상황, 저장 차단
+            console.error(`🚨 [speakers 보호] 저장 차단: DB ${dbCount}명 → 로컬 ${localCount}명 (${Math.round(localCount/dbCount*100)}%)`);
+            Toast.error(`연자 데이터 이상 감지! DB:${dbCount}명, 현재:${localCount}명. 연자 저장을 건너뜁니다.`, 8000);
+            // speakers 빼고 나머지만 저장
+            database.ref().update(updates)
+                .then(() => { updateSyncStatus('synced', '저장됨 (speakers 보호)'); })
+                .catch((error) => { updateSyncStatus('offline', '저장 실패'); console.error(error); });
+            return;
+        }
+
+        // 정상: speakers 포함 저장
+        updates['/data/speakers'] = AppState.speakers;
+        database.ref().update(updates)
+            .then(() => {
+                updateSyncStatus('synced', '저장됨');
+                console.log(`Firebase 저장 완료 (speakers: ${localCount}명)`);
+            })
+            .catch((error) => {
+                updateSyncStatus('offline', '저장 실패');
+                console.error('Firebase 저장 실패:', error);
+            });
+    }).catch((error) => {
+        // DB 조회 실패 시에도 기존 보호 유지
+        console.warn('speakers DB 조회 실패, 로컬 기준 저장:', error);
+        if (AppState.speakers.length >= 20) {
+            updates['/data/speakers'] = AppState.speakers;
+        }
+        database.ref().update(updates)
+            .then(() => { updateSyncStatus('synced', '저장됨'); })
+            .catch((err) => { updateSyncStatus('offline', '저장 실패'); console.error(err); });
+    });
 };
 
 /**
@@ -385,39 +440,53 @@ window.deleteRoom = function(roomIndex) {
     createScheduleTable();
 };
 
-window.moveRoom = function(roomIndex, direction) {
-    const newIndex = direction === 'left' ? roomIndex - 1 : roomIndex + 1;
-    
-    // 범위 체크
-    if (newIndex < 0 || newIndex >= AppState.rooms.length) return;
-    
-    // 룸 순서 변경
-    const temp = AppState.rooms[roomIndex];
-    AppState.rooms[roomIndex] = AppState.rooms[newIndex];
-    AppState.rooms[newIndex] = temp;
-    
-    // 저장 및 UI 업데이트
-    saveRoomsToStorage();
-    saveAndSync();
-    createScheduleTable();
-    updateScheduleDisplay();
-};
+// moveRoom은 schedule.js에서 정의 (saveStateForUndo 포함 버전)
 
 window.updateRoomNameInData = function(oldName, newName) {
+    // ── v3: 룸 이름 변경 시 전체 참조 일괄 업데이트 ──
+    // 변경 전 상태 백업 (콘솔 복구용)
+    const backupScheduleKeys = Object.keys(AppState.schedule).filter(k => k.includes(`-${oldName}`));
+    console.log(`[룸 이름 변경] "${oldName}" → "${newName}" (영향 key: ${backupScheduleKeys.length}개)`);
+
+    // 1. schedule key 업데이트 (핵심)
     const newSchedule = {};
     Object.entries(AppState.schedule).forEach(([key, value]) => {
-        const newKey = key.replace(`-${oldName}`, `-${newName}`);
-        newSchedule[newKey] = value;
+        // key 형식: "09:00-룸이름" → 정확히 "-룸이름" 부분만 교체
+        const timePart = key.substring(0, 5);
+        const roomPart = key.substring(6);
+        if (roomPart === oldName) {
+            newSchedule[`${timePart}-${newName}`] = value;
+        } else {
+            newSchedule[key] = value;
+        }
     });
     AppState.schedule = newSchedule;
 
+    // 2. sessions[].room 업데이트
     AppState.sessions.forEach(s => {
         if (s.room === oldName) {
             s.room = newName;
         }
     });
 
+    // 3. roomManagers 키 업데이트
+    if (AppState.roomManagers && AppState.roomManagers[oldName]) {
+        AppState.roomManagers[newName] = AppState.roomManagers[oldName];
+        delete AppState.roomManagers[oldName];
+        // Firebase에 roomManagers 즉시 동기화
+        const currentDate = AppState.currentDate;
+        database.ref(`/settings/roomManagers/${currentDate}`).set(AppState.roomManagers)
+            .catch(err => console.error('roomManagers 동기화 실패:', err));
+    }
+
+    // 4. kmaRooms 키 업데이트 (의협제출용 룸)
+    if (AppState.kmaRooms && AppState.kmaRooms[oldName] !== undefined) {
+        AppState.kmaRooms[newName] = AppState.kmaRooms[oldName];
+        delete AppState.kmaRooms[oldName];
+    }
+
     saveAndSync();
+    console.log(`[룸 이름 변경] 완료: schedule ${Object.keys(newSchedule).length}개 키 재매핑`);
 };
 
 window.saveRoomsToStorage = function() {
@@ -440,7 +509,7 @@ window.saveRoomsToStorage = function() {
 
 window.resetAllData = function() {
     if (AppState.currentUserRole !== 'admin') {
-        alert('⛔ 초기화는 관리자만 수행할 수 있습니다.');
+        Toast.error(' 초기화는 관리자만 수행할 수 있습니다.');
         return;
     }
 
@@ -450,7 +519,7 @@ window.resetAllData = function() {
 
     const confirmText = prompt('초기화를 진행하려면 "초기화"를 입력하세요:');
     if (confirmText !== '초기화') {
-        alert('초기화가 취소되었습니다.');
+        Toast.info('초기화가 취소되었습니다.');
         return;
     }
 
@@ -475,7 +544,7 @@ window.resetAllData = function() {
     updateLectureList();
     createScheduleTable();
 
-    alert('✅ 모든 데이터가 초기화되었습니다.');
+    Toast.success(' 모든 데이터가 초기화되었습니다.');
     location.reload();
 };
 
@@ -877,7 +946,9 @@ function closeExportDropdown(e) {
     }
 }
 
-window.openPrintModal = function() {
+// openPrintModal은 leaflet.js에서 확장 정의됨 (originalOpenPrintModal 패턴)
+// 기본 구현을 여기서 유지 (leaflet.js가 호출함)
+window._baseOpenPrintModal = function() {
     document.getElementById('exportDropdown').style.display = 'none';
     
     const container = document.getElementById('printRoomCheckboxes');
@@ -906,6 +977,8 @@ window.openPrintModal = function() {
     document.getElementById('printModal').classList.add('active');
 };
 
+window.openPrintModal = window._baseOpenPrintModal;
+
 window.closePrintModal = function() {
     document.getElementById('printModal').classList.remove('active');
 };
@@ -923,7 +996,7 @@ window.executePrint = function() {
     });
     
     if (selectedRooms.length === 0) {
-        alert('출력할 룸을 선택해주세요.');
+        Toast.warning('출력할 룸을 선택해주세요.');
         return;
     }
     
@@ -1199,9 +1272,13 @@ function timeToMinutes(time) {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('=== 초기화 시작 ===');
 
-    // 기본 데이터 설정
+    // ── SPEAKERS_DATA 격리 (v3) ──
+    // DB가 완전히 비어있는 최초 설치 시에만 SPEAKERS_DATA 사용
+    // 정상 운영 시에는 Firebase 데이터만 사용 (startRealtimeListeners에서 로드)
     if (AppState.speakers.length === 0) {
-        AppState.speakers = [...SPEAKERS_DATA];
+        console.log('[초기화] speakers 비어있음 → Firebase 로드 대기');
+        // SPEAKERS_DATA는 사용하지 않음 (Firebase에서 수신 후 채워짐)
+        // 만약 Firebase에도 없으면 generateSpeakersFromLectures가 자동 생성
     }
 
     if (AppState.categories.length === 0) {
@@ -1326,7 +1403,7 @@ window.createAutoBackup = function() {
  */
 window.createManualBackup = function() {
     createBackup('manual');
-    alert('✅ 백업이 생성되었습니다.');
+    Toast.success(' 백업이 생성되었습니다.');
 };
 
 /**
@@ -1395,7 +1472,7 @@ window.downloadEncryptedBackup = function(backupKey) {
     database.ref(`/backups/${backupKey}`).once('value', (snapshot) => {
         const backup = snapshot.val();
         if (!backup) {
-            alert('백업 데이터를 찾을 수 없습니다.');
+            Toast.error('백업 데이터를 찾을 수 없습니다.');
             return;
         }
         
@@ -1432,7 +1509,7 @@ window.downloadEncryptedBackup = function(backupKey) {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         
-        alert('✅ 백업 파일이 다운로드되었습니다.');
+        Toast.success(' 백업 파일이 다운로드되었습니다.');
     });
 };
 
@@ -1465,13 +1542,13 @@ window.uploadAndRestoreBackup = function() {
                         const decryptedStr = decrypted.toString(CryptoJS.enc.Utf8);
                         
                         if (!decryptedStr) {
-                            alert('❌ 복호화 실패: 잘못된 키입니다.');
+                            Toast.error(' 복호화 실패: 잘못된 키입니다.');
                             return;
                         }
                         
                         restoreData = JSON.parse(decryptedStr);
                     } catch (err) {
-                        alert('❌ 복호화 실패: ' + err.message);
+                        Toast.error(' 복호화 실패: ' + err.message);
                         return;
                     }
                 } else if (data.data) {
@@ -1506,10 +1583,10 @@ window.uploadAndRestoreBackup = function() {
                 updateCategoryDropdowns();
                 
                 closeBackupModal();
-                alert('✅ 백업 파일에서 복원되었습니다.');
+                Toast.success(' 백업 파일에서 복원되었습니다.');
                 
             } catch (err) {
-                alert('❌ 파일 읽기 실패: ' + err.message);
+                Toast.error(' 파일 읽기 실패: ' + err.message);
             }
         };
         reader.readAsText(file);
@@ -1528,71 +1605,7 @@ window.updateBackupStatus = function(dateStr) {
     }
 };
 
-/**
- * 백업 목록 모달 열기
- */
-window.openBackupModal = function() {
-    const modal = document.getElementById('backupModal');
-    const list = document.getElementById('backupList');
-    
-    list.innerHTML = '<p style="text-align: center; padding: 2rem;">백업 목록 로딩 중...</p>';
-    modal.classList.add('active');
-    
-    // Firebase에서 백업 목록 로드
-    database.ref('/backups').orderByChild('timestamp').once('value', (snapshot) => {
-        const backups = [];
-        snapshot.forEach(child => {
-            backups.push({ key: child.key, ...child.val() });
-        });
-        
-        // 최신순 정렬
-        backups.sort((a, b) => b.timestamp - a.timestamp);
-        
-        if (backups.length === 0) {
-            list.innerHTML = '<p style="text-align: center; padding: 2rem; color: #999;">백업이 없습니다.</p>';
-            return;
-        }
-        
-        let html = `
-            <div style="padding: 0.5rem; background: #f0f0f0; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 0.8rem; color: #666;">총 ${backups.length}개 백업</span>
-                <button class="btn btn-secondary btn-small" onclick="uploadAndRestoreBackup()">📁 파일에서 복원</button>
-            </div>
-        `;
-        
-        html += backups.map((backup, idx) => {
-            const typeLabel = backup.type === 'auto' ? '🔄 자동' : '💾 수동';
-            const isLatest = idx === 0;
-            
-            return `
-                <div class="backup-item" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid #eee; ${isLatest ? 'background: #f0fff0;' : ''}">
-                    <div>
-                        <div style="font-weight: ${isLatest ? 'bold' : 'normal'};">
-                            ${backup.dateStr} ${isLatest ? '(최신)' : ''}
-                        </div>
-                        <div style="font-size: 0.8rem; color: #666;">
-                            ${typeLabel} · ${backup.createdBy || '알 수 없음'}
-                        </div>
-                    </div>
-                    <div style="display: flex; gap: 0.25rem;">
-                        <button class="btn btn-secondary btn-small" onclick="downloadEncryptedBackup('${backup.key}')" title="다운로드">📥</button>
-                        <button class="btn btn-secondary btn-small" onclick="previewBackup('${backup.key}')" title="미리보기">👁️</button>
-                        <button class="btn btn-primary btn-small" onclick="restoreBackup('${backup.key}')" title="복원">복원</button>
-                    </div>
-                </div>
-            `;
-        }).join('');
-        
-        list.innerHTML = html;
-    });
-};
-
-/**
- * 백업 모달 닫기
- */
-window.closeBackupModal = function() {
-    document.getElementById('backupModal').classList.remove('active');
-};
+// openBackupModal / closeBackupModal은 modals.js에서 정의
 
 /**
  * 백업 미리보기
@@ -1601,7 +1614,7 @@ window.previewBackup = function(backupKey) {
     database.ref(`/backups/${backupKey}`).once('value', (snapshot) => {
         const backup = snapshot.val();
         if (!backup || !backup.data) {
-            alert('백업 데이터를 불러올 수 없습니다.');
+            Toast.error('백업 데이터를 불러올 수 없습니다.');
             return;
         }
         
@@ -1626,7 +1639,7 @@ window.previewBackup = function(backupKey) {
         summary += `\n연자: ${data.speakers ? data.speakers.length : 0}명`;
         summary += `\n카테고리: ${data.categories ? data.categories.length : 0}개`;
         
-        alert(summary);
+        Toast.info(summary, 6000);
     });
 };
 
@@ -1635,7 +1648,7 @@ window.previewBackup = function(backupKey) {
  */
 window.restoreBackup = function(backupKey) {
     if (!canEdit()) {
-        alert('편집 권한이 없습니다.');
+        Toast.warning('편집 권한이 없습니다.');
         return;
     }
     
@@ -1649,7 +1662,7 @@ window.restoreBackup = function(backupKey) {
     database.ref(`/backups/${backupKey}`).once('value', (snapshot) => {
         const backup = snapshot.val();
         if (!backup || !backup.data) {
-            alert('백업 데이터를 불러올 수 없습니다.');
+            Toast.error('백업 데이터를 불러올 수 없습니다.');
             return;
         }
         
@@ -1679,7 +1692,7 @@ window.restoreBackup = function(backupKey) {
         createCategoryFilters();
         
         closeBackupModal();
-        alert(`✅ ${backup.dateStr} 시점으로 복원되었습니다.`);
+        Toast.success(`${backup.dateStr} 시점으로 복원되었습니다.`);
     });
 };
 
@@ -1790,18 +1803,18 @@ window.addEventDate = function() {
     const label = labelInput.value.trim();
     
     if (!date) {
-        alert('날짜를 선택해주세요.');
+        Toast.warning('날짜를 선택해주세요.');
         return;
     }
     
     if (!label) {
-        alert('행사명을 입력해주세요.');
+        Toast.warning('행사명을 입력해주세요.');
         return;
     }
     
     // 중복 체크
     if (AppState.eventDates.some(e => e.date === date)) {
-        alert('이미 등록된 날짜입니다.');
+        Toast.warning('이미 등록된 날짜입니다.');
         return;
     }
     
@@ -1834,7 +1847,7 @@ window.addEventDate = function() {
     labelInput.value = '';
     
     renderEventDateList();
-    alert(`✅ "${label}" 행사 날짜가 추가되었습니다.`);
+    Toast.success(`"${label}" 행사 날짜가 추가되었습니다.`);
 };
 
 /**
@@ -1845,7 +1858,7 @@ window.deleteEventDate = function(date) {
     if (!event) return;
     
     if (AppState.eventDates.length <= 1) {
-        alert('최소 1개의 행사 날짜는 유지해야 합니다.');
+        Toast.warning('최소 1개의 행사 날짜는 유지해야 합니다.');
         return;
     }
     

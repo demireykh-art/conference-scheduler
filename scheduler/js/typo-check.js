@@ -289,9 +289,9 @@
             if (typeof saveAndSync === 'function') saveAndSync();
             if (typeof updateLectureList === 'function') updateLectureList();
             if (typeof updateScheduleDisplay === 'function') updateScheduleDisplay();
-            alert(`✅ "${wrong}" → "${correct}" 수정 완료`);
+            Toast.success(`"${wrong}" → "${correct}" 수정 완료`);
         } else {
-            alert('해당 강의를 찾을 수 없습니다.');
+            Toast.error('해당 강의를 찾을 수 없습니다.');
         }
     }
 

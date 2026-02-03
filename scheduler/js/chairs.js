@@ -450,7 +450,7 @@ window.addSpeaker = function() {
         saveAndSync();
         updateSpeakerList();
     } else {
-        alert('연자명(한글)과 소속(한글)은 필수 입력 항목입니다.');
+        Toast.warning('연자명(한글)과 소속(한글)은 필수 입력 항목입니다.');
     }
 };
 
@@ -733,7 +733,7 @@ window.confirmAddNewSpeaker = function() {
 window.openSpeakerDetailModal = function(speakerName) {
     const speaker = AppState.speakers.find(s => s.name === speakerName);
     if (!speaker) {
-        alert('연자 정보를 찾을 수 없습니다.');
+        Toast.error('연자 정보를 찾을 수 없습니다.');
         return;
     }
     

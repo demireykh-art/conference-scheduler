@@ -12,7 +12,7 @@ window.leafletConfig = {
 // ============================================
 // 기존 openPrintModal 함수 확장 (호출 후 초기화 추가)
 // ============================================
-const originalOpenPrintModal = window.openPrintModal;
+const originalOpenPrintModal = window._baseOpenPrintModal || window.openPrintModal;
 
 window.openPrintModal = function() {
     // 기존 openPrintModal 호출 (있으면)
@@ -204,7 +204,7 @@ function executePrintWithFormat() {
     console.log('선택된 룸:', selectedRooms); // 디버깅용
     
     if (selectedRooms.length === 0) {
-        alert('출력할 룸을 선택해주세요.');
+        Toast.warning('출력할 룸을 선택해주세요.');
         return;
     }
     
@@ -228,12 +228,12 @@ function executePrintWithFormat() {
 // ============================================
 function generateLeafletPDFWithDate(selectedRooms, language, selectedDate) {
     if (!selectedDate) {
-        alert('날짜를 선택해주세요.');
+        Toast.warning('날짜를 선택해주세요.');
         return;
     }
     
     if (selectedRooms.length === 0) {
-        alert('출력할 룸을 선택해주세요.');
+        Toast.warning('출력할 룸을 선택해주세요.');
         return;
     }
     
@@ -253,7 +253,7 @@ function generateLeafletPDFWithDate(selectedRooms, language, selectedDate) {
         
     } catch (error) {
         console.error('리플렛 생성 오류:', error);
-        alert('리플렛 생성 중 오류가 발생했습니다.');
+        Toast.error('리플렛 생성 중 오류가 발생했습니다.');
     }
 }
 
@@ -361,12 +361,12 @@ function generateLeafletPDF(selectedRooms, language) {
     const currentDate = window.AppState?.currentDate || window.AppState?.selectedDate;
     
     if (!currentDate) {
-        alert('날짜를 선택해주세요.');
+        Toast.warning('날짜를 선택해주세요.');
         return;
     }
     
     if (selectedRooms.length === 0) {
-        alert('출력할 룸을 선택해주세요.');
+        Toast.warning('출력할 룸을 선택해주세요.');
         return;
     }
     
@@ -386,7 +386,7 @@ function generateLeafletPDF(selectedRooms, language) {
         
     } catch (error) {
         console.error('리플렛 생성 오류:', error);
-        alert('리플렛 생성 중 오류가 발생했습니다.');
+        Toast.error('리플렛 생성 중 오류가 발생했습니다.');
     }
 }
 

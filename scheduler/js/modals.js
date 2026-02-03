@@ -53,12 +53,12 @@ window.addCategory = function() {
     const color = document.getElementById('newCategoryColor').value;
 
     if (!name) {
-        alert('분류명을 입력해주세요.');
+        Toast.warning('분류명을 입력해주세요.');
         return;
     }
 
     if (AppState.categories.includes(name)) {
-        alert('이미 존재하는 분류입니다.');
+        Toast.warning('이미 존재하는 분류입니다.');
         return;
     }
 
@@ -85,7 +85,7 @@ window.updateCategoryColor = function(cat, color) {
 
 window.deleteCategory = function(cat) {
     if (cat === 'Others') {
-        alert('"Others" 분류는 삭제할 수 없습니다.');
+        Toast.warning('"Others" 분류는 삭제할 수 없습니다.');
         return;
     }
 
@@ -166,12 +166,12 @@ window.addCompany = function() {
     const name = document.getElementById('newCompanyName').value.trim();
 
     if (!name) {
-        alert('업체명을 입력해주세요.');
+        Toast.warning('업체명을 입력해주세요.');
         return;
     }
 
     if (AppState.companies.includes(name)) {
-        alert('이미 존재하는 업체입니다.');
+        Toast.warning('이미 존재하는 업체입니다.');
         return;
     }
 
@@ -183,7 +183,7 @@ window.addCompany = function() {
     updateCompanyList();
     saveAndSync();
 
-    alert(`✅ "${name}" 업체가 추가되었습니다.`);
+    Toast.success(`"${name}" 업체가 추가되었습니다.`);
 };
 
 window.editCompany = function(oldName) {
@@ -193,7 +193,7 @@ window.editCompany = function(oldName) {
     if (newName.trim() === oldName) return;
 
     if (AppState.companies.includes(newName.trim())) {
-        alert('이미 존재하는 업체명입니다.');
+        Toast.warning('이미 존재하는 업체명입니다.');
         return;
     }
 
@@ -339,7 +339,7 @@ window.selectCompany = function(name) {
 
 window.openUserManagementModal = function() {
     if (!isAdmin()) {
-        alert('관리자만 접근할 수 있습니다.');
+        Toast.error('관리자만 접근할 수 있습니다.');
         return;
     }
 
@@ -427,7 +427,7 @@ window.approveUser = function(uid, role) {
             loadUserList();
             updatePendingBadge();
         })
-        .catch(err => alert('승인 실패: ' + err.message));
+        .catch(err => Toast.error('승인 실패: ' + err.message));
 };
 
 window.rejectUser = function(uid) {
@@ -438,13 +438,13 @@ window.rejectUser = function(uid) {
             loadUserList();
             updatePendingBadge();
         })
-        .catch(err => alert('거부 실패: ' + err.message));
+        .catch(err => Toast.error('거부 실패: ' + err.message));
 };
 
 window.changeUserRole = function(uid, newRole) {
     database.ref(`/users/${uid}/role`).set(newRole)
         .then(() => loadUserList())
-        .catch(err => alert('역할 변경 실패: ' + err.message));
+        .catch(err => Toast.error('역할 변경 실패: ' + err.message));
 };
 
 window.removeUser = function(uid, email) {
@@ -452,7 +452,7 @@ window.removeUser = function(uid, email) {
 
     database.ref(`/users/${uid}`).remove()
         .then(() => loadUserList())
-        .catch(err => alert('삭제 실패: ' + err.message));
+        .catch(err => Toast.error('삭제 실패: ' + err.message));
 };
 
 // ============================================
@@ -461,11 +461,61 @@ window.removeUser = function(uid, email) {
 
 window.openBackupModal = function() {
     if (!AppState.currentUser) {
-        alert('로그인이 필요합니다.');
+        Toast.warning('로그인이 필요합니다.');
         return;
     }
-    document.getElementById('backupModal').classList.add('active');
-    loadBackupList();
+    const modal = document.getElementById('backupModal');
+    const list = document.getElementById('backupList');
+    
+    list.innerHTML = '<p style="text-align: center; padding: 2rem;">백업 목록 로딩 중...</p>';
+    modal.classList.add('active');
+    
+    // Firebase에서 백업 목록 로드
+    database.ref('/backups').orderByChild('timestamp').once('value', (snapshot) => {
+        const backups = [];
+        snapshot.forEach(child => {
+            backups.push({ key: child.key, ...child.val() });
+        });
+        
+        backups.sort((a, b) => b.timestamp - a.timestamp);
+        
+        if (backups.length === 0) {
+            list.innerHTML = '<p style="text-align: center; padding: 2rem; color: #999;">백업이 없습니다.</p>';
+            return;
+        }
+        
+        let html = `
+            <div style="padding: 0.5rem; background: #f0f0f0; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; color: #666;">총 ${backups.length}개 백업</span>
+                <button class="btn btn-secondary btn-small" onclick="uploadAndRestoreBackup()">📁 파일에서 복원</button>
+            </div>
+        `;
+        
+        html += backups.map((backup, idx) => {
+            const typeLabel = backup.type === 'auto' ? '🔄 자동' : '💾 수동';
+            const isLatest = idx === 0;
+            
+            return `
+                <div class="backup-item" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid #eee; ${isLatest ? 'background: #f0fff0;' : ''}">
+                    <div>
+                        <div style="font-weight: ${isLatest ? 'bold' : 'normal'};">
+                            ${backup.dateStr} ${isLatest ? '(최신)' : ''}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #666;">
+                            ${typeLabel} · ${backup.createdBy || '알 수 없음'}
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.25rem;">
+                        <button class="btn btn-secondary btn-small" onclick="downloadEncryptedBackup('${backup.key}')" title="다운로드">📥</button>
+                        <button class="btn btn-secondary btn-small" onclick="previewBackup('${backup.key}')" title="미리보기">👁️</button>
+                        <button class="btn btn-primary btn-small" onclick="restoreBackup('${backup.key}')" title="복원">복원</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        list.innerHTML = html;
+    });
 };
 
 window.closeBackupModal = function() {
@@ -506,7 +556,7 @@ window.loadBackupList = function() {
 
 window.createBackup = function() {
     if (!canEdit()) {
-        alert('편집 권한이 필요합니다.');
+        Toast.warning('편집 권한이 필요합니다.');
         return;
     }
 
@@ -526,17 +576,17 @@ window.createBackup = function() {
 
     database.ref(`/backups/${backupId}`).set(backupData)
         .then(() => {
-            alert(`✅ 백업이 생성되었습니다.\n\n백업 ID: ${backupId}`);
+            Toast.success(`백업이 생성되었습니다.\n\n백업 ID: ${backupId}`);
             loadBackupList();
         })
         .catch((error) => {
-            alert('백업 생성 실패: ' + error.message);
+            Toast.error('백업 생성 실패: ' + error.message);
         });
 };
 
 window.restoreBackup = function(backupId) {
     if (!canEdit()) {
-        alert('편집 권한이 필요합니다.');
+        Toast.warning('편집 권한이 필요합니다.');
         return;
     }
 
@@ -547,7 +597,7 @@ window.restoreBackup = function(backupId) {
     database.ref(`/backups/${backupId}`).once('value', (snapshot) => {
         const backup = snapshot.val();
         if (!backup) {
-            alert('백업을 찾을 수 없습니다.');
+            Toast.error('백업을 찾을 수 없습니다.');
             return;
         }
 
@@ -574,16 +624,16 @@ window.restoreBackup = function(backupId) {
 
         database.ref('/data').set(dataToRestore)
             .then(() => {
-                alert('✅ 백업이 복원되었습니다.');
+                Toast.success('백업이 복원되었습니다.');
                 closeBackupModal();
             })
-            .catch(err => alert('복원 실패: ' + err.message));
+            .catch(err => Toast.error('복원 실패: ' + err.message));
     });
 };
 
 window.deleteBackup = function(backupId) {
     if (!isAdmin()) {
-        alert('관리자만 백업을 삭제할 수 있습니다.');
+        Toast.error('관리자만 백업을 삭제할 수 있습니다.');
         return;
     }
 
@@ -591,7 +641,7 @@ window.deleteBackup = function(backupId) {
 
     database.ref(`/backups/${backupId}`).remove()
         .then(() => loadBackupList())
-        .catch(err => alert('삭제 실패: ' + err.message));
+        .catch(err => Toast.error('삭제 실패: ' + err.message));
 };
 
 // ============================================
@@ -600,7 +650,7 @@ window.deleteBackup = function(backupId) {
 
 window.openTimeSettingsModal = function() {
     if (!canEdit()) {
-        alert('편집 권한이 없습니다.');
+        Toast.warning('편집 권한이 없습니다.');
         return;
     }
 
@@ -637,7 +687,7 @@ window.applyTimeSettings = function() {
     const endIndex = ALL_TIME_OPTIONS.indexOf(endTime);
 
     if (startIndex >= endIndex) {
-        alert('종료 시간은 시작 시간보다 뒤여야 합니다.');
+        Toast.warning('종료 시간은 시작 시간보다 뒤여야 합니다.');
         return;
     }
 
@@ -648,7 +698,7 @@ window.applyTimeSettings = function() {
     saveTimeSettingsToFirebase();
     closeTimeSettingsModal();
 
-    alert(`✅ 시간대가 ${startTime} ~ ${endTime}으로 설정되었습니다.`);
+    Toast.success(`시간대가 ${startTime} ~ ${endTime}으로 설정되었습니다.`);
 };
 
 // ============================================
@@ -864,7 +914,7 @@ window.openBreakDurationModal = function(scheduleKey, lecture) {
             updateScheduleDisplay();
             dialog.remove();
         } else {
-            alert('시간은 5분에서 120분 사이여야 합니다.');
+            Toast.warning('시간은 5분에서 120분 사이여야 합니다.');
         }
     });
     

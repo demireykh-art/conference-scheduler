@@ -555,7 +555,7 @@
         const duration = parseInt(document.getElementById('newLectureTypeDuration').value) || 15;
 
         if (!name) {
-            alert('강의 종류명을 입력해주세요.');
+            Toast.warning('강의 종류명을 입력해주세요.');
             return;
         }
 
@@ -566,7 +566,7 @@
         document.getElementById('newLectureTypeName').value = '';
         switchSponsorTab('lectureTypes');
         
-        alert(`✅ "${name}" 강의 종류가 추가되었습니다.`);
+        Toast.success(`"${name}" 강의 종류가 추가되었습니다.`);
     };
 
     /**

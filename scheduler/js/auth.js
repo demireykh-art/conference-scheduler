@@ -17,7 +17,7 @@ window.signInWithGoogle = function() {
         })
         .catch((error) => {
             console.error('로그인 에러:', error);
-            alert('로그인 실패: ' + error.message);
+            Toast.error('로그인 실패: ' + error.message);
         });
 };
 
@@ -74,7 +74,7 @@ window.resetSessionTimeout = function() {
 
     sessionTimeoutId = setTimeout(() => {
         if (AppState.currentUser) {
-            alert('⏰ 보안을 위해 2시간 동안 활동이 없어 자동 로그아웃됩니다.');
+            Toast.warning('⏰ 보안을 위해 2시간 동안 활동이 없어 자동 로그아웃됩니다.');
             signOut();
         }
     }, AppConfig.SESSION_TIMEOUT);
@@ -197,11 +197,11 @@ window.canEdit = function() {
  */
 window.checkEditPermission = function() {
     if (!AppState.currentUser) {
-        alert('로그인이 필요합니다.');
+        Toast.warning('로그인이 필요합니다.');
         return false;
     }
     if (AppState.currentUserRole === 'pending') {
-        alert('⏳ 승인 대기 중입니다.\n관리자의 승인 후 편집이 가능합니다.');
+        Toast.info('⏳ 승인 대기 중입니다.\n관리자의 승인 후 편집이 가능합니다.');
         return false;
     }
     return true;

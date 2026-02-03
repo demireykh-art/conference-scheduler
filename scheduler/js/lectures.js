@@ -475,7 +475,7 @@ window.openEditModal = function(lectureId) {
     
     if (!lecture) {
         console.error('강의를 찾을 수 없습니다. ID:', lectureId);
-        alert('강의 정보를 찾을 수 없습니다.');
+        Toast.error('강의 정보를 찾을 수 없습니다.');
         return;
     }
 

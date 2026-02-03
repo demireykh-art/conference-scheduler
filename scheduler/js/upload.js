@@ -13,7 +13,7 @@
     
     function openUploadModal() {
         if (!window.checkEditPermission()) {
-            alert('편집 권한이 없습니다.');
+            Toast.warning('편집 권한이 없습니다.');
             return;
         }
         document.getElementById('uploadModal').classList.add('active');
@@ -104,7 +104,7 @@
         const isValid = validExtensions.some(ext => fileName.endsWith(ext));
         
         if (!isValid) {
-            alert('지원되지 않는 파일 형식입니다.\n지원 형식: Excel (.xlsx, .xls), CSV (.csv)');
+            Toast.warning('지원되지 않는 파일 형식입니다.\n지원 형식: Excel (.xlsx, .xls), CSV (.csv)');
             return;
         }
         
@@ -119,7 +119,7 @@
                 parseAndPreviewData(jsonData);
             } catch (error) {
                 console.error('파일 파싱 오류:', error);
-                alert('파일을 읽는 중 오류가 발생했습니다.\n' + error.message);
+                Toast.error('파일을 읽는 중 오류가 발생했습니다.\n' + error.message);
             }
         };
         reader.readAsArrayBuffer(file);
@@ -306,7 +306,7 @@
     
     function displayUploadPreview() {
         if (pendingUploadData.length === 0) {
-            alert('업로드 가능한 강의 데이터가 없습니다.');
+            Toast.warning('업로드 가능한 강의 데이터가 없습니다.');
             return;
         }
         
@@ -358,7 +358,7 @@
     
     async function confirmUpload() {
         if (pendingUploadData.length === 0) {
-            alert('업로드할 데이터가 없습니다.');
+            Toast.warning('업로드할 데이터가 없습니다.');
             return;
         }
         
@@ -570,10 +570,10 @@
             if (skippedCount > 0) message += `⏭️ 건너뜀: ${skippedCount}개\n`;
             message += `\n📚 현재 총 강의: ${window.AppState.lectures.length}개`;
             
-            alert(message);
+            Toast.info(message, 5000);
         } catch (error) {
             console.error('❌ Firebase 저장 실패:', error);
-            alert(`⚠️ 저장 중 오류 발생!\n\n${error.message}\n\n데이터가 저장되지 않았을 수 있습니다.`);
+            Toast.error(`저장 중 오류 발생!\n\n${error.message}\n\n데이터가 저장되지 않았을 수 있습니다.`);
         }
         
         closeUploadModal();
@@ -596,7 +596,7 @@
     
     function openScheduleUploadModal() {
         if (!window.checkEditPermission()) {
-            alert('편집 권한이 없습니다.');
+            Toast.warning('편집 권한이 없습니다.');
             return;
         }
         document.getElementById('scheduleUploadModal').classList.add('active');
@@ -658,7 +658,7 @@
     function processScheduleFile(file) {
         const ext = file.name.split('.').pop().toLowerCase();
         if (!['xlsx', 'xls'].includes(ext)) {
-            alert('Excel 파일(.xlsx, .xls)만 지원됩니다.');
+            Toast.warning('Excel 파일(.xlsx, .xls)만 지원됩니다.');
             return;
         }
         
@@ -675,7 +675,7 @@
                 parseScheduleData(jsonData, file.name);
             } catch (error) {
                 console.error('파일 파싱 오류:', error);
-                alert('파일 파싱 중 오류가 발생했습니다:\n' + error.message);
+                Toast.error('파일 파싱 중 오류가 발생했습니다:\n' + error.message);
             }
         };
         reader.readAsArrayBuffer(file);
@@ -691,7 +691,7 @@
     
     function parseScheduleData(rows, fileName) {
         if (rows.length < 2) {
-            alert('데이터가 없습니다.');
+            Toast.warning('데이터가 없습니다.');
             return;
         }
         
@@ -1239,7 +1239,7 @@
     
     function showConflictResults(conflicts) {
         if (conflicts.length === 0) {
-            alert('✅ 충돌이 발견되지 않았습니다!\n\n모든 강의를 안전하게 배치할 수 있습니다.');
+            Toast.success(' 충돌이 발견되지 않았습니다!\n\n모든 강의를 안전하게 배치할 수 있습니다.');
             return;
         }
         
@@ -1341,7 +1341,7 @@
         let { room, sessions, lectures } = pendingScheduleData;
         
         if (lectures.length === 0) {
-            alert('업로드할 강의가 없습니다.');
+            Toast.warning('업로드할 강의가 없습니다.');
             return;
         }
         
@@ -1490,7 +1490,7 @@
         if (overwriteCount > 0) {
             resultMsg += `\n🔄 ${overwriteCount}개 덮어쓰기`;
         }
-        alert(resultMsg);
+        Toast.success(resultMsg, 5000);
         
         closeScheduleUploadModal();
     }

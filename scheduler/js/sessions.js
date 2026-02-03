@@ -351,7 +351,7 @@ window.saveCellSession = function() {
     const duration = durationSelect ? parseInt(durationSelect.value) || 0 : 0;
 
     if (!name) {
-        alert('세션명을 입력해주세요.');
+        Toast.warning('세션명을 입력해주세요.');
         document.getElementById('cellSessionName').focus();
         return;
     }
@@ -579,7 +579,7 @@ window.toggleSessionMembership = function(key, time, room) {
     } else if (foundSession) {
         lecture.sessionId = foundSession.id;
     } else {
-        alert('이 룸에 세션이 없습니다. 먼저 세션을 추가해주세요.');
+        Toast.warning('이 룸에 세션이 없습니다. 먼저 세션을 추가해주세요.');
         return;
     }
 

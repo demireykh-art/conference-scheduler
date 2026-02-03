@@ -24,7 +24,7 @@ window.createScheduleTable = function() {
     headerRow.appendChild(timeHeader);
 
     // 각 룸의 폭 계산 (균등)
-    const roomWidth = 360; // 고정 폭 (25% 증가)
+    const roomWidth = 290; // 고정 폭
 
     AppState.rooms.forEach((room, roomIndex) => {
         const roomHeader = document.createElement('th');
@@ -90,10 +90,15 @@ window.createScheduleTable = function() {
             const oldName = AppState.rooms[roomIndex];
             const newName = this.value.trim();
             if (newName && newName !== oldName) {
+                // v3: undo 저장 (룸 이름 변경은 되돌릴 수 있어야 함)
+                saveStateForUndo();
                 updateRoomNameInData(oldName, newName);
                 AppState.rooms[roomIndex] = newName;
                 saveRoomsToStorage();
+                // v3: 테이블 전체 재생성 (셀의 dataset.room도 갱신)
+                createScheduleTable();
                 updateScheduleDisplay();
+                Toast.success(`룸 이름 변경: "${oldName}" → "${newName}"`);
             } else {
                 this.value = oldName;
             }
@@ -504,7 +509,7 @@ window.updateScheduleDisplay = function() {
             lectureDiv.style.borderLeft = `4px solid ${color}`;
         }
 
-        const cellHeight = 34; // CSS height 33px + border-spacing 1px (25% 증가)
+        const cellHeight = 27; // CSS height 26px + border-spacing 1px
         const totalHeight = slotsSpan * cellHeight;
         // 세션 헤더가 있으면 강의를 아래로 내리고 높이 조정
         lectureDiv.style.height = `${totalHeight - sessionHeaderHeight - 2}px`; // 2px 여백
@@ -903,7 +908,7 @@ window.handleDrop = function(e) {
         
         // Lunch 위에 배치하는데 런천강의가 아닌 경우 안내
         if (isPlacingOnLunch && !isBreak && !AppState.draggedLecture.isLuncheon) {
-            alert(`⭐ 런천강의로 지정됩니다!\n\n"${AppState.draggedLecture.titleKo}" 강의가\nLunch 시간대에 배치되어 런천강의(Luncheon Lecture)로\n자동 지정됩니다.`);
+            Toast.info(`⭐ 런천강의로 지정됩니다!\n\n"${AppState.draggedLecture.titleKo}" 강의가\nLunch 시간대에 배치되어 런천강의(Luncheon Lecture)로\n자동 지정됩니다.`);
             // 런천강의 태그 추가
             AppState.draggedLecture.isLuncheon = true;
             
@@ -914,10 +919,10 @@ window.handleDrop = function(e) {
             }
         }
 
-        // 시간 겹침 체크 (Lunch와 강의는 중복 허용)
-        const overlapCheck = checkTimeOverlap(time, room, AppState.draggedLecture.duration || 15, AppState.draggedScheduleKey, AppState.draggedLecture);
+        // 시간 겹침 체크 (Lunch와 강의는 중복 허용) - 정규화된 룸 이름 사용
+        const overlapCheck = checkTimeOverlap(time, normalizedRoom, AppState.draggedLecture.duration || 15, AppState.draggedScheduleKey, AppState.draggedLecture);
         if (overlapCheck.hasOverlap) {
-            alert(`⚠️ 시간이 겹칩니다!\n\n배치하려는 강의: ${time} ~ ${overlapCheck.newEndTime} (${AppState.draggedLecture.duration || 15}분)\n\n겹치는 강의: "${overlapCheck.conflictLecture.titleKo}"\n시간: ${overlapCheck.conflictTime} ~ ${overlapCheck.conflictEndTime}\n\n다른 시간대를 선택해주세요.`);
+            Toast.warning(`⚠️ 시간이 겹칩니다!\n\n배치하려는 강의: ${time} ~ ${overlapCheck.newEndTime} (${AppState.draggedLecture.duration || 15}분)\n\n겹치는 강의: "${overlapCheck.conflictLecture.titleKo}"\n시간: ${overlapCheck.conflictTime} ~ ${overlapCheck.conflictEndTime}\n\n다른 시간대를 선택해주세요.`);
             AppState.draggedScheduleKey = null;
             AppState.draggedLecture = null;
             AppState.draggedIsBreak = false;
@@ -926,7 +931,7 @@ window.handleDrop = function(e) {
 
         // Break가 아닌 경우만 연자 중복 체크
         if (!isBreak) {
-            const speakerConflict = checkSpeakerConflict(time, room, AppState.draggedLecture, AppState.draggedScheduleKey);
+            const speakerConflict = checkSpeakerConflict(time, normalizedRoom, AppState.draggedLecture, AppState.draggedScheduleKey);
             if (speakerConflict.hasConflict) {
                 let alertMessage;
                 if (speakerConflict.conflictType === 'moderator') {
@@ -939,7 +944,7 @@ window.handleDrop = function(e) {
                     // 일반 연자 충돌
                     alertMessage = `⚠️ 연자 시간 충돌!\n\n연자: ${speakerConflict.speakerName}\n\n기존 강의: "${speakerConflict.conflictLecture.titleKo}"\n룸: ${speakerConflict.conflictRoom}\n시간: ${speakerConflict.conflictTime} ~ ${speakerConflict.conflictEndTime}\n\n배치하려는 시간: ${time} ~ ${speakerConflict.targetEndTime}\n룸: ${room}\n\n⏱️ 다른 룸 간 이동시간 최소 ${AppConfig.SPEAKER_TRANSFER_TIME}분 필요\n\n다른 시간대를 선택해주세요.`;
                 }
-                alert(alertMessage);
+                Toast.warning(alertMessage.replace(/\n/g, '<br>'), 6000);
                 AppState.draggedScheduleKey = null;
                 AppState.draggedLecture = null;
                 AppState.draggedIsBreak = false;
@@ -1042,7 +1047,7 @@ window.handleDrop = function(e) {
 
         const existingSession = AppState.sessions.find(s => s.time === time && normalizeRoomName(s.room) === normalizedDropRoom);
         if (existingSession) {
-            alert('이 위치에 이미 세션이 있습니다.');
+            Toast.warning('이 위치에 이미 세션이 있습니다.');
             AppState.draggedSession = null;
             return;
         }
@@ -1071,11 +1076,16 @@ window.checkTimeOverlap = function(targetTime, targetRoom, targetDuration, exclu
     // 배치하려는 강의가 런천강의인지 확인
     const isLuncheonLecture = draggedLecture && (draggedLecture.isLuncheon || draggedLecture.category === 'Luncheon');
 
+    // 룸 이름 정규화 (별표/공백 제거하여 비교)
+    const normalizedTargetRoom = window.normalizeRoomName ? window.normalizeRoomName(targetRoom) : targetRoom;
+
     for (const [scheduleKey, lecture] of Object.entries(AppState.schedule)) {
         if (excludeKey && scheduleKey === excludeKey) continue;
 
         const [existingTime, existingRoom] = [scheduleKey.substring(0, 5), scheduleKey.substring(6)];
-        if (existingRoom !== targetRoom) continue;
+        // 룸 이름 정규화 비교 (핵심 수정: 변경된 룸 이름도 정확히 매칭)
+        const normalizedExistingRoom = window.normalizeRoomName ? window.normalizeRoomName(existingRoom) : existingRoom;
+        if (normalizedExistingRoom !== normalizedTargetRoom) continue;
 
         const existingStartIndex = AppState.timeSlots.indexOf(existingTime);
         if (existingStartIndex === -1) continue;
