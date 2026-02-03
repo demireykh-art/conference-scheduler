@@ -1074,5 +1074,43 @@
     <script src="js/sponsor.js"></script>
     <script src="js/leaflet.js"></script>
     <script src="js/app.js"></script>
+
+    <!-- 모달 드래그 이탈 방지 + 안전한 배경 클릭 닫기 -->
+    <script>
+    // ── v3: 모달 드래그 이탈 방지 + 폼 입력 보호 ──
+    (function() {
+        let mouseDownTarget = null;
+        
+        // 1. mousedown 시작점 기록
+        document.addEventListener('mousedown', function(e) {
+            mouseDownTarget = e.target;
+        }, true);
+        
+        // 2. mouseup 시 닫기 판단
+        document.addEventListener('mouseup', function(e) {
+            const downOnBackdrop = mouseDownTarget && 
+                mouseDownTarget.classList.contains('modal') && 
+                mouseDownTarget.classList.contains('active');
+            const upOnBackdrop = e.target.classList.contains('modal') && 
+                e.target.classList.contains('active');
+            
+            // mousedown과 mouseup 모두 모달 배경(.modal)에서 발생한 경우만 닫기
+            // 모달 내부(input/textarea/select 등)에서 시작된 드래그는 절대 닫지 않음
+            if (downOnBackdrop && upOnBackdrop) {
+                e.target.classList.remove('active');
+            }
+            mouseDownTarget = null;
+        }, true);
+        
+        // 3. 모달 내부 input/textarea에서 발생한 mousedown이 모달까지 전파되지 않도록
+        document.addEventListener('mousedown', function(e) {
+            const isFormElement = e.target.matches('input, textarea, select, button, [contenteditable]');
+            const insideModal = e.target.closest('.modal-content');
+            if (isFormElement && insideModal) {
+                e.stopPropagation();
+            }
+        }, false);
+    })();
+    </script>
 </body>
 </html>
