@@ -940,9 +940,13 @@ window.openBreakDurationModal = function(scheduleKey, lecture) {
     });
 };
 
-// 모달 외부 클릭 시 닫기
+// 모달 외부 클릭 시 닫기 (data-lock 모달은 제외)
 window.onclick = function(event) {
-    if (event.target.className === 'modal active') {
+    if (event.target.classList.contains('modal') && event.target.classList.contains('active')) {
+        // data-lock="true"인 모달은 배경 클릭으로 닫지 않음
+        if (event.target.dataset.lock === 'true') {
+            return;
+        }
         event.target.classList.remove('active');
     }
 };
