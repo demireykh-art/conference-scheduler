@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ASLS Korea 2026 춘계</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Bebas+Neue&display=swap" rel="stylesheet">
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+  // Firebase 초기화 (V1 스케줄러와 동일한 프로젝트)
+  const firebaseConfig = {
+    apiKey: "AIzaSyBzV50mjOaEnUS86sS8zOhBH0i9OePnDhM",
+    authDomain: "conference-scheduler-a5656.firebaseapp.com",
+    databaseURL: "https://conference-scheduler-a5656-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "conference-scheduler-a5656",
+    storageBucket: "conference-scheduler-a5656.firebasestorage.app",
+    messagingSenderId: "592497469624",
+    appId: "1:592497469624:web:66012149580a0e144eec4d"
+  };
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+</script>
+<style>
+  :root {
+    --red: #D0021B; --red-dark: #A80016;
+    --white: #FFFFFF; --gray-50: #F9F9F9;
+    --gray-100: #F0F0F0; --gray-200: #E0E0E0;
+    --gray-400: #9E9E9E; --gray-600: #555;
+    --gray-900: #1A1A1A;
+    --gold: #C9962A; --plat: #7B8FA1; --emerald: #1A7A4A;
+    --shadow-sm: 0 2px 8px rgba(0,0,0,0.07);
+    --shadow-md: 0 4px 20px rgba(0,0,0,0.11);
+    --shadow-red: 0 8px 30px rgba(208,2,27,0.15);
+    --radius: 16px; --radius-sm: 10px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Noto Sans KR',sans-serif; background:var(--gray-50); color:var(--gray-900); max-width:430px; margin:0 auto; min-height:100vh; overflow-x:hidden; }
+
+  /* STATUS */
+  .status-bar { background:var(--red); padding:12px 20px 8px; display:flex; justify-content:space-between; align-items:center; }
+  .status-bar .time { font-size:15px; font-weight:600; color:white; }
+  .status-bar .icons { color:white; font-size:12px; }
+
+  /* HEADER */
+  .header { background:var(--red); padding:0 20px 20px; position:relative; overflow:hidden; }
+  .header::before { content:''; position:absolute; top:-50px; right:-50px; width:200px; height:200px; background:rgba(255,255,255,0.05); border-radius:50%; }
+  .header-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .logo-badge { background:white; border-radius:10px; padding:6px 10px; font-family:'Bebas Neue',sans-serif; font-size:18px; color:var(--red); letter-spacing:1px; }
+  .logo-text { color:white; font-size:13px; font-weight:500; opacity:.9; margin-left:10px; }
+  .header-icon { width:36px; height:36px; background:rgba(255,255,255,.15); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; border:none; color:white; font-size:17px; }
+  .event-title { color:rgba(255,255,255,.8); font-size:11px; font-weight:500; letter-spacing:.5px; margin-bottom:4px; }
+  .event-name { color:white; font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:2px; line-height:1; margin-bottom:10px; }
+  .event-meta { display:flex; gap:14px; }
+  .event-meta-item { display:flex; align-items:center; gap:5px; color:rgba(255,255,255,.85); font-size:12px; }
+
+  /* NAV */
+  .nav-tabs { background:white; display:flex; border-bottom:1px solid var(--gray-100); position:sticky; top:0; z-index:100; box-shadow:var(--shadow-sm); }
+  .nav-tab { flex:1; padding:13px 6px; text-align:center; font-size:11px; font-weight:500; color:var(--gray-400); cursor:pointer; border-bottom:3px solid transparent; border:none; background:none; display:flex; flex-direction:column; align-items:center; gap:3px; transition:all .2s; }
+  .nav-tab .tab-icon { font-size:17px; }
+  .nav-tab.active { color:var(--red); border-bottom:3px solid var(--red); }
+
+  /* SCREENS */
+  .screen { display:none; padding:16px; animation:fadeIn .25s ease; }
+  .screen.active { display:block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+  /* HOME */
+  .d-day-card { background:linear-gradient(135deg,var(--red),var(--red-dark)); border-radius:var(--radius); padding:20px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow-red); position:relative; overflow:hidden; }
+  .d-day-card::before { content:'2026'; position:absolute; right:-8px; bottom:-12px; font-family:'Bebas Neue',sans-serif; font-size:72px; color:rgba(255,255,255,.07); letter-spacing:4px; }
+  .d-day-left h3 { color:rgba(255,255,255,.8); font-size:12px; font-weight:400; margin-bottom:4px; }
+  .d-day-left .d-day { color:white; font-family:'Bebas Neue',sans-serif; font-size:48px; line-height:1; }
+  .d-day-right { text-align:right; }
+  .d-day-right .date { color:white; font-size:15px; font-weight:700; }
+  .d-day-right .venue { color:rgba(255,255,255,.8); font-size:12px; margin-top:4px; }
+
+  .stats-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:20px; }
+  .stat-card { background:white; border-radius:var(--radius-sm); padding:14px 10px; text-align:center; box-shadow:var(--shadow-sm); }
+  .stat-num { font-family:'Bebas Neue',sans-serif; font-size:28px; color:var(--red); line-height:1; }
+  .stat-label { font-size:11px; color:var(--gray-400); margin-top:3px; }
+
+  .section-title { font-size:15px; font-weight:700; color:var(--gray-900); margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; }
+  .see-all { font-size:12px; color:var(--red); font-weight:500; cursor:pointer; }
+
+  .quick-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:20px; }
+  .quick-btn { background:white; border-radius:var(--radius-sm); padding:14px 6px; text-align:center; box-shadow:var(--shadow-sm); cursor:pointer; transition:all .2s; border:1.5px solid transparent; }
+  .quick-btn:active { transform:scale(.96); }
+  .quick-btn.hl { border-color:var(--red); background:#FFF5F6; }
+  .quick-btn .q-icon { width:42px; height:42px; background:var(--gray-100); border-radius:11px; display:flex; align-items:center; justify-content:center; margin:0 auto 7px; font-size:21px; }
+  .quick-btn.hl .q-icon { background:rgba(208,2,27,.1); }
+  .quick-btn .q-label { font-size:11px; font-weight:500; color:var(--gray-600); line-height:1.3; }
+  .quick-btn.hl .q-label { color:var(--red); }
+
+  .notice-card { background:white; border-radius:var(--radius-sm); padding:13px 16px; margin-bottom:8px; box-shadow:var(--shadow-sm); display:flex; align-items:center; gap:10px; cursor:pointer; }
+  .notice-badge { background:var(--red); color:white; font-size:10px; font-weight:700; padding:3px 7px; border-radius:6px; white-space:nowrap; }
+  .notice-text { flex:1; font-size:13px; font-weight:500; }
+  .notice-date { font-size:11px; color:var(--gray-400); }
+
+  /* DIRECTORY */
+  .dir-search { background:white; border-radius:var(--radius-sm); padding:11px 14px; display:flex; align-items:center; gap:9px; box-shadow:var(--shadow-sm); margin-bottom:12px; border:1.5px solid var(--gray-100); }
+  .dir-search input { flex:1; border:none; outline:none; font-size:14px; font-family:'Noto Sans KR',sans-serif; }
+  .dir-search input::placeholder { color:var(--gray-400); }
+
+  .grade-filter { display:flex; gap:7px; overflow-x:auto; margin-bottom:14px; padding-bottom:3px; scrollbar-width:none; }
+  .grade-filter::-webkit-scrollbar { display:none; }
+  .grade-chip { padding:7px 13px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; border:1.5px solid; transition:all .2s; }
+  .grade-chip.all { border-color:var(--gray-200); background:white; color:var(--gray-600); }
+  .grade-chip.all.active { background:var(--gray-900); border-color:var(--gray-900); color:white; }
+  .grade-chip.ultimate { border-color:#8B1A8B; color:#8B1A8B; background:white; }
+  .grade-chip.ultimate.active { background:#8B1A8B; color:white; }
+  .grade-chip.elite { border-color:var(--red); color:var(--red); background:white; }
+  .grade-chip.elite.active { background:var(--red); color:white; }
+  .grade-chip.emerald { border-color:var(--emerald); color:var(--emerald); background:white; }
+  .grade-chip.emerald.active { background:var(--emerald); color:white; }
+  .grade-chip.platinum { border-color:var(--plat); color:var(--plat); background:white; }
+  .grade-chip.platinum.active { background:var(--plat); color:white; }
+  .grade-chip.gold { border-color:var(--gold); color:var(--gold); background:white; }
+  .grade-chip.gold.active { background:var(--gold); color:white; }
+  .grade-chip.classic { border-color:#5B7FA6; color:#5B7FA6; background:white; }
+  .grade-chip.classic.active { background:#5B7FA6; color:white; }
+
+  .company-list { }
+  .grade-section { margin-bottom:18px; }
+  .grade-header { display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:10px 14px; border-radius:var(--radius-sm); }
+  .grade-header.ultimate { background:rgba(139,26,139,.08); }
+  .grade-header.elite { background:rgba(208,2,27,.08); }
+  .grade-header.emerald { background:rgba(26,122,74,.08); }
+  .grade-header.platinum { background:rgba(123,143,161,.1); }
+  .grade-header.gold { background:rgba(201,150,42,.08); }
+  .grade-header.classic { background:rgba(91,127,166,.08); }
+  .grade-header.basic { background:var(--gray-100); }
+  .grade-crown { font-size:18px; }
+  .grade-name { font-size:13px; font-weight:700; }
+  .grade-name.ultimate { color:#8B1A8B; }
+  .grade-name.elite { color:var(--red); }
+  .grade-name.emerald { color:var(--emerald); }
+  .grade-name.platinum { color:var(--plat); }
+  .grade-name.gold { color:var(--gold); }
+  .grade-name.classic { color:#5B7FA6; }
+  .grade-count { margin-left:auto; font-size:11px; color:var(--gray-400); font-weight:500; }
+
+  .company-card { background:white; border-radius:var(--radius-sm); padding:13px 15px; margin-bottom:7px; box-shadow:var(--shadow-sm); display:flex; align-items:center; gap:12px; cursor:pointer; transition:all .2s; border:1px solid transparent; }
+  .company-card:active { transform:scale(.99); }
+  .cat-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .cat-dot.laser { background:#E53935; }
+  .cat-dot.inject { background:#1565C0; }
+  .cat-dot.lift { background:#2E7D32; }
+  .cat-dot.hair { background:#6A1B9A; }
+  .cat-dot.it { background:#E65100; }
+  .cat-dot.cosm { background:#AD1457; }
+  .cat-dot.other { background:#546E7A; }
+  .company-info { flex:1; min-width:0; }
+  .company-name { font-size:14px; font-weight:600; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .company-prod { font-size:11px; color:var(--gray-400); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .company-grade-badge { font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; white-space:nowrap; flex-shrink:0; }
+  .badge-ultimate { background:rgba(139,26,139,.12); color:#8B1A8B; }
+  .badge-elite { background:rgba(208,2,27,.1); color:var(--red); }
+  .badge-emerald { background:rgba(26,122,74,.1); color:var(--emerald); }
+  .badge-platinum { background:rgba(123,143,161,.15); color:var(--plat); }
+  .badge-gold { background:rgba(201,150,42,.1); color:var(--gold); }
+  .badge-classic { background:rgba(91,127,166,.1); color:#5B7FA6; }
+  .badge-basic { background:var(--gray-100); color:var(--gray-600); }
+
+  /* MODAL */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:300; align-items:flex-end; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal-sheet { background:white; border-radius:20px 20px 0 0; padding:24px 20px 44px; width:100%; max-width:430px; animation:slideUp .3s ease; }
+  @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+  .modal-handle { width:40px; height:4px; background:var(--gray-200); border-radius:2px; margin:0 auto 18px; }
+  .modal-grade { display:inline-block; font-size:11px; font-weight:700; padding:4px 10px; border-radius:8px; margin-bottom:8px; }
+  .modal-title { font-size:20px; font-weight:700; margin-bottom:4px; }
+  .modal-cat { font-size:13px; color:var(--gray-400); margin-bottom:18px; }
+  .modal-row { display:flex; gap:12px; margin-bottom:11px; align-items:flex-start; }
+  .modal-row .lbl { font-size:12px; color:var(--gray-400); min-width:56px; padding-top:1px; }
+  .modal-row .val { font-size:14px; font-weight:500; flex:1; line-height:1.5; }
+  .modal-row .val.red { color:var(--red); }
+  .modal-actions { display:flex; gap:8px; margin-top:18px; }
+  .btn-out { flex:1; padding:13px; border-radius:var(--radius-sm); font-size:14px; font-weight:600; cursor:pointer; border:1.5px solid var(--gray-200); background:white; font-family:'Noto Sans KR',sans-serif; color:var(--gray-600); }
+  .btn-pri { flex:2; padding:13px; border-radius:var(--radius-sm); font-size:14px; font-weight:600; cursor:pointer; border:none; background:var(--red); color:white; font-family:'Noto Sans KR',sans-serif; }
+
+  /* BOTTOM NAV */
+  .bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:430px; background:white; border-top:1px solid var(--gray-100); display:flex; padding:8px 0 20px; z-index:200; box-shadow:0 -4px 20px rgba(0,0,0,.06); }
+  .bottom-nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer; border:none; background:none; padding:4px 0; }
+  .bottom-nav-btn .b-icon { font-size:21px; color:var(--gray-400); transition:color .2s; }
+  .bottom-nav-btn .b-label { font-size:10px; color:var(--gray-400); font-weight:500; transition:color .2s; }
+  .bottom-nav-btn.active .b-icon, .bottom-nav-btn.active .b-label { color:var(--red); }
+  .pb-safe { height:80px; }
+
+  /* CONFIRM chip */
+  .confirm-chip { display:inline-block; font-size:10px; padding:2px 7px; border-radius:5px; font-weight:600; margin-left:6px; }
+  .chip-confirmed { background:rgba(26,122,74,.1); color:var(--emerald); }
+  .chip-pending { background:rgba(201,150,42,.1); color:var(--gold); }
+  .chip-no { background:var(--gray-100); color:var(--gray-400); text-decoration:line-through; }
+
+  .empty-msg { text-align:center; padding:40px 20px; color:var(--gray-400); font-size:14px; }
+</style>
+</head>
+<body>
+
+<div class="status-bar">
+  <span class="time">9:41</span>
+  <span class="icons">▪▪▪▪ WiFi 🔋95</span>
+</div>
+
+<div class="header">
+  <div class="header-top">
+    <div style="display:flex;align-items:center">
+      <div class="logo-badge">ASLS</div>
+      <span class="logo-text">Korea 2026</span>
+    </div>
+    <button class="header-icon">⚙</button>
+  </div>
+  <div class="event-title">대한미용성형레이저의학회</div>
+  <div class="event-name">춘계학술대회</div>
+  <div class="event-meta">
+    <div class="event-meta-item">📅 2026 상반기 예정</div>
+    <div class="event-meta-item">📍 코엑스 서울</div>
+  </div>
+</div>
+
+<div class="nav-tabs">
+  <button class="nav-tab active" onclick="switchTab('home',this)"><span class="tab-icon">🏠</span>홈</button>
+  <button class="nav-tab" onclick="switchTab('directory',this)"><span class="tab-icon">🏢</span>업체</button>
+  <button class="nav-tab" onclick="switchTab('program',this)"><span class="tab-icon">📋</span>프로그램</button>
+  <button class="nav-tab" onclick="switchTab('mypage',this)"><span class="tab-icon">👤</span>MY</button>
+</div>
+
+<!-- HOME -->
+<div class="screen active" id="screen-home">
+  <div class="d-day-card">
+    <div class="d-day-left">
+      <h3>개최까지</h3>
+      <div class="d-day">D-<span id="dday-num">--</span></div>
+      <div style="font-size:11px;color:var(--gray-400);margin-top:2px"><span id="dday-label">일 후</span> 개최</div>
+    </div>
+    <div class="d-day-right">
+      <div class="date" id="event-date-display">2026 춘계</div>
+      <div class="venue" id="event-venue-display">COEX, 서울</div>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-num" id="stat-companies">-</div>
+      <div class="stat-label">참가업체</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">6</div>
+      <div class="stat-label">등급</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">5</div>
+      <div class="stat-label">카테고리</div>
+    </div>
+  </div>
+
+  <div class="section-title">빠른 메뉴</div>
+  <div class="quick-grid">
+    <div class="quick-btn hl" onclick="switchTabByName('directory')">
+      <div class="q-icon">🏢</div>
+      <div class="q-label">참가업체<br>디렉토리</div>
+    </div>
+    <div class="quick-btn" onclick="switchTabByName('program')">
+      <div class="q-icon">📋</div>
+      <div class="q-label">세미나<br>일정</div>
+    </div>
+    <div class="quick-btn">
+      <div class="q-icon">🗺</div>
+      <div class="q-label">전시장<br>도면</div>
+    </div>
+    <div class="quick-btn">
+      <div class="q-icon">📷</div>
+      <div class="q-label">QR<br>스캔</div>
+    </div>
+    <div class="quick-btn">
+      <div class="q-icon">🏆</div>
+      <div class="q-label">어워드</div>
+    </div>
+    <div class="quick-btn">
+      <div class="q-icon">🔖</div>
+      <div class="q-label">즐겨찾기</div>
+    </div>
+  </div>
+
+  <div class="section-title">공지사항 <span class="see-all">전체보기</span></div>
+  <div class="notice-card"><span class="notice-badge">NEW</span><span class="notice-text">2026 춘계 참가업체 등록 마감 안내</span><span class="notice-date">01.20</span></div>
+  <div class="notice-card"><span class="notice-badge">공지</span><span class="notice-text">얼티밋/엘리트 등급 부스 배치 확정</span><span class="notice-date">01.15</span></div>
+  <div class="notice-card"><span class="notice-badge">공지</span><span class="notice-text">사전등록 참가자 혜택 안내</span><span class="notice-date">01.10</span></div>
+  <div class="pb-safe"></div>
+</div>
+
+<!-- DIRECTORY -->
+<div class="screen" id="screen-directory">
+  <div class="dir-search">
+    <span style="font-size:18px">🔍</span>
+    <input type="text" id="company-search" placeholder="업체명 또는 제품명 검색" oninput="filterCompanies()">
+  </div>
+  <div class="grade-filter">
+    <button class="grade-chip all active" onclick="filterGrade('all',this)">전체</button>
+    <button class="grade-chip ultimate" onclick="filterGrade('ultimate',this)">👑 얼티밋</button>
+    <button class="grade-chip elite" onclick="filterGrade('elite',this)">⭐ 엘리트</button>
+    <button class="grade-chip emerald" onclick="filterGrade('emerald',this)">💎 에메랄드</button>
+    <button class="grade-chip platinum" onclick="filterGrade('platinum',this)">🥈 플래티넘</button>
+    <button class="grade-chip gold" onclick="filterGrade('gold',this)">🥇 골드</button>
+    <button class="grade-chip classic" onclick="filterGrade('classic',this)">클래식/베이직</button>
+  </div>
+  <div id="company-list"></div>
+  <div class="pb-safe"></div>
+</div>
+
+<!-- PROGRAM -->
+<div class="screen" id="screen-program">
+  <div style="background:white;border-radius:var(--radius-sm);padding:20px;box-shadow:var(--shadow-sm);text-align:center;margin-bottom:12px">
+    <div style="font-size:32px;margin-bottom:8px">📋</div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:6px">세미나 프로그램</div>
+    <div style="font-size:13px;color:var(--gray-400)">2026 춘계 프로그램은<br>확정 후 업데이트 예정입니다.</div>
+  </div>
+  <div class="notice-card"><span class="notice-badge">예정</span><span class="notice-text">키노트: K-미용의료 글로벌 전략 2026</span><span class="notice-date">예정</span></div>
+  <div class="notice-card"><span class="notice-badge">예정</span><span class="notice-text">레이저/에너지기기 최신 임상 세션</span><span class="notice-date">예정</span></div>
+  <div class="notice-card"><span class="notice-badge">예정</span><span class="notice-text">필러/톡신 워크샵 (핸즈온)</span><span class="notice-date">예정</span></div>
+  <div class="pb-safe"></div>
+</div>
+
+<!-- MY PAGE -->
+<div class="screen" id="screen-mypage">
+  <div style="background:linear-gradient(135deg,var(--red),var(--red-dark));border-radius:var(--radius);padding:24px 20px;margin-bottom:16px;color:white;box-shadow:var(--shadow-red)">
+    <div style="font-size:36px;margin-bottom:8px">👤</div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:4px">홍길동 원장</div>
+    <div style="font-size:12px;opacity:.8">대한미용성형레이저의학회 회원</div>
+  </div>
+  <div class="notice-card">
+  <span style="font-size:20px">🔖</span>
+  <span class="notice-text">즐겨찾기 업체 (<span id="fav-count">0</span>)</span>
+</div>
+<div id="fav-list" style="padding:0 16px 16px;"></div>
+  <div class="notice-card"><span style="font-size:20px">📅</span><span class="notice-text">내 세미나 일정</span><span style="color:var(--red);font-size:13px">›</span></div>
+  <div class="notice-card"><span style="font-size:20px">📷</span><span class="notice-text">QR 명함 스캔 기록</span><span style="color:var(--red);font-size:13px">›</span></div>
+  <div class="notice-card"><span style="font-size:20px">⚙</span><span class="notice-text">설정</span><span style="color:var(--red);font-size:13px">›</span></div>
+  <div class="pb-safe"></div>
+</div>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <button class="bottom-nav-btn active" id="nav-home" onclick="switchTabByName('home')"><span class="b-icon">🏠</span><span class="b-label">홈</span></button>
+  <button class="bottom-nav-btn" id="nav-directory" onclick="switchTabByName('directory')"><span class="b-icon">🏢</span><span class="b-label">업체</span></button>
+  <button class="bottom-nav-btn" id="nav-program" onclick="switchTabByName('program')"><span class="b-icon">📋</span><span class="b-label">프로그램</span></button>
+  <button class="bottom-nav-btn" id="nav-mypage" onclick="switchTabByName('mypage')"><span class="b-icon">👤</span><span class="b-label">MY</span></button>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div id="modal-grade-badge" class="modal-grade badge-elite">엘리트</div>
+    <div id="modal-name" class="modal-title">클래시스</div>
+    <div id="modal-cat" class="modal-cat">Laser &amp; EBDs</div>
+    <div class="modal-row"><span class="lbl">주요제품</span><span id="modal-prod" class="val"></span></div>
+    <div class="modal-row"><span class="lbl">담당자</span><span id="modal-person" class="val"></span></div>
+    <div class="modal-row"><span class="lbl">연락처</span><span id="modal-tel" class="val red"></span></div>
+    <div class="modal-actions">
+      <button class="btn-out" onclick="closeModalBtn()">닫기</button>
+      <button class="btn-pri" id="modal-fav-btn">🔖 즐겨찾기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================
+// 상수
+// ============================================
+const GRADE_INFO = {
+  ultimate: { label:'👑 얼티밋', badgeClass:'badge-ultimate' },
+  elite:    { label:'⭐ 엘리트', badgeClass:'badge-elite' },
+  emerald:  { label:'💎 에메랄드', badgeClass:'badge-emerald' },
+  platinum: { label:'🥈 플래티넘', badgeClass:'badge-platinum' },
+  gold:     { label:'🥇 골드', badgeClass:'badge-gold' },
+  classic:  { label:'클래식/베이직', badgeClass:'badge-classic' },
+};
+const GRADE_ORDER = ['ultimate','elite','emerald','platinum','gold','classic'];
+
+// ============================================
+// 상태
+// ============================================
+let COMPANIES = [];       // Firebase에서 로드
+let currentGrade = 'all';
+let currentSearch = '';
+let favorites = JSON.parse(localStorage.getItem('asls_favorites') || '[]');
+let eventInfo = {};       // Firebase에서 로드 (날짜, 장소 등)
+
+// ============================================
+// Firebase 데이터 로드
+// ============================================
+function loadFromFirebase() {
+  showLoading(true);
+
+  // 행사 정보 로드 (날짜, 장소)
+  db.ref('/settings').once('value', snap => {
+    const settings = snap.val() || {};
+    eventInfo = settings;
+
+    // D-Day 계산
+    const dates = settings.dates || [];
+    if (dates.length > 0) {
+      const firstDate = new Date(dates[0].date);
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const diff = Math.ceil((firstDate - today) / (1000 * 60 * 60 * 24));
+      const ddayEl = document.getElementById('dday-num');
+      if (ddayEl) {
+        ddayEl.textContent = diff > 0 ? diff : (diff === 0 ? 'D-Day' : Math.abs(diff));
+        const ddayLabel = document.getElementById('dday-label');
+        if (ddayLabel) ddayLabel.textContent = diff > 0 ? '일 후' : (diff === 0 ? '!' : '일 전');
+      }
+      // 날짜/장소 표시
+      const dateEl = document.getElementById('event-date-display');
+      if (dateEl && dates.length > 0) {
+        const d0 = dates[0];
+        const d1 = dates[dates.length - 1];
+        dateEl.textContent = d0.date + (d1 && d1.date !== d0.date ? ' ~ ' + d1.date : '');
+      }
+    }
+  });
+
+  // 업체 데이터 로드
+  db.ref('/companies').once('value', snap => {
+    const raw = snap.val();
+    if (raw) {
+      // Firebase 데이터가 배열 또는 객체일 수 있음
+      if (Array.isArray(raw)) {
+        COMPANIES = raw.filter(Boolean);
+      } else {
+        COMPANIES = Object.values(raw).filter(Boolean);
+      }
+      // grade 없는 경우 기본값
+      COMPANIES = COMPANIES.map(c => ({
+        grade: 'classic',
+        cat: 'other',
+        catLabel: '기타',
+        prod: '-',
+        person: '-',
+        tel: '-',
+        ...c
+      }));
+    } else {
+      // Firebase에 데이터 없으면 안내
+      COMPANIES = [];
+      console.log('⚠️ Firebase에 업체 데이터 없음');
+    }
+    showLoading(false);
+    renderList();
+    updateStats();
+  });
+
+  // 실시간 업데이트 리스너 (관리자가 수정하면 앱도 반영)
+  db.ref('/companies').on('value', snap => {
+    const raw = snap.val();
+    if (!raw) return;
+    COMPANIES = Array.isArray(raw)
+      ? raw.filter(Boolean)
+      : Object.values(raw).filter(Boolean);
+    COMPANIES = COMPANIES.map(c => ({
+      grade: 'classic', cat: 'other', catLabel: '기타',
+      prod: '-', person: '-', tel: '-', ...c
+    }));
+    renderList();
+    updateStats();
+  });
+}
+
+function showLoading(show) {
+  let el = document.getElementById('loading-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'loading-overlay';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;z-index:9999;font-size:14px;color:#999;';
+    el.innerHTML = '<div style="text-align:center"><div style="font-size:24px;margin-bottom:8px">⏳</div>데이터 로딩 중...</div>';
+    document.body.appendChild(el);
+  }
+  el.style.display = show ? 'flex' : 'none';
+}
+
+function updateStats() {
+  const statEl = document.getElementById('stat-companies');
+  if (statEl) statEl.textContent = COMPANIES.length;
+}
+
+// ============================================
+// 렌더링
+// ============================================
+function renderList() {
+  const list = document.getElementById('company-list');
+  if (!list) return;
+  const q = currentSearch.toLowerCase();
+
+  let filtered = COMPANIES.filter(c => {
+    const matchGrade = currentGrade === 'all' || c.grade === currentGrade;
+    const matchSearch = !q ||
+      (c.name || '').toLowerCase().includes(q) ||
+      (c.prod || '').toLowerCase().includes(q);
+    return matchGrade && matchSearch;
+  });
+
+  if (filtered.length === 0) {
+    list.innerHTML = COMPANIES.length === 0
+      ? '<div class="empty-msg">🔄 데이터를 불러오는 중입니다...</div>'
+      : '<div class="empty-msg">검색 결과가 없습니다.</div>';
+    return;
+  }
+
+  if (currentGrade !== 'all' || q) {
+    list.innerHTML = filtered.map(c => companyCardHTML(c)).join('');
+    return;
+  }
+
+  let html = '';
+  GRADE_ORDER.forEach(grade => {
+    const group = filtered.filter(c => c.grade === grade);
+    if (!group.length) return;
+    const g = GRADE_INFO[grade];
+    html += `<div class="grade-section">
+      <div class="grade-header ${grade}">
+        <span class="grade-name ${grade}">${g.label}</span>
+        <span class="grade-count">${group.length}개사</span>
+      </div>
+      ${group.map(c => companyCardHTML(c)).join('')}
+    </div>`;
+  });
+  list.innerHTML = html;
+}
+
+function companyCardHTML(c) {
+  const g = GRADE_INFO[c.grade] || GRADE_INFO.classic;
+  const isFav = favorites.includes(c.name);
+  return `<div class="company-card" onclick='showDetail(${JSON.stringify(c).replace(/'/g,"&#39;")})'>
+    <div class="cat-dot ${c.cat || 'other'}"></div>
+    <div class="company-info">
+      <div class="company-name">${c.name}</div>
+      <div class="company-prod">${c.prod || '-'}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span style="font-size:14px;cursor:pointer;" onclick="event.stopPropagation();toggleFav('${c.name}')">${isFav ? '🔖' : '☆'}</span>
+      <span class="company-grade-badge ${g.badgeClass}">${g.label.replace(/^[^\s]+ /,'')}</span>
+    </div>
+  </div>`;
+}
+
+// ============================================
+// 즐겨찾기
+// ============================================
+function toggleFav(name) {
+  const idx = favorites.indexOf(name);
+  if (idx > -1) {
+    favorites.splice(idx, 1);
+  } else {
+    favorites.push(name);
+  }
+  localStorage.setItem('asls_favorites', JSON.stringify(favorites));
+  renderList();
+  renderFavorites();
+}
+
+function renderFavorites() {
+  const el = document.getElementById('fav-list');
+  if (!el) return;
+  const favCompanies = COMPANIES.filter(c => favorites.includes(c.name));
+  const countEl = document.getElementById('fav-count');
+  if (countEl) countEl.textContent = favCompanies.length;
+  if (favCompanies.length === 0) {
+    el.innerHTML = '<div class="empty-msg">즐겨찾기한 업체가 없습니다.<br>업체 카드의 ☆을 눌러 추가하세요.</div>';
+    return;
+  }
+  el.innerHTML = favCompanies.map(c => companyCardHTML(c)).join('');
+}
+
+// ============================================
+// 필터/검색
+// ============================================
+function filterGrade(grade, el) {
+  currentGrade = grade;
+  document.querySelectorAll('.grade-chip').forEach(c => c.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderList();
+}
+
+function filterCompanies() {
+  currentSearch = document.getElementById('company-search').value;
+  renderList();
+}
+
+// ============================================
+// 상세 모달
+// ============================================
+function showDetail(c) {
+  const g = GRADE_INFO[c.grade] || GRADE_INFO.classic;
+  document.getElementById('modal-grade-badge').className = `modal-grade ${g.badgeClass}`;
+  document.getElementById('modal-grade-badge').textContent = g.label;
+  document.getElementById('modal-name').textContent = c.name;
+  document.getElementById('modal-cat').textContent = c.catLabel || c.cat || '-';
+  document.getElementById('modal-prod').textContent = c.prod || '-';
+  document.getElementById('modal-person').textContent = c.person || '-';
+  document.getElementById('modal-tel').textContent = c.tel || '-';
+
+  // 즐겨찾기 버튼 상태
+  const favBtn = document.getElementById('modal-fav-btn');
+  if (favBtn) {
+    const isFav = favorites.includes(c.name);
+    favBtn.textContent = isFav ? '🔖 즐겨찾기 해제' : '🔖 즐겨찾기';
+    favBtn.onclick = () => { toggleFav(c.name); closeModalBtn(); };
+  }
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('modal'))
+    document.getElementById('modal').classList.remove('open');
+}
+function closeModalBtn() {
+  document.getElementById('modal').classList.remove('open');
+}
+
+// ============================================
+// 탭 전환
+// ============================================
+function switchTab(name, el) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  if (el) el.classList.add('active');
+  document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.remove('active'));
+  const nb = document.getElementById('nav-' + name);
+  if (nb) nb.classList.add('active');
+
+  // 즐겨찾기 탭 진입 시 렌더
+  if (name === 'mypage') renderFavorites();
+}
+function switchTabByName(name) {
+  const names = ['home', 'directory', 'program', 'mypage'];
+  switchTab(name, document.querySelectorAll('.nav-tab')[names.indexOf(name)]);
+}
+
+// ============================================
+// 초기 실행
+// ============================================
+loadFromFirebase();
+</script>
+</body>
+</html>
