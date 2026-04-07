@@ -1492,3 +1492,35 @@ input[type="radio"] {
     border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--primary-light); }
+
+/* ============================================
+   PWA standalone 모드 (홈화면 앱)
+   ============================================ */
+
+/* iOS safe area 대응 */
+@supports (padding: max(0px)) {
+    .app-header {
+        padding-top: max(0px, env(safe-area-inset-top));
+        height: calc(var(--header-h) + max(0px, env(safe-area-inset-top)));
+    }
+    .app-layout {
+        top: calc(var(--header-h) + max(0px, env(safe-area-inset-top)));
+    }
+    .bottom-tabbar {
+        padding-bottom: max(0px, env(safe-area-inset-bottom));
+        height: calc(var(--tabbar-h) + max(0px, env(safe-area-inset-bottom)));
+    }
+    .app-layout {
+        bottom: calc(var(--tabbar-h) + max(0px, env(safe-area-inset-bottom)));
+    }
+}
+
+/* standalone 모드에서 헤더 상태바 여백 */
+@media (display-mode: standalone) {
+    body {
+        background: var(--primary);
+    }
+    .app-layout {
+        background: var(--bg);
+    }
+}
