@@ -144,26 +144,32 @@ window.updateAuthUI = function(user) {
         let roleText = '';
         let roleColor = '';
 
+        const addLectureCard = document.getElementById('addLectureCard');
+
         switch (AppState.currentUserRole) {
             case 'admin':
                 roleText = '👑 관리자';
                 roleColor = '#f39c12';
                 adminOnlyBtns.forEach(btn => btn.style.display = '');
+                if (addLectureCard) addLectureCard.style.display = '';
                 break;
             case 'editor':
                 roleText = '✏️ 편집자';
                 roleColor = '#27ae60';
                 adminOnlyBtns.forEach(btn => btn.style.display = 'none');
+                if (addLectureCard) addLectureCard.style.display = '';
                 break;
             case 'pending':
                 roleText = '⏳ 승인대기';
                 roleColor = '#e74c3c';
                 adminOnlyBtns.forEach(btn => btn.style.display = 'none');
+                if (addLectureCard) addLectureCard.style.display = 'none';
                 break;
             default:
                 roleText = '로딩...';
                 roleColor = '#999';
                 adminOnlyBtns.forEach(btn => btn.style.display = 'none');
+                if (addLectureCard) addLectureCard.style.display = 'none';
         }
 
         authStatus.innerHTML = `
