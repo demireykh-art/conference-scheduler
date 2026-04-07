@@ -6,18 +6,8 @@
 // 기본 연자 데이터
 // ============================================
 
-const SPEAKERS_DATA = [
-    { name: "Yesin Lae", nameEn: "Yesin Lae", affiliation: "인도네시아", affiliationEn: "Indonesia" },
-    { name: "Ting Song Lim", nameEn: "Ting Song Lim", affiliation: "Malaysia", affiliationEn: "Malaysia" },
-    { name: "황제완", nameEn: "Hwang Je-wan", affiliation: "메이린의원 더현대 대구", affiliationEn: "Mayline Clinic" },
-    { name: "황용호", nameEn: "Hwang Yong-ho", affiliation: "웰스킨의원", affiliationEn: "Wellskin Clinic" },
-    { name: "홍한빛", nameEn: "Hong Han-bit", affiliation: "룩스웰의원", affiliationEn: "Luxwell Clinic" },
-    { name: "최호성", nameEn: "Choi Ho-seong", affiliation: "피어나의원", affiliationEn: "Pieona Clinic" },
-    { name: "이상돈", nameEn: "Lee Sang-don", affiliation: "대미레 학술고문", affiliationEn: "Daemire Academic Advisor" },
-    { name: "문형진", nameEn: "Moon Hyeong-jin", affiliation: "대미레 학술고문", affiliationEn: "Daemire Academic Advisor" },
-    { name: "김희진", nameEn: "Kim Hee-jin", affiliation: "연세대학교 치과대학 교수", affiliationEn: "Yonsei University Dental Professor" }
-    // 추가 연자는 실제 데이터에서 로드
-];
+// 연자 데이터는 Firebase /data/speakers 에서만 로드 (하드코딩 제거)
+const SPEAKERS_DATA = [];
 
 // ============================================
 // Firebase 실시간 리스너
@@ -25,6 +15,7 @@ const SPEAKERS_DATA = [
 
 window.startRealtimeListeners = function() {
     listenToOnlineUsers();
+    loadConferenceDatesFromFirebase();  // 날짜 설정 로드 (하드코딩 제거)
     loadTimeSettingsFromFirebase();
     loadLastBackupTime();
 
@@ -324,6 +315,45 @@ window.saveTimeSettingsToFirebase = function() {
 /**
  * 시간 설정 Firebase에서 로드
  */
+/**
+ * Firebase에서 날짜/룸 설정 로드 (하드코딩 대체)
+ */
+window.loadConferenceDatesFromFirebase = function() {
+    database.ref('/settings/dates').once('value', (snapshot) => {
+        if (snapshot.exists()) {
+            AppConfig.CONFERENCE_DATES = snapshot.val();
+        }
+        // 날짜가 없으면 설정 안내
+        if (!AppConfig.CONFERENCE_DATES || AppConfig.CONFERENCE_DATES.length === 0) {
+            console.warn('⚠️ 날짜 설정 없음 - 설정 모달에서 날짜를 추가해주세요');
+            if (typeof showDateSetupGuide === 'function') showDateSetupGuide();
+            return;
+        }
+        // dataByDate 초기화
+        AppConfig.CONFERENCE_DATES.forEach(d => {
+            if (!AppState.dataByDate[d.date]) {
+                AppState.dataByDate[d.date] = { lectures: [], schedule: {}, sessions: [] };
+            }
+        });
+        // 첫 번째 날짜를 기본 선택
+        if (!AppState.currentDate) {
+            AppState.currentDate = AppConfig.CONFERENCE_DATES[0].date;
+        }
+        updateDateButtons();
+        loadDateData(AppState.currentDate);
+        console.log('날짜 설정 로드:', AppConfig.CONFERENCE_DATES);
+    });
+
+    database.ref('/settings/roomsByDate').once('value', (snapshot) => {
+        if (snapshot.exists()) {
+            AppConfig.ROOMS_BY_DATE = snapshot.val();
+            if (AppState.currentDate) {
+                AppState.rooms = AppConfig.ROOMS_BY_DATE[AppState.currentDate] || [];
+            }
+        }
+    });
+};
+
 window.loadTimeSettingsFromFirebase = function() {
     database.ref('/settings/timeSettings').once('value', (snapshot) => {
         if (snapshot.exists()) {
@@ -529,14 +559,13 @@ window.resetAllData = function() {
     localStorage.removeItem('conference_categories');
 
     AppState.dataByDate = {
-        '2026-04-11': { lectures: [], schedule: {}, sessions: [] },
-        '2026-04-12': { lectures: [], schedule: {}, sessions: [] }
+        // 날짜 데이터: Firebase에서 동적 로드
     };
     AppState.lectures = [];
     AppState.schedule = {};
     AppState.sessions = [];
     AppState.speakers = [...SPEAKERS_DATA];
-    AppState.currentDate = '2026-04-11';
+    // currentDate: Firebase settings 로드 후 설정
     AppState.rooms = AppConfig.ROOMS_BY_DATE[AppState.currentDate];
 
     saveToFirebase();
@@ -1030,8 +1059,10 @@ window.executePrintWithFormat = function() {
 
 window.printSelectedRooms = function(roomIndices, language = 'ko') {
     const isEnglish = language === 'en';
-    const dateLabel = AppState.currentDate === '2026-04-11' ? (isEnglish ? 'Saturday' : '토요일') : (isEnglish ? 'Sunday' : '일요일');
-    const dateShort = AppState.currentDate === '2026-04-11' ? (isEnglish ? 'Sat' : '토') : (isEnglish ? 'Sun' : '일');
+    const dateInfo = AppConfig.CONFERENCE_DATES.find(d => d.date === AppState.currentDate);
+    const dateLabel = dateInfo ? dateInfo.label : AppState.currentDate;
+    const _dateInfo = AppConfig.CONFERENCE_DATES.find(d => d.date === AppState.currentDate);
+    const dateShort = _dateInfo ? _dateInfo.label.substring(0, 1) : (AppState.currentDate || '');
     
     // 1안 형식 스타일
     let printContent = `
@@ -1743,12 +1774,9 @@ window.restoreSidebarState = function() {
 // 행사 날짜 관리 (요청사항 #7)
 // ============================================
 
-// 기본 행사 날짜
+// 날짜는 Firebase /settings/dates 에서 로드 (하드코딩 없음)
 if (!AppState.eventDates) {
-    AppState.eventDates = [
-        { date: '2026-04-11', label: 'ASLS춘계 토요일', day: 'sat' },
-        { date: '2026-04-12', label: 'ASLS춘계 일요일', day: 'sun' }
-    ];
+    AppState.eventDates = [];
 }
 
 /**
