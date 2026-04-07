@@ -767,10 +767,9 @@ window.selectSpeaker = function(index) {
  * 새 연자 추가 확인 모달 닫기
  */
 window.closeConfirmAddSpeaker = function() {
+    // 아니오: 연자 추가 안 하고 강의만 추가
     document.getElementById('confirmAddSpeakerModal').classList.remove('active');
-    if (AppState.pendingSpeakerInfo) {
-        addLectureToList();
-    }
+    addLectureToList();
     AppState.pendingSpeakerInfo = null;
 };
 
