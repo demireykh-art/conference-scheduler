@@ -134,16 +134,13 @@ window.AppState = {
     lastSyncTime: null,
 
     // 현재 날짜
-    currentDate: '2026-04-11',
+    currentDate: null,  // Firebase /settings/dates 로드 후 설정
 
     // 현재 언어
     currentLanguage: 'ko',
 
     // 날짜별 데이터 저장소
-    dataByDate: {
-        '2026-04-11': { lectures: [], schedule: {}, sessions: [] },
-        '2026-04-12': { lectures: [], schedule: {}, sessions: [] }
-    },
+    dataByDate: {},  // Firebase에서 동적 로드
 
     // 현재 날짜의 데이터 (참조)
     lectures: [],
@@ -173,8 +170,7 @@ window.AppState = {
 
     // 날짜별 시간 설정
     timeSettingsByDate: {
-        '2026-04-11': { startTime: '13:00', endTime: '18:30' },
-        '2026-04-12': { startTime: '08:30', endTime: '17:00' }
+        // Firebase /settings/timeSettings 에서 로드
     },
 
     // 필터 상태
