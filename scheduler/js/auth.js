@@ -102,7 +102,7 @@ auth.onAuthStateChanged((user) => {
     AppState.currentUser = user;
 
     if (user) {
-        document.getElementById('loginOverlay').classList.add('hidden');
+        document.getElementById('loginOverlay').classList.remove('active');
         resetSessionTimeout();
         listenToUserRole(user);
         registerOnlinePresence(user);
@@ -110,7 +110,7 @@ auth.onAuthStateChanged((user) => {
         registerOrCheckUser(user);
         console.log('로그인됨:', user.email);
     } else {
-        document.getElementById('loginOverlay').classList.remove('hidden');
+        document.getElementById('loginOverlay').classList.add('active');
         AppState.currentUserRole = null;
         updateAuthUI(null);
 
