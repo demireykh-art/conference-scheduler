@@ -6,10 +6,19 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="스케줄러">
+    <meta name="application-name" content="스케줄러">
+    <meta name="theme-color" content="#2E1A47">
+    <meta name="msapplication-TileColor" content="#2E1A47">
     <title>학술대회 스케줄러</title>
 
-    <!-- Favicon -->
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Favicon / Apple Touch Icon -->
     <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="favicon-192.png">
+    <link rel="apple-touch-startup-image" href="favicon-192.png">
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -1135,6 +1144,50 @@
     <script src="js/sponsor.js"></script>
     <script src="js/leaflet.js"></script>
     <script src="js/app.js"></script>
+
+    <!-- PWA Service Worker 등록 -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('SW 등록됨:', reg.scope))
+                .catch(err => console.warn('SW 등록 실패:', err));
+        });
+    }
+    </script>
+
+    <!-- PWA 설치 유도 배너 -->
+    <div id="pwaInstallBanner" style="display:none;position:fixed;bottom:calc(var(--tabbar-h,64px) + 8px);left:50%;transform:translateX(-50%);background:#2E1A47;color:white;padding:0.6rem 1rem;border-radius:20px;font-size:0.8rem;align-items:center;gap:0.75rem;box-shadow:0 4px 20px rgba(46,26,71,0.4);z-index:800;white-space:nowrap;">
+        <span>📲 홈화면에 추가하면 앱처럼 사용할 수 있어요!</span>
+        <button id="pwaInstallBtn" style="background:#FF6B9D;color:white;border:none;border-radius:12px;padding:0.3rem 0.75rem;font-size:0.75rem;cursor:pointer;font-family:inherit;font-weight:600;">추가</button>
+        <button onclick="document.getElementById('pwaInstallBanner').style.display='none'" style="background:rgba(255,255,255,0.15);color:white;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:0.8rem;">✕</button>
+    </div>
+    <script>
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', e => {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (window.matchMedia('(display-mode: standalone)').matches) return;
+        const banner = document.getElementById('pwaInstallBanner');
+        if (banner) banner.style.display = 'flex';
+    });
+    document.addEventListener('DOMContentLoaded', () => {
+        const installBtn = document.getElementById('pwaInstallBtn');
+        if (installBtn) {
+            installBtn.addEventListener('click', async () => {
+                if (!deferredPrompt) return;
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                deferredPrompt = null;
+                document.getElementById('pwaInstallBanner').style.display = 'none';
+            });
+        }
+    });
+    window.addEventListener('appinstalled', () => {
+        const banner = document.getElementById('pwaInstallBanner');
+        if (banner) banner.style.display = 'none';
+    });
+    </script>
 
     <!-- 탭 전환 + 모달 드래그 이탈 방지 -->
     <script>
