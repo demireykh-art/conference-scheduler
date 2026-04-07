@@ -68,6 +68,18 @@ window.openCellSessionModal = function(time, room) {
         btn.classList.toggle('selected', btn.dataset.color === defaultColor);
     });
 
+    // 패널 토의 설정 초기화
+    const hasPanelEl = document.getElementById('cellSessionHasPanel');
+    const panelDurEl = document.getElementById('cellSessionPanelDuration');
+    const panelRow = document.getElementById('cellSessionPanelRow');
+    if (hasPanelEl) {
+        hasPanelEl.checked = existingSession ? !!existingSession.hasPanelDiscussion : false;
+        if (panelRow) panelRow.style.display = hasPanelEl.checked ? 'flex' : 'none';
+    }
+    if (panelDurEl) {
+        panelDurEl.value = existingSession ? (existingSession.panelDuration || 20) : 20;
+    }
+
     // 세션의 카테고리 태그 계산 및 표시
     const duration = existingSession?.duration || 60;
     let sessionTags = [];
@@ -428,6 +440,12 @@ window.saveCellSession = function() {
 
     const existingSession = sessionId ? AppState.sessions.find(s => s.id == sessionId) : null;
 
+    // 패널 토의 설정
+    const hasPanelEl = document.getElementById('cellSessionHasPanel');
+    const panelDurEl = document.getElementById('cellSessionPanelDuration');
+    const hasPanelDiscussion = hasPanelEl ? hasPanelEl.checked : false;
+    const panelDuration = panelDurEl ? parseInt(panelDurEl.value) || 20 : 20;
+
     if (existingSession) {
         existingSession.name = name;
         existingSession.nameEn = nameEn;
@@ -435,6 +453,8 @@ window.saveCellSession = function() {
         existingSession.moderatorEn = finalModeratorEn;
         existingSession.color = color;
         existingSession.duration = duration;
+        existingSession.hasPanelDiscussion = hasPanelDiscussion;
+        existingSession.panelDuration = panelDuration;
     } else {
         const newSession = {
             id: Date.now(),
@@ -445,13 +465,21 @@ window.saveCellSession = function() {
             time: time,
             room: room,
             color: color,
-            duration: duration
+            duration: duration,
+            hasPanelDiscussion: hasPanelDiscussion,
+            panelDuration: panelDuration
         };
         AppState.sessions.push(newSession);
     }
 
     saveAndSync();
     updateScheduleDisplay();
+
+    // ★ 패널 토의 자동 배치
+    if (typeof autoPlacePanelDiscussions === 'function') {
+        setTimeout(() => autoPlacePanelDiscussions(), 300);
+    }
+
     closeCellSessionModal();
 };
 
