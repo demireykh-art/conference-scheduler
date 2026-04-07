@@ -56,10 +56,7 @@
   .event-meta-item { display:flex; align-items:center; gap:5px; color:rgba(255,255,255,.85); font-size:12px; }
 
   /* NAV */
-  .nav-tabs { background:white; display:flex; border-bottom:1px solid var(--gray-100); position:sticky; top:0; z-index:100; box-shadow:var(--shadow-sm); }
-  .nav-tab { flex:1; padding:13px 6px; text-align:center; font-size:11px; font-weight:500; color:var(--gray-400); cursor:pointer; border-bottom:3px solid transparent; border:none; background:none; display:flex; flex-direction:column; align-items:center; gap:3px; transition:all .2s; }
-  .nav-tab .tab-icon { font-size:17px; }
-  .nav-tab.active { color:var(--red); border-bottom:3px solid var(--red); }
+  /* 상단 nav 제거 — 하단 nav만 사용 */
 
   /* SCREENS */
   .screen { display:none; padding:16px; animation:fadeIn .25s ease; }
@@ -261,12 +258,7 @@
   </div>
 </div>
 
-<div class="nav-tabs">
-  <button class="nav-tab active" onclick="switchTab('home',this)"><span class="tab-icon">🏠</span>홈</button>
-  <button class="nav-tab" onclick="switchTab('directory',this)"><span class="tab-icon">🏢</span>업체</button>
-  <button class="nav-tab" onclick="switchTab('program',this)"><span class="tab-icon">📋</span>프로그램</button>
-  <button class="nav-tab" onclick="switchTab('mypage',this)"><span class="tab-icon">👤</span>MY</button>
-</div>
+
 
 <!-- HOME -->
 <div class="screen active" id="screen-home">
@@ -299,11 +291,11 @@
 
   <div class="section-title">빠른 메뉴</div>
   <div class="quick-grid">
-    <div class="quick-btn hl" onclick="switchTabByName('directory')">
+    <div class="quick-btn hl" onclick="switchTab('directory')">
       <div class="q-icon">🏢</div>
       <div class="q-label">참가업체<br>디렉토리</div>
     </div>
-    <div class="quick-btn" onclick="switchTabByName('program')">
+    <div class="quick-btn" onclick="switchTab('program')">
       <div class="q-icon">📋</div>
       <div class="q-label">세미나<br>일정</div>
     </div>
@@ -415,10 +407,10 @@
 
 <!-- BOTTOM NAV -->
 <div class="bottom-nav">
-  <button class="bottom-nav-btn active" id="nav-home" onclick="switchTabByName('home')"><span class="b-icon">🏠</span><span class="b-label">홈</span></button>
-  <button class="bottom-nav-btn" id="nav-directory" onclick="switchTabByName('directory')"><span class="b-icon">🏢</span><span class="b-label">업체</span></button>
-  <button class="bottom-nav-btn" id="nav-program" onclick="switchTabByName('program')"><span class="b-icon">📋</span><span class="b-label">프로그램</span></button>
-  <button class="bottom-nav-btn" id="nav-mypage" onclick="switchTabByName('mypage')"><span class="b-icon">👤</span><span class="b-label">MY</span></button>
+  <button class="bottom-nav-btn active" id="nav-home" onclick="switchTab('home')"><span class="b-icon">🏠</span><span class="b-label">홈</span></button>
+  <button class="bottom-nav-btn" id="nav-directory" onclick="switchTab('directory')"><span class="b-icon">🏢</span><span class="b-label">업체</span></button>
+  <button class="bottom-nav-btn" id="nav-program" onclick="switchTab('program')"><span class="b-icon">📋</span><span class="b-label">프로그램</span></button>
+  <button class="bottom-nav-btn" id="nav-mypage" onclick="switchTab('mypage')"><span class="b-icon">👤</span><span class="b-label">MY</span></button>
 </div>
 
 <!-- MODAL -->
@@ -912,21 +904,16 @@ function closeModalBtn() {
 // ============================================
 // 탭 전환
 // ============================================
-function switchTab(name, el) {
+function switchTab(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('screen-' + name).classList.add('active');
-  if (el) el.classList.add('active');
   document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.remove('active'));
   const nb = document.getElementById('nav-' + name);
   if (nb) nb.classList.add('active');
-
-  // 즐겨찾기 탭 진입 시 렌더
   if (name === 'mypage') renderFavorites();
 }
 function switchTabByName(name) {
-  const names = ['home', 'directory', 'program', 'mypage'];
-  switchTab(name, document.querySelectorAll('.nav-tab')[names.indexOf(name)]);
+  switchTab(name);
 }
 
 // ============================================
