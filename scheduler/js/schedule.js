@@ -382,20 +382,28 @@ window.updateScheduleDisplay = function() {
             sessionHeader.dataset.sessionId = session.id;
             sessionHeader.dataset.sessionTime = time;
             sessionHeader.dataset.sessionRoom = room;
-            sessionHeader.style.background = `linear-gradient(135deg, ${session.color} 0%, ${adjustColor(session.color, -20)} 100%)`;
-            sessionHeader.style.cursor = 'grab';
+            // ★ 새 스타일: 얇은 좌측 컬러 바 + 흰 배경 → 강의 카드를 가리지 않음
+            sessionHeader.style.cssText = `
+                background: white;
+                border-left: 4px solid ${session.color};
+                border-bottom: 1px solid ${session.color}40;
+                cursor: grab;
+                position: relative;
+            `;
             
-            // 좌장명 포맷
             const moderatorText = moderatorName ? ` | ${moderatorLabel}${moderatorName}` : '';
+            const panelIcon = session.hasPanelDiscussion ? ' 💬' : '';
             
             sessionHeader.innerHTML = `
-                <div class="session-content" style="display: flex; flex-direction: column; width: calc(100% - 25px); pointer-events: none;">
-                    <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                        <span class="session-name" title="${sessionName}${moderatorText} (드래그: 이동 / 더블클릭: 수정)">${sessionName}</span>
+                <div class="session-content" style="display:flex;flex-direction:column;width:calc(100% - 20px);pointer-events:none;">
+                    <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.72rem;font-weight:600;color:${session.color};" title="${sessionName}${moderatorText}">
+                        ${sessionName}${panelIcon}
                     </div>
-                    ${moderatorName ? `<div style="font-size: 0.65rem; opacity: 0.9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${moderatorLabel}${moderatorName}</div>` : ''}
+                    ${moderatorName ? `<div style="font-size:0.62rem;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        ${moderatorLabel}${moderatorName}
+                    </div>` : ''}
                 </div>
-                <button class="session-remove" onclick="event.stopPropagation(); removeSession('${time}', '${room}')" title="세션 삭제" style="position: absolute; right: 3px; top: 3px; background: rgba(255,255,255,0.3); border: none; color: white; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 0.7rem; pointer-events: auto; line-height: 1;">×</button>
+                <button class="session-remove" onclick="event.stopPropagation(); removeSession('${time}', '${room}')" title="세션 삭제" style="position:absolute;right:2px;top:2px;background:${session.color}20;border:none;color:${session.color};width:16px;height:16px;border-radius:50%;cursor:pointer;font-size:0.65rem;pointer-events:auto;line-height:1;">×</button>
             `;
 
             // 드래그 시작
@@ -551,17 +559,29 @@ window.updateScheduleDisplay = function() {
         let titleDisplay = title;
         
         if (isPanelDiscussion) {
-            // 해당 세션의 연자들과 좌장 가져오기
+            // 세션 내 전체 연자 자동 수집 (speakerNames 배열 우선)
             const sessionInfo = getSessionPanelInfo(startTime, room, belongingSession);
-            
-            const panelistsStr = sessionInfo.speakers.length > 0 ? sessionInfo.speakers.join(', ') : '(없음)';
-            const moderatorStr = sessionInfo.moderator || '(없음)';
-            
+            const panelists = sessionInfo.speakers;
+            const moderatorStr = sessionInfo.moderator || '';
+
+            // 중복 체크: 패널 참석자가 같은 시간 타 룸에 배치됐는지 확인
+            const conflicts = panelists.filter(spName => {
+                const conflict = checkSpeakerConflict(startTime, room,
+                    { speakerKo: spName, duration: duration }, key);
+                return conflict && conflict.hasConflict;
+            });
+
+            const conflictBadge = conflicts.length > 0
+                ? `<span style="font-size:0.55rem;background:#fee;color:#c00;border-radius:3px;padding:0 3px;margin-left:3px;">⚠️ 충돌 ${conflicts.length}</span>`
+                : '';
+
+            const panelistsStr = panelists.length > 0 ? panelists.join(', ') : '(없음)';
             metaDisplay = `
-                <span class="panel-info" style="font-size: 0.6rem; line-height: 1.2; color: #333;">
-                    패널: ${panelistsStr.length > 25 ? panelistsStr.substring(0, 25) + '...' : panelistsStr}
-                </span>
-                <span class="moderator-info" style="font-size: 0.6rem; color: #333;">좌장: ${moderatorStr}</span>
+                <div style="font-size:0.6rem;line-height:1.3;color:#555;">
+                    <div>💬 ${panelistsStr.length > 30 ? panelistsStr.substring(0,30)+'...' : panelistsStr}${conflictBadge}</div>
+                    ${moderatorStr ? `<div style="color:#888;">좌장: ${moderatorStr}</div>` : ''}
+                    <div style="color:#aaa;">${startTime}~${endTime} · ${duration}분</div>
+                </div>
             `;
         } else if (isLuncheon) {
             // 런천강의 - 별표 + 파트너사 표시
@@ -572,9 +592,38 @@ window.updateScheduleDisplay = function() {
         } else if (isBreak && !isPanelDiscussion) {
             metaDisplay = `<span class="duration-badge">${timeRangeDisplay}</span>`;
         } else {
-            // 일반 강의 - 연자 (소속)
-            const affiliationInfo = lecture.affiliation ? ` (${lecture.affiliation})` : '';
-            metaDisplay = `<span class="speaker-name" style="color: #333;">${speaker || '미정'}${affiliationInfo}</span><span class="duration-badge">${timeRangeDisplay}</span>`;
+            // 일반 강의 - 연자 사진 + 이름 + 시간
+            const affiliationInfo = lecture.affiliation ? ` · ${lecture.affiliation}` : '';
+            // 다중 연자 처리
+            const speakerNames = lecture.speakerNames && lecture.speakerNames.length > 0
+                ? lecture.speakerNames
+                : (lecture.speakerKo ? lecture.speakerKo.split(',').map(s => s.trim()) : []);
+            
+            // 연자 사진 (첫 번째 연자만 표시)
+            const firstSpeakerName = speakerNames[0] || speaker;
+            const speakerObj = AppState.speakers
+                ? AppState.speakers.find(s => s.name === firstSpeakerName)
+                : null;
+            const photoUrl = speakerObj && speakerObj.photoURL ? speakerObj.photoURL : null;
+            
+            const photoHtml = photoUrl
+                ? `<img src="${photoUrl}" style="width:18px;height:18px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-right:3px;" onerror="this.style.display='none'">`
+                : `<span style="width:18px;height:18px;border-radius:50%;background:${color}30;color:${color};font-size:0.55rem;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:3px;font-weight:700;">${firstSpeakerName ? firstSpeakerName.charAt(0) : '?'}</span>`;
+            
+            const multiSpeakerBadge = speakerNames.length > 1
+                ? `<span style="font-size:0.55rem;background:#f0f0f0;color:#666;border-radius:3px;padding:0 3px;margin-left:2px;">+${speakerNames.length - 1}</span>`
+                : '';
+            
+            metaDisplay = \`
+                <div style="display:flex;align-items:center;gap:2px;flex-wrap:wrap;">
+                    \${photoHtml}
+                    <span class="speaker-name" style="color:#333;font-size:0.65rem;">\${speaker || '미정'}\${multiSpeakerBadge}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:3px;margin-top:1px;">
+                    <span style="font-size:0.6rem;color:#888;background:#f5f5f5;border-radius:3px;padding:0 3px;">\${startTime}~\${endTime}</span>
+                    <span style="font-size:0.6rem;color:#aaa;">\${duration}분</span>
+                </div>
+            \`;
         }
         
         // 파트너사/제품명 별도 줄로 표시
@@ -647,38 +696,100 @@ function getSessionPanelInfo(time, room, session) {
     let sessionModerator = '';
     let sessionSpeakers = [];
     const normalizedRoom = normalizeRoomName(room);
-    
+
     if (session) {
         sessionModerator = session.moderator || '';
-        
         const sessionTimeIndex = AppState.timeSlots.indexOf(session.time);
         const panelTimeIndex = AppState.timeSlots.indexOf(time);
-        
-        // 세션 시작부터 Panel Discussion 시작 전까지의 강의 연자 수집
+
         Object.entries(AppState.schedule).forEach(([key, lecture]) => {
-            const keyRoom = key.substring(6);
-            if (normalizeRoomName(keyRoom) === normalizedRoom && !lecture.isBreak && lecture.category !== 'Panel Discussion') {
-                const lectureTime = key.substring(0, 5);
-                const lectureTimeIndex = AppState.timeSlots.indexOf(lectureTime);
-                
-                // 해당 세션 범위 내이고 Panel Discussion 이전인 강의
-                if (lectureTimeIndex >= sessionTimeIndex && lectureTimeIndex < panelTimeIndex) {
-                    if (lecture.speakerKo && lecture.speakerKo.trim() && lecture.speakerKo !== '미정') {
-                        sessionSpeakers.push(lecture.speakerKo);
-                    }
-                }
+            if (!lecture || lecture.isBreak || lecture.category === 'Panel Discussion') return;
+            const keyParts = key.split('-');
+            const keyRoom = keyParts.slice(2).join('-');
+            if (normalizeRoomName(keyRoom) !== normalizedRoom) return;
+
+            const lectureTime = keyParts[0] + ':' + keyParts[1];
+            const lectureTimeIndex = AppState.timeSlots.indexOf(lectureTime);
+            if (lectureTimeIndex < sessionTimeIndex || lectureTimeIndex >= panelTimeIndex) return;
+
+            // ★ speakerNames 배열 우선, 없으면 speakerKo 쉼표 파싱
+            if (lecture.speakerNames && lecture.speakerNames.length > 0) {
+                lecture.speakerNames.forEach(n => { if (n && n !== '미정') sessionSpeakers.push(n); });
+            } else if (lecture.speakerKo && lecture.speakerKo.trim() && lecture.speakerKo !== '미정') {
+                lecture.speakerKo.split(',').map(s => s.trim()).filter(s => s).forEach(n => sessionSpeakers.push(n));
             }
         });
     }
-    
-    // 중복 제거
+
     sessionSpeakers = [...new Set(sessionSpeakers)];
-    
-    return {
-        moderator: sessionModerator,
-        speakers: sessionSpeakers
-    };
+    return { moderator: sessionModerator, speakers: sessionSpeakers };
 }
+
+/**
+ * ★ 패널 토의 자동 배치
+ * 세션에 hasPanelDiscussion: true 설정 시 세션 마지막 시간에 자동 배치
+ */
+window.autoPlacePanelDiscussions = function() {
+    let placed = 0;
+    AppState.sessions.forEach(session => {
+        if (!session.hasPanelDiscussion) return;
+
+        const panelDuration = session.panelDuration || 20;
+        const normalizedRoom = normalizeRoomName(session.room);
+
+        // 세션 범위 내 마지막 강의 종료 시간 찾기
+        const sessionTimeIdx = AppState.timeSlots.indexOf(session.time);
+        if (sessionTimeIdx < 0) return;
+
+        let lastEndMinutes = 0;
+        Object.entries(AppState.schedule).forEach(([key, lec]) => {
+            if (!lec || lec.isBreak) return;
+            const keyParts = key.split('-');
+            const keyRoom = keyParts.slice(2).join('-');
+            if (normalizeRoomName(keyRoom) !== normalizedRoom) return;
+
+            const lTime = keyParts[0] + ':' + keyParts[1];
+            const lIdx = AppState.timeSlots.indexOf(lTime);
+            if (lIdx < sessionTimeIdx) return;
+
+            const [h, m] = lTime.split(':').map(Number);
+            const endMin = h * 60 + m + (lec.duration || 20);
+            if (endMin > lastEndMinutes) lastEndMinutes = endMin;
+        });
+
+        if (lastEndMinutes === 0) return;
+
+        // 패널 시작 시간 계산
+        const panelH = Math.floor(lastEndMinutes / 60);
+        const panelM = lastEndMinutes % 60;
+        const panelTime = `${String(panelH).padStart(2,'0')}:${String(panelM).padStart(2,'0')}`;
+
+        // 이미 패널이 있으면 스킵
+        const panelKey = `${panelTime}-${session.room}`;
+        const existing = AppState.schedule[panelKey];
+        if (existing && existing.category === 'Panel Discussion') return;
+
+        // 패널 자동 배치
+        AppState.schedule[panelKey] = {
+            titleKo: 'Panel Discussion',
+            titleEn: 'Panel Discussion',
+            speakerKo: session.moderator || '',
+            category: 'Panel Discussion',
+            duration: panelDuration,
+            isBreak: false,
+            _autoPanel: true,
+            _sessionId: session.id
+        };
+        placed++;
+    });
+
+    if (placed > 0) {
+        saveAndSync();
+        updateScheduleDisplay();
+        Toast.success(`패널 토의 ${placed}개 자동 배치 완료`);
+    }
+    return placed;
+};
 
 /**
  * 드래그 시작 (강의 목록에서)
