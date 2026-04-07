@@ -403,15 +403,21 @@ window.updateSpeakerList = function() {
             }
         }
         
+        // 프로필 사진 또는 이니셜 아바타
+        const photoHtml = speaker.photoURL
+            ? `<img src="${speaker.photoURL}" style="width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid #eee;" onerror="this.style.display='none'">`
+            : `<div style="width:38px;height:38px;border-radius:50%;background:#e8e8e8;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#888;flex-shrink:0;">${speaker.name ? speaker.name.charAt(0) : '?'}</div>`;
+
         return `
-            <div class="speaker-item">
-                <div class="speaker-info">
+            <div class="speaker-item" style="display:flex;align-items:center;gap:10px;">
+                ${photoHtml}
+                <div class="speaker-info" style="flex:1;min-width:0;">
                     <strong>${speaker.name}${speaker.nameEn ? ' / ' + speaker.nameEn : ''}${aslsBadge}${statsHtml}${timeStatsHtml}</strong>
                     <small>${speaker.affiliation}${speaker.affiliationEn ? ' / ' + speaker.affiliationEn : ''}</small>
                     ${detailHtml}
                     ${tagsHtml}
                 </div>
-                <div class="speaker-actions">
+                <div class="speaker-actions" style="flex-shrink:0;">
                     <button class="btn btn-secondary btn-small" onclick="openSpeakerDetailModal('${speaker.name.replace(/'/g, "\\'")}')" title="강의 목록 보기" style="background: #5C3D8E; color: white;">📋 상세</button>
                     <button class="btn btn-secondary btn-small" onclick="editSpeaker(event, ${originalIndex})">수정</button>
                     <button class="btn btn-secondary btn-small" onclick="deleteSpeaker(event, ${originalIndex})">삭제</button>
@@ -500,7 +506,65 @@ window.editSpeaker = function(event, index) {
         if (container) container.innerHTML = '';
     }
 
+    // 사진 미리보기
+    const photoPreview = document.getElementById('editSpeakerPhotoPreview');
+    const photoInput = document.getElementById('editSpeakerPhotoInput');
+    if (photoPreview) {
+        if (speaker.photoURL) {
+            photoPreview.innerHTML = `<img src="${speaker.photoURL}" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid #ddd;">
+                <button onclick="clearSpeakerPhoto()" style="position:absolute;top:-4px;right:-4px;background:#e74c3c;color:white;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;line-height:1;">×</button>`;
+            photoPreview.style.position = 'relative';
+        } else {
+            const initial = speaker.name ? speaker.name.charAt(0) : '?';
+            photoPreview.innerHTML = `<div style="width:60px;height:60px;border-radius:50%;background:#e8e8e8;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#888;">${initial}</div>`;
+        }
+    }
+    if (photoInput) photoInput.value = '';
+    window._editingSpeakerIndex = index;
+    window._editingSpeakerPhotoURL = speaker.photoURL || null;
+
     document.getElementById('editSpeakerModal').classList.add('active');
+};
+
+/**
+ * 연자 사진 업로드 처리
+ */
+window.handleSpeakerPhotoUpload = function(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+        Toast.warning('이미지 파일만 업로드할 수 있습니다.');
+        return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+        Toast.warning('이미지 크기는 2MB 이하여야 합니다.');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const dataURL = e.target.result;
+        window._editingSpeakerPhotoURL = dataURL;
+        const photoPreview = document.getElementById('editSpeakerPhotoPreview');
+        if (photoPreview) {
+            photoPreview.style.position = 'relative';
+            photoPreview.innerHTML = `<img src="${dataURL}" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid #3498db;">
+                <button onclick="clearSpeakerPhoto()" style="position:absolute;top:-4px;right:-4px;background:#e74c3c;color:white;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;line-height:1;">×</button>`;
+        }
+        Toast.success('사진이 선택되었습니다. 저장 버튼을 눌러 확정하세요.');
+    };
+    reader.readAsDataURL(file);
+};
+
+window.clearSpeakerPhoto = function() {
+    window._editingSpeakerPhotoURL = null;
+    const photoPreview = document.getElementById('editSpeakerPhotoPreview');
+    const idx = window._editingSpeakerIndex;
+    const speaker = AppState.speakers[idx];
+    const initial = speaker ? (speaker.name.charAt(0) || '?') : '?';
+    if (photoPreview) {
+        photoPreview.innerHTML = `<div style="width:60px;height:60px;border-radius:50%;background:#e8e8e8;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#888;">${initial}</div>`;
+    }
 };
 
 /**
@@ -574,13 +638,17 @@ window.saveEditedSpeaker = function() {
         expertiseTags.push(cb.value);
     });
 
+    // 기존 데이터 유지 (추가 필드 보존)
+    const existing = AppState.speakers[index] || {};
     AppState.speakers[index] = {
+        ...existing,
         name: document.getElementById('editSpeakerNameField').value.trim(),
         nameEn: document.getElementById('editSpeakerNameEnField').value.trim(),
         affiliation: document.getElementById('editSpeakerAffiliationField').value.trim(),
         affiliationEn: document.getElementById('editSpeakerAffiliationEnField').value.trim(),
         isASLSMember: document.getElementById('editSpeakerASLS')?.checked || false,
-        expertiseTags: expertiseTags
+        expertiseTags: expertiseTags,
+        photoURL: window._editingSpeakerPhotoURL || existing.photoURL || null
     };
 
     saveAndSync();
