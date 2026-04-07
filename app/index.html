@@ -194,6 +194,48 @@
   .chip-no { background:var(--gray-100); color:var(--gray-400); text-decoration:line-through; }
 
   .empty-msg { text-align:center; padding:40px 20px; color:var(--gray-400); font-size:14px; }
+
+  /* PROGRAM TAB */
+  .day-tabs { display:flex; gap:8px; margin-bottom:16px; }
+  .day-tab { flex:1; background:white; border-radius:var(--radius-sm); padding:12px; text-align:center; cursor:pointer; box-shadow:var(--shadow-sm); border:1.5px solid var(--gray-200); transition:all .2s; }
+  .day-tab.active { background:var(--red); border-color:var(--red); }
+  .day-tab .day-num { font-size:20px; font-weight:700; color:var(--gray-600); }
+  .day-tab .day-label { font-size:11px; color:var(--gray-400); margin-top:2px; }
+  .day-tab.active .day-num, .day-tab.active .day-label { color:white; }
+
+  .room-filter { display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:12px; scrollbar-width:none; }
+  .room-filter::-webkit-scrollbar { display:none; }
+  .room-chip { flex-shrink:0; padding:6px 12px; border-radius:20px; font-size:11px; font-weight:500; background:var(--gray-100); color:var(--gray-600); cursor:pointer; white-space:nowrap; border:none; }
+  .room-chip.active { background:var(--red); color:white; }
+
+  .session-item { background:white; border-radius:var(--radius-sm); padding:14px 16px; margin-bottom:8px; box-shadow:var(--shadow-sm); border-left:4px solid var(--gray-200); cursor:pointer; transition:all .2s; }
+  .session-item:active { transform:scale(.99); }
+  .session-item.cat-laser { border-left-color:#1565C0; }
+  .session-item.cat-inject { border-left-color:#E65100; }
+  .session-item.cat-lift { border-left-color:#7B1FA2; }
+  .session-item.cat-break { border-left-color:#795548; }
+  .session-item.cat-open { border-left-color:#D0021B; }
+  .session-item.cat-luncheon { border-left-color:#FF8F00; }
+  .session-item.cat-sponsor { border-left-color:#F9A825; }
+  .session-time { font-size:11px; color:var(--gray-400); font-weight:500; margin-bottom:4px; }
+  .session-title { font-size:14px; font-weight:600; color:var(--gray-900); margin-bottom:6px; line-height:1.4; }
+  .session-speaker { font-size:12px; color:var(--gray-600); margin-bottom:6px; }
+  .session-meta { display:flex; gap:6px; flex-wrap:wrap; }
+  .session-tag { font-size:10px; padding:3px 8px; border-radius:6px; font-weight:500; }
+  .tag-room { background:var(--gray-100); color:var(--gray-600); }
+  .tag-cat { background:rgba(208,2,27,0.08); color:var(--red); }
+  .tag-sponsor { background:rgba(249,168,37,0.12); color:#E65100; }
+
+  .program-empty { text-align:center; padding:40px 20px; color:var(--gray-400); font-size:13px; }
+  .session-detail-modal { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; display:none; align-items:flex-end; }
+  .session-detail-modal.open { display:flex; }
+  .session-detail-sheet { background:white; border-radius:20px 20px 0 0; padding:24px 20px 40px; width:100%; max-height:70vh; overflow-y:auto; }
+  .session-detail-time { font-size:12px; color:var(--gray-400); font-weight:500; margin-bottom:6px; }
+  .session-detail-title { font-size:16px; font-weight:700; color:var(--gray-900); line-height:1.4; margin-bottom:8px; }
+  .session-detail-speaker { font-size:13px; color:var(--gray-600); margin-bottom:12px; }
+  .session-detail-row { display:flex; gap:8px; margin-bottom:8px; font-size:13px; }
+  .session-detail-label { color:var(--gray-400); min-width:50px; }
+  .session-detail-value { color:var(--gray-900); font-weight:500; flex:1; }
 </style>
 </head>
 <body>
@@ -311,15 +353,46 @@
 
 <!-- PROGRAM -->
 <div class="screen" id="screen-program">
-  <div style="background:white;border-radius:var(--radius-sm);padding:20px;box-shadow:var(--shadow-sm);text-align:center;margin-bottom:12px">
-    <div style="font-size:32px;margin-bottom:8px">📋</div>
-    <div style="font-size:15px;font-weight:700;margin-bottom:6px">세미나 프로그램</div>
-    <div style="font-size:13px;color:var(--gray-400)">2026 춘계 프로그램은<br>확정 후 업데이트 예정입니다.</div>
+  <!-- 날짜 탭 -->
+  <div class="day-tabs" id="program-day-tabs">
+    <div class="day-tab active" style="text-align:center;padding:16px;">
+      <div style="font-size:13px;color:inherit;">프로그램 로딩 중...</div>
+    </div>
   </div>
-  <div class="notice-card"><span class="notice-badge">예정</span><span class="notice-text">키노트: K-미용의료 글로벌 전략 2026</span><span class="notice-date">예정</span></div>
-  <div class="notice-card"><span class="notice-badge">예정</span><span class="notice-text">레이저/에너지기기 최신 임상 세션</span><span class="notice-date">예정</span></div>
-  <div class="notice-card"><span class="notice-badge">예정</span><span class="notice-text">필러/톡신 워크샵 (핸즈온)</span><span class="notice-date">예정</span></div>
+
+  <!-- 룸 필터 -->
+  <div class="room-filter" id="program-room-filter" style="display:none;">
+    <button class="room-chip active" onclick="filterRoom('all',this)">전체</button>
+  </div>
+
+  <!-- 세션 목록 -->
+  <div id="program-list">
+    <div class="program-empty">⏳ 데이터 로딩 중...</div>
+  </div>
   <div class="pb-safe"></div>
+</div>
+
+<!-- 세션 상세 모달 -->
+<div class="session-detail-modal" id="session-modal" onclick="closeSessionModal(event)">
+  <div class="session-detail-sheet">
+    <div class="modal-handle" style="width:40px;height:4px;background:var(--gray-200);border-radius:2px;margin:0 auto 20px;"></div>
+    <div class="session-detail-time" id="smodal-time"></div>
+    <div class="session-detail-title" id="smodal-title"></div>
+    <div class="session-detail-speaker" id="smodal-speaker"></div>
+    <div class="session-detail-row">
+      <span class="session-detail-label">룸</span>
+      <span class="session-detail-value" id="smodal-room"></span>
+    </div>
+    <div class="session-detail-row">
+      <span class="session-detail-label">시간</span>
+      <span class="session-detail-value" id="smodal-duration"></span>
+    </div>
+    <div class="session-detail-row" id="smodal-company-row" style="display:none;">
+      <span class="session-detail-label">업체</span>
+      <span class="session-detail-value" id="smodal-company"></span>
+    </div>
+    <button onclick="closeSessionModal()" style="width:100%;margin-top:16px;padding:14px;background:var(--gray-100);border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;">닫기</button>
+  </div>
 </div>
 
 <!-- MY PAGE -->
@@ -452,6 +525,9 @@ function loadFromFirebase() {
     updateStats();
   });
 
+  // 프로그램 데이터 로드
+  loadProgramFromFirebase();
+
   // 실시간 업데이트 리스너 (관리자가 수정하면 앱도 반영)
   db.ref('/companies').on('value', snap => {
     const raw = snap.val();
@@ -483,6 +559,220 @@ function showLoading(show) {
 function updateStats() {
   const statEl = document.getElementById('stat-companies');
   if (statEl) statEl.textContent = COMPANIES.length;
+}
+
+
+// ============================================
+// 프로그램 탭 — Firebase 연동
+// ============================================
+let programData = {};      // { date: [ {time, room, title, speaker, ...} ] }
+let currentProgramDate = '';
+let currentRoom = 'all';
+
+function loadProgramFromFirebase() {
+  // /settings/dates 에서 날짜 목록 로드
+  db.ref('/settings/dates').once('value', snap => {
+    const dates = snap.val() || [];
+    if (!dates.length) {
+      document.getElementById('program-list').innerHTML =
+        '<div class="program-empty">📋 프로그램이 아직 등록되지 않았습니다.</div>';
+      return;
+    }
+    renderDayTabs(dates);
+    currentProgramDate = dates[0].date;
+    loadDayProgram(currentProgramDate);
+  });
+
+  // 실시간 업데이트
+  db.ref('/data/dataByDate').on('value', snap => {
+    const all = snap.val() || {};
+    programData = {};
+    Object.entries(all).forEach(([date, dateData]) => {
+      const schedule = dateData.schedule || {};
+      const lectures = dateData.lectures || [];
+      const lectureMap = {};
+      lectures.forEach(l => { if(l && l.id) lectureMap[l.id] = l; });
+
+      const items = [];
+      Object.entries(schedule).forEach(([key, sched]) => {
+        if (!sched) return;
+        const parts = key.split('-');
+        const time = parts[0] + ':' + parts[1];
+        const room = parts.slice(2).join('-');
+        const lecture = lectureMap[sched.id] || sched;
+        items.push({
+          time,
+          room,
+          title: lecture.titleKo || sched.titleKo || '',
+          titleEn: lecture.titleEn || '',
+          speaker: lecture.speakerKo || sched.speakerKo || '',
+          affiliation: lecture.affiliation || '',
+          duration: lecture.duration || sched.duration || 20,
+          category: lecture.category || sched.category || '',
+          companyName: lecture.companyName || sched.companyName || '',
+          isLuncheon: lecture.isLuncheon || false,
+        });
+      });
+      // 시간순 정렬
+      items.sort((a, b) => a.time.localeCompare(b.time));
+      programData[date] = items;
+    });
+    if (currentProgramDate) renderProgramList();
+  });
+}
+
+function renderDayTabs(dates) {
+  const tabs = document.getElementById('program-day-tabs');
+  if (!tabs) return;
+  tabs.innerHTML = dates.map((d, i) => {
+    const dateObj = new Date(d.date);
+    const dayNum = dateObj.getDate();
+    const month = dateObj.getMonth() + 1;
+    const dayNames = ['일','월','화','수','목','금','토'];
+    const dayName = dayNames[dateObj.getDay()];
+    return `<div class="day-tab ${i===0?'active':''}" onclick="selectProgramDay(this,'${d.date}')">
+      <div class="day-num">${dayNum}</div>
+      <div class="day-label">${month}월 ${dayName}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectProgramDay(el, date) {
+  document.querySelectorAll('.day-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentProgramDate = date;
+  currentRoom = 'all';
+  document.querySelectorAll('.room-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.room === 'all');
+  });
+  loadDayProgram(date);
+}
+
+function loadDayProgram(date) {
+  if (programData[date]) {
+    renderProgramList();
+    return;
+  }
+  document.getElementById('program-list').innerHTML =
+    '<div class="program-empty">⏳ 로딩 중...</div>';
+}
+
+function renderProgramList() {
+  const list = document.getElementById('program-list');
+  const filter = document.getElementById('program-room-filter');
+  if (!list) return;
+
+  const items = programData[currentProgramDate] || [];
+
+  if (!items.length) {
+    list.innerHTML = '<div class="program-empty">📋 등록된 프로그램이 없습니다.</div>';
+    if (filter) filter.style.display = 'none';
+    return;
+  }
+
+  // 룸 필터 업데이트
+  if (filter) {
+    filter.style.display = 'flex';
+    const rooms = [...new Set(items.map(i => i.room))].filter(Boolean);
+    filter.innerHTML = `<button class="room-chip ${currentRoom==='all'?'active':''}" data-room="all" onclick="filterRoom('all',this)">전체</button>` +
+      rooms.map(r => {
+        const label = r.replace(/^\([^)]+\)/, '').trim();
+        return `<button class="room-chip ${currentRoom===r?'active':''}" data-room="${r}" onclick="filterRoom('${r.replace(/'/g,"\'")}',this)">${label}</button>`;
+      }).join('');
+  }
+
+  // 필터 적용
+  const filtered = currentRoom === 'all' ? items : items.filter(i => i.room === currentRoom);
+
+  if (!filtered.length) {
+    list.innerHTML = '<div class="program-empty">해당 룸의 프로그램이 없습니다.</div>';
+    return;
+  }
+
+  // 카테고리 → CSS 클래스 매핑
+  function getCatClass(cat) {
+    if (!cat) return '';
+    const c = cat.toLowerCase();
+    if (c.includes('laser') || c.includes('ebd')) return 'cat-laser';
+    if (c.includes('inject') || c.includes('filler') || c.includes('toxin')) return 'cat-inject';
+    if (c.includes('lift') || c.includes('thread')) return 'cat-lift';
+    if (c.includes('coffee') || c.includes('lunch') && !c.includes('luncheon')) return 'cat-break';
+    if (c.includes('luncheon')) return 'cat-luncheon';
+    if (c.includes('opening') || c.includes('closing')) return 'cat-open';
+    return '';
+  }
+
+  list.innerHTML = filtered.map((item, idx) => {
+    const catClass = getCatClass(item.category);
+    const endMin = timeToMin(item.time) + (item.duration || 20);
+    const endTime = minToTime(endMin);
+    const roomLabel = item.room.replace(/^\([^)]+\)/, '').trim();
+    const isBreak = item.category && ['Coffee Break','Lunch','Opening-Closing'].includes(item.category);
+    const isSponsor = item.companyName && item.companyName !== '학회강의';
+
+    return `<div class="session-item ${catClass}" onclick="showSessionDetail(${idx})">
+      <div class="session-time">${item.time} – ${endTime}</div>
+      <div class="session-title">${item.title || '(제목 없음)'}</div>
+      ${item.speaker && !isBreak ? `<div class="session-speaker">👤 ${item.speaker}${item.affiliation ? ' · ' + item.affiliation : ''}</div>` : ''}
+      <div class="session-meta">
+        ${currentRoom === 'all' ? `<span class="session-tag tag-room">${roomLabel}</span>` : ''}
+        ${item.category ? `<span class="session-tag tag-cat">${item.category}</span>` : ''}
+        ${isSponsor ? `<span class="session-tag tag-sponsor">${item.companyName}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // 상세 모달용 데이터 저장
+  window._programItems = filtered;
+}
+
+function filterRoom(room, el) {
+  currentRoom = room;
+  document.querySelectorAll('.room-chip').forEach(c => c.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderProgramList();
+}
+
+function showSessionDetail(idx) {
+  const item = (window._programItems || [])[idx];
+  if (!item) return;
+  const endMin = timeToMin(item.time) + (item.duration || 20);
+  const endTime = minToTime(endMin);
+  const roomLabel = item.room.replace(/^\([^)]+\)/, '').trim();
+
+  document.getElementById('smodal-time').textContent = `${item.time} – ${endTime} (${item.duration}분)`;
+  document.getElementById('smodal-title').textContent = item.title || '(제목 없음)';
+  document.getElementById('smodal-speaker').textContent = item.speaker
+    ? `👤 ${item.speaker}${item.affiliation ? ' · ' + item.affiliation : ''}`
+    : '';
+  document.getElementById('smodal-room').textContent = roomLabel;
+  document.getElementById('smodal-duration').textContent = `${item.duration}분`;
+
+  const companyRow = document.getElementById('smodal-company-row');
+  if (item.companyName && item.companyName !== '학회강의') {
+    document.getElementById('smodal-company').textContent = item.companyName;
+    companyRow.style.display = 'flex';
+  } else {
+    companyRow.style.display = 'none';
+  }
+  document.getElementById('session-modal').classList.add('open');
+}
+
+function closeSessionModal(e) {
+  if (!e || e.target === document.getElementById('session-modal')) {
+    document.getElementById('session-modal').classList.remove('open');
+  }
+}
+
+function timeToMin(t) {
+  if (!t) return 0;
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+function minToTime(min) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 }
 
 // ============================================
