@@ -2,27 +2,31 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>학술대회 스케줄러</title>
-    
+
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="favicon.png">
-    
+
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-    
+
     <!-- SheetJS for Excel parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
+
     <!-- CryptoJS for backup encryption -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    
+
     <!-- Styles -->
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+
     <!-- 드래그 툴팁 -->
     <div class="drag-tooltip" id="dragTooltip">
         <div class="tooltip-title" id="tooltipTitle"></div>
@@ -33,7 +37,8 @@
     <!-- 로그인 오버레이 -->
     <div class="login-overlay" id="loginOverlay">
         <div class="login-box">
-            <h2>📅 학술대회 스케줄러</h2>
+            <div class="login-logo">📅</div>
+            <h2>학술대회 스케줄러</h2>
             <p>편집하려면 Google 계정으로 로그인하세요.<br>승인된 사용자만 수정할 수 있습니다.</p>
             <button class="google-login-btn" onclick="signInWithGoogle()">
                 <img src="https://www.google.com/favicon.ico" alt="Google">
@@ -42,92 +47,141 @@
         </div>
     </div>
 
-    <div class="header">
-        <div>
-            <h1>📅 학술대회 스케줄러</h1>
+    <!-- ============================
+         헤더
+         ============================ -->
+    <header class="app-header">
+        <div class="header-left">
+            <h1 class="header-title">📅 스케줄러</h1>
         </div>
-        <div class="header-actions">
+        <div class="header-right">
             <!-- 동기화 상태 -->
             <div class="sync-status synced" id="syncStatus">
                 <span class="sync-dot"></span>
-                <span id="syncText">동기화됨</span>
+                <span id="syncText" class="sync-label">동기화됨</span>
             </div>
-            
-            <!-- 마지막 백업 시간 -->
-            <div class="backup-info" style="font-size: 0.65rem; color: rgba(255,255,255,0.7);">
+            <!-- 마지막 백업 -->
+            <div class="backup-info">
                 마지막: <span id="lastBackupTime">-</span>
             </div>
-            
             <!-- 온라인 사용자 -->
             <div class="online-users" id="onlineUsers">
                 <span>👥</span>
                 <div class="user-avatars" id="userAvatars"></div>
-                <span id="onlineCount">0명 접속</span>
+                <span id="onlineCount">0명</span>
             </div>
-            
-            <!-- 한글/영문 전환 버튼 -->
-            <div style="display: flex; border-radius: 6px; overflow: hidden;">
-                <button class="btn btn-small" id="langKoBtn" onclick="setLanguage('ko')" style="background: var(--accent); color: white; border-radius: 6px 0 0 6px;">한글</button>
-                <button class="btn btn-small" id="langEnBtn" onclick="setLanguage('en')" style="background: rgba(255,255,255,0.2); color: white; border-radius: 0 6px 6px 0;">English</button>
+            <!-- 언어 토글 -->
+            <div class="lang-toggle">
+                <button class="lang-btn active" id="langKoBtn" onclick="setLanguage('ko')">한</button>
+                <button class="lang-btn" id="langEnBtn" onclick="setLanguage('en')">EN</button>
             </div>
-            
             <!-- 로그인 상태 -->
             <div class="auth-status" id="authStatus">
                 <span id="authText">로그인 필요</span>
             </div>
-            
-            <!-- 버튼 그룹 1: 사용자 관리 -->
-            <div class="btn-group" style="display: flex; gap: 0.2rem; padding: 0.2rem; background: rgba(255,255,255,0.1); border-radius: 6px;">
-                <button class="btn btn-secondary btn-small user-mgmt-btn" onclick="openUserManagementModal()" title="사용자 관리">
-                    👥사용자
-                    <span class="pending-badge" id="pendingBadge" style="display:none;">0</span>
-                </button>
+            <!-- 사용자 관리 -->
+            <button class="header-icon-btn user-mgmt-btn" onclick="openUserManagementModal()" title="사용자 관리">
+                👥
+                <span class="pending-badge" id="pendingBadge" style="display:none;">0</span>
+            </button>
+            <!-- 되돌리기 -->
+            <button class="header-icon-btn" id="undoBtn" onclick="performUndo()" disabled title="되돌리기 (Ctrl+Z)">↩</button>
+            <!-- 오타 검사 -->
+            <button class="header-icon-btn" onclick="openTypoCheckModal()" title="맞춤법 검사">✏️</button>
+            <!-- 업로드 -->
+            <button class="header-icon-btn accent-btn" onclick="openUploadModal()" title="강의 업로드">📤</button>
+            <!-- 출력 드롭다운 -->
+            <div class="dropdown" style="position:relative;">
+                <button class="header-icon-btn" onclick="toggleExportDropdown()" title="출력">🖨️</button>
+                <div class="dropdown-menu" id="exportDropdown" style="display:none;">
+                    <button class="dropdown-item" onclick="openPrintModal()">🖨️ 인쇄/PDF</button>
+                    <button class="dropdown-item" onclick="exportToExcel()">📊 엑셀 내보내기</button>
+                </div>
             </div>
-            
-            <!-- 버튼 그룹 2: 편집 도구 -->
-            <div class="btn-group" style="display: flex; gap: 0.2rem; padding: 0.2rem; background: rgba(255,255,255,0.1); border-radius: 6px;">
-                <button class="btn btn-secondary btn-small" id="undoBtn" onclick="performUndo()" disabled title="되돌리기 (Ctrl+Z)">↩되돌리기</button>
-                <button class="btn btn-secondary btn-small" onclick="openSessionModal()" title="세션 관리">📋세션</button>
-                <button class="btn btn-secondary btn-small" onclick="openSpeakerModal()" title="연자 관리">👤연자</button>
-                <button class="btn btn-secondary btn-small" onclick="openTypoCheckModal()" title="맞춤법 검사">✏️오타</button>
-            </div>
-            
-            <!-- 버튼 그룹 3: 데이터 관리 -->
-            <div class="btn-group" style="display: flex; gap: 0.2rem; padding: 0.2rem; background: rgba(255,255,255,0.1); border-radius: 6px;">
-                <button class="btn btn-primary btn-small" onclick="openUploadModal()" title="강의 업로드">📤업로드</button>
-                <button class="btn btn-secondary btn-small" onclick="openBackupModal()" title="백업 관리">💾백업</button>
-                <button class="btn btn-secondary btn-small" onclick="openSponsorManagementModal()" title="파트너사 강의 관리">🏢파트너사</button>
-            </div>
-            
-            <!-- 버튼 그룹 4: 출력 -->
-            <div class="btn-group" style="display: flex; gap: 0.2rem; padding: 0.2rem; background: rgba(255,255,255,0.1); border-radius: 6px;">
-                <div class="dropdown" style="position: relative;">
-                    <button class="btn btn-secondary btn-small" onclick="toggleExportDropdown()" title="출력">🖨️출력▼</button>
-                    <div class="dropdown-menu" id="exportDropdown" style="display: none; position: absolute; top: 100%; right: 0; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 180px; z-index: 1000;">
-                        <button class="dropdown-item" onclick="openPrintModal()">🖨️ 인쇄/PDF</button>
-                        <button class="dropdown-item" onclick="exportToExcel()">📊 엑셀로 내보내기</button>
+            <!-- 백업 -->
+            <button class="header-icon-btn" onclick="openBackupModal()" title="백업">💾</button>
+            <!-- 파트너사 -->
+            <button class="header-icon-btn" onclick="openSponsorManagementModal()" title="파트너사">🏢</button>
+            <!-- 초기화(관리자) -->
+            <button class="header-icon-btn danger-btn admin-only-btn" onclick="resetAllData()" style="display:none;" title="전체 초기화">🔄</button>
+        </div>
+    </header>
+
+    <!-- ============================
+         PC 사이드 네비 + 메인 레이아웃
+         ============================ -->
+    <div class="app-layout">
+
+        <!-- PC 좌측 탭 네비게이션 -->
+        <nav class="side-nav" id="sideNav">
+            <button class="side-nav-item active" data-tab="schedule" onclick="switchTab('schedule')">
+                <span class="side-nav-icon">🗓️</span>
+                <span class="side-nav-label">시간표</span>
+            </button>
+            <button class="side-nav-item" data-tab="lectures" onclick="switchTab('lectures')">
+                <span class="side-nav-icon">📚</span>
+                <span class="side-nav-label">강의목록</span>
+            </button>
+            <button class="side-nav-item" data-tab="add" onclick="switchTab('add')">
+                <span class="side-nav-icon">➕</span>
+                <span class="side-nav-label">강의추가</span>
+            </button>
+            <button class="side-nav-item" data-tab="speaker" onclick="switchTab('speaker')">
+                <span class="side-nav-icon">👤</span>
+                <span class="side-nav-label">연자</span>
+            </button>
+            <button class="side-nav-item" data-tab="settings" onclick="switchTab('settings')">
+                <span class="side-nav-icon">⚙️</span>
+                <span class="side-nav-label">설정</span>
+            </button>
+        </nav>
+
+        <!-- 메인 콘텐츠 영역 -->
+        <main class="app-main">
+
+            <!-- ===== 탭: 시간표 ===== -->
+            <section class="tab-panel active" id="tab-schedule">
+                <div class="panel-toolbar">
+                    <div class="date-selector-btns" id="dateSelectorBtns"></div>
+                    <div class="toolbar-actions">
+                        <button class="tool-btn" onclick="openEventDateModal()" title="날짜 관리">📅+</button>
+                        <button class="tool-btn" onclick="openTimeSettingsModal()" title="시간대 설정">⏰</button>
+                        <button class="tool-btn" onclick="addRoom()" title="룸 추가">➕룸</button>
+                        <button class="tool-btn" onclick="openFullScheduleModal()" title="크게 보기">🔍크게보기</button>
                     </div>
                 </div>
-            </div>
-            
-            <button class="btn btn-secondary btn-small admin-only-btn" onclick="resetAllData()" style="color:#e74c3c; display:none;" title="전체 초기화">🔄</button>
-        </div>
-    </div>
-
-    <!-- 사이드바 토글 버튼 (항상 보이도록 container 밖에 배치) -->
-    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="사이드바 접기/펼치기">
-        <span id="sidebarToggleIcon">◀</span>
-    </button>
-
-    <div class="container">
-        <div class="sidebar" id="sidebar">
-            <div class="sidebar-content" id="sidebarContent">
-            <div class="card" id="addLectureCard">
-                <div class="card-title" onclick="toggleCard('addLectureCard')">
-                    ➕ 강의 추가
-                    <span class="toggle-icon">▼</span>
+                <div class="schedule-table-wrapper">
+                    <table class="schedule-table" id="scheduleTable"></table>
                 </div>
-                <div class="card-content">
+            </section>
+
+            <!-- ===== 탭: 강의목록 ===== -->
+            <section class="tab-panel" id="tab-lectures">
+                <!-- 이 div가 lectureListCard — JS가 이 ID로 접근 -->
+                <div id="lectureListCard" class="tab-inner">
+                    <div class="lecture-toolbar">
+                        <div class="lecture-search-box">
+                            <input type="text" id="lectureSearchInput" placeholder="🔍 제목, 연자명, 회사명 검색..." oninput="filterLecturesBySearch()">
+                            <button class="search-clear-btn" onclick="clearLectureSearch()" title="검색 초기화">✕</button>
+                        </div>
+                        <div class="lecture-filter-btns">
+                            <button class="filter-chip filter-quick-btn" id="filterUnscheduledBtn" onclick="toggleQuickFilter('unscheduled')" title="미배치 강의만 보기">📌 미배치</button>
+                            <button class="filter-chip filter-quick-btn" id="filterNoSpeakerBtn" onclick="toggleQuickFilter('noSpeaker')" title="연자 미정만 보기">❓ 미정</button>
+                            <button class="filter-chip" id="toggleFiltersBtn" onclick="toggleCategoryFilters()">📂 분류</button>
+                        </div>
+                    </div>
+                    <div class="category-filters-wrapper" id="categoryFiltersWrapper">
+                        <div class="category-filters" id="categoryFilters"></div>
+                    </div>
+                    <div class="lecture-list" id="lectureList"></div>
+                </div>
+            </section>
+
+            <!-- ===== 탭: 강의추가 ===== -->
+            <section class="tab-panel" id="tab-add">
+                <!-- addLectureCard — JS가 이 ID로 show/hide -->
+                <div id="addLectureCard" class="tab-inner">
+                    <div class="section-title">➕ 강의 추가</div>
                     <form class="lecture-form" id="lectureForm" onsubmit="return false;">
                         <div class="form-group">
                             <label>분류</label>
@@ -135,23 +189,23 @@
                                 <option value="">선택하세요</option>
                             </select>
                         </div>
-                        
+
                         <div class="form-group">
                             <label>제목 (한글)</label>
                             <input type="text" id="titleKo" required>
                         </div>
-                        
+
                         <div class="form-group">
                             <label>제목 (영문)</label>
                             <input type="text" id="titleEn" placeholder="English title">
                             <div class="translation-help">
-                                💡 번역: 
-                                <a href="https://translate.google.com/?sl=ko&tl=en" target="_blank">Google</a> | 
-                                <a href="https://papago.naver.com/" target="_blank">Papago</a> | 
+                                💡 번역:
+                                <a href="https://translate.google.com/?sl=ko&tl=en" target="_blank">Google</a> |
+                                <a href="https://papago.naver.com/" target="_blank">Papago</a> |
                                 <a href="https://www.deepl.com/translator#ko/en/" target="_blank">DeepL</a>
                             </div>
                         </div>
-                        
+
                         <div class="form-row">
                             <div class="form-group autocomplete-container">
                                 <label>연자 (한글)</label>
@@ -163,7 +217,7 @@
                                 <input type="text" id="speakerEn" placeholder="Speaker name">
                             </div>
                         </div>
-                        
+
                         <div class="form-row">
                             <div class="form-group">
                                 <label>소속</label>
@@ -182,19 +236,19 @@
                                 </select>
                             </div>
                         </div>
-                        
-                        <div class="form-group" style="border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-top: 0.5rem;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <label style="color: var(--accent);">🏢 파트너사/제품 정보 (선택)</label>
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" id="isAcademicLecture" style="width: 16px; height: 16px; accent-color: #8E24AA;">
-                                    <span style="color: #8E24AA; font-weight: bold; font-size: 0.85rem;">🎓 학회강의</span>
+
+                        <div class="form-section-divider">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <label style="color:var(--accent);">🏢 파트너사/제품 정보 (선택)</label>
+                                <label class="checkbox-label" style="color:#8E24AA;">
+                                    <input type="checkbox" id="isAcademicLecture" style="width:16px;height:16px;accent-color:#8E24AA;">
+                                    🎓 학회강의
                                 </label>
                             </div>
                         </div>
-                        
+
                         <div class="form-row">
-                            <div class="form-group" style="position: relative;">
+                            <div class="form-group" style="position:relative;">
                                 <label>회사명</label>
                                 <input type="text" id="companyName" placeholder="예: 원텍" autocomplete="off">
                                 <div id="companyAutocomplete" class="autocomplete-dropdown"></div>
@@ -204,189 +258,270 @@
                                 <input type="text" id="productName" placeholder="예: 올리지오키스">
                             </div>
                         </div>
-                        
+
                         <div class="form-group">
                             <label>제품 설명</label>
                             <input type="text" id="productDescription" placeholder="예: 보툴리눔 톡신">
                         </div>
-                        
-                        <!-- 런천강의 체크박스 -->
-                        <div class="form-group" style="border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-top: 0.5rem;">
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" id="isLuncheon" style="width: 18px; height: 18px; accent-color: #FF8F00;">
-                                <span style="color: #FF8F00; font-weight: bold;">⭐ 런천강의 (Luncheon Lecture)</span>
+
+                        <div class="form-section-divider">
+                            <label class="checkbox-label" style="color:#FF8F00;">
+                                <input type="checkbox" id="isLuncheon" style="width:18px;height:18px;accent-color:#FF8F00;">
+                                ⭐ 런천강의 (Luncheon Lecture)
                             </label>
-                            <small style="color: #666; margin-left: 1.5rem;">런치 시간 내 파트너사 강의인 경우 체크</small>
+                            <small style="color:#666;margin-left:1.5rem;">런치 시간 내 파트너사 강의인 경우 체크</small>
                         </div>
-                        
-                        <button type="button" class="btn btn-primary" id="addLectureBtn">강의 추가</button>
-                        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-                            <button type="button" class="btn btn-secondary" onclick="openCategoryModal()" style="flex: 1;">📂 분류 관리</button>
-                            <button type="button" class="btn btn-secondary" onclick="openCompanyModal()" style="flex: 1;">🏢 업체 관리</button>
+
+                        <button type="button" class="btn btn-primary btn-full" id="addLectureBtn">강의 추가</button>
+                        <div class="form-row" style="margin-top:0.5rem;">
+                            <button type="button" class="btn btn-secondary" onclick="openCategoryModal()" style="flex:1;">📂 분류 관리</button>
+                            <button type="button" class="btn btn-secondary" onclick="openCompanyModal()" style="flex:1;">🏢 업체 관리</button>
                         </div>
                     </form>
                 </div>
-            </div>
-            
-            <div class="card" id="lectureListCard">
-                <div class="card-title" style="font-size: 0.9rem;">
-                    📚 강의 목록
-                    <div style="display: flex; gap: 0.2rem; margin-left: auto;">
-                        <button class="btn btn-small filter-quick-btn" id="filterUnscheduledBtn" onclick="toggleQuickFilter('unscheduled')" title="미배치 강의만 보기" style="padding: 0.15rem 0.35rem; font-size: 0.6rem;">
-                            📌미배치
-                        </button>
-                        <button class="btn btn-small filter-quick-btn" id="filterNoSpeakerBtn" onclick="toggleQuickFilter('noSpeaker')" title="연자 미정 강의만 보기" style="padding: 0.15rem 0.35rem; font-size: 0.6rem;">
-                            ❓미정
-                        </button>
-                        <button class="btn btn-small" id="toggleFiltersBtn" onclick="toggleCategoryFilters()" style="padding: 0.15rem 0.35rem; font-size: 0.6rem;">
-                            📂분류
-                        </button>
-                    </div>
-                </div>
-                <div class="card-content">
-                    <!-- 검색창 -->
-                    <div class="lecture-search-box">
-                        <input type="text" id="lectureSearchInput" placeholder="🔍 강의 제목, 연자명, 회사명 검색..." oninput="filterLecturesBySearch()">
-                        <button class="search-clear-btn" onclick="clearLectureSearch()" title="검색 초기화">✕</button>
-                    </div>
-                    <div class="category-filters-wrapper" id="categoryFiltersWrapper">
-                        <div class="category-filters" id="categoryFilters"></div>
-                    </div>
-                    <div class="lecture-list" id="lectureList"></div>
-                </div>
-            </div>
-            </div><!-- sidebar-content 닫기 -->
-        </div>
+            </section>
 
-        <div class="schedule-grid" id="scheduleGrid">
-            <div class="grid-header">
-                <h2>시간표</h2>
-                <div class="date-selector-btns" id="dateSelectorBtns">
-                    <!-- 날짜 버튼은 JavaScript에서 동적 생성 -->
-                </div>
-                <button class="btn btn-small btn-secondary" onclick="openEventDateModal()" style="margin-left: 0.5rem;" title="행사 날짜 관리">📅+</button>
-                <button class="btn btn-small btn-secondary" onclick="openTimeSettingsModal()" style="margin-left: 0.25rem;" title="시간대 설정">⏰</button>
-                <button class="btn btn-small btn-secondary" onclick="addRoom()" style="margin-left: 0.25rem;" title="룸 추가">➕</button>
-                <button class="btn btn-small btn-secondary" onclick="openFullScheduleModal()" style="margin-left: 0.25rem;" title="전체 시간표 크게 보기">🔍 크게보기</button>
-            </div>
+            <!-- ===== 탭: 연자 ===== -->
+            <section class="tab-panel" id="tab-speaker">
+                <div class="tab-inner">
+                    <div class="section-title">👤 연자 관리</div>
 
-            <div class="schedule-table-wrapper">
-                <table class="schedule-table" id="scheduleTable"></table>
-            </div>
-        </div>
+                    <div class="card" style="margin-bottom:1rem;">
+                        <div class="card-body">
+                            <label style="font-weight:600;margin-bottom:0.5rem;display:block;">새 연자 추가</label>
+                            <div class="form-grid-4">
+                                <input type="text" id="newSpeakerName" placeholder="연자명 (한글)">
+                                <input type="text" id="newSpeakerNameEn" placeholder="연자명 (영문)">
+                                <input type="text" id="newSpeakerAffiliation" placeholder="소속 (한글)">
+                                <input type="text" id="newSpeakerAffiliationEn" placeholder="소속 (영문)">
+                            </div>
+                            <div style="margin-top:0.5rem;display:flex;justify-content:space-between;align-items:center;">
+                                <label class="checkbox-label" style="color:#8E24AA;">
+                                    <input type="checkbox" id="newSpeakerASLS" style="width:18px;height:18px;accent-color:#8E24AA;">
+                                    🏅 ASLS 학회 멤버
+                                </label>
+                                <button class="btn btn-primary" onclick="addSpeaker()">추가</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="search-sort-container">
+                        <input type="text" id="speakerSearch" class="search-input"
+                               placeholder="🔍 연자명 또는 소속으로 검색..."
+                               oninput="searchSpeakers()">
+                        <select id="speakerSort" class="sort-select" onchange="updateSpeakerList()">
+                            <option value="name-ko">가나다순 (한글)</option>
+                            <option value="name-en">ABC순 (영문)</option>
+                            <option value="affiliation">소속순</option>
+                            <option value="recent">최근 추가순</option>
+                            <option value="time-desc">활동시간 많은순</option>
+                            <option value="time-asc">활동시간 적은순</option>
+                        </select>
+                    </div>
+                    <div style="margin-top:0.5rem;display:flex;gap:1rem;align-items:center;">
+                        <label class="checkbox-label" style="font-size:0.85rem;color:#E53935;">
+                            <input type="checkbox" id="speakerFilterOvertime" onchange="updateSpeakerList()" style="width:16px;height:16px;accent-color:#E53935;">
+                            ⚠️ 2시간 초과자만 보기
+                        </label>
+                        <span id="speakerOvertimeCount" style="font-size:0.8rem;color:#666;"></span>
+                    </div>
+                    <div class="speaker-list" id="speakerList" style="margin-top:1rem;"></div>
+                </div>
+            </section>
+
+            <!-- ===== 탭: 설정 ===== -->
+            <section class="tab-panel" id="tab-settings">
+                <div class="tab-inner">
+                    <div class="section-title">⚙️ 설정</div>
+
+                    <div class="settings-grid">
+                        <button class="settings-card" onclick="openSessionModal()">
+                            <span class="settings-icon">📋</span>
+                            <span class="settings-label">세션 관리</span>
+                        </button>
+                        <button class="settings-card" onclick="openEventDateModal()">
+                            <span class="settings-icon">📅</span>
+                            <span class="settings-label">날짜 관리</span>
+                        </button>
+                        <button class="settings-card" onclick="openTimeSettingsModal()">
+                            <span class="settings-icon">⏰</span>
+                            <span class="settings-label">시간대 설정</span>
+                        </button>
+                        <button class="settings-card" onclick="openCategoryModal()">
+                            <span class="settings-icon">📂</span>
+                            <span class="settings-label">분류 관리</span>
+                        </button>
+                        <button class="settings-card" onclick="openCompanyModal()">
+                            <span class="settings-icon">🏢</span>
+                            <span class="settings-label">업체 관리</span>
+                        </button>
+                        <button class="settings-card" onclick="openUserManagementModal()">
+                            <span class="settings-icon">👥</span>
+                            <span class="settings-label">사용자 관리
+                                <span class="pending-badge" id="pendingBadge2" style="display:none;position:static;margin-left:4px;"></span>
+                            </span>
+                        </button>
+                        <button class="settings-card" onclick="openBackupModal()">
+                            <span class="settings-icon">💾</span>
+                            <span class="settings-label">백업 관리</span>
+                        </button>
+                        <button class="settings-card" onclick="openUploadModal()">
+                            <span class="settings-icon">📤</span>
+                            <span class="settings-label">강의 업로드</span>
+                        </button>
+                        <button class="settings-card" onclick="openSponsorManagementModal()">
+                            <span class="settings-icon">🤝</span>
+                            <span class="settings-label">파트너사 강의</span>
+                        </button>
+                        <button class="settings-card" onclick="openPrintModal()">
+                            <span class="settings-icon">🖨️</span>
+                            <span class="settings-label">인쇄/PDF</span>
+                        </button>
+                        <button class="settings-card" onclick="exportToExcel()">
+                            <span class="settings-icon">📊</span>
+                            <span class="settings-label">엑셀 내보내기</span>
+                        </button>
+                        <button class="settings-card" onclick="openTypoCheckModal()">
+                            <span class="settings-icon">✏️</span>
+                            <span class="settings-label">오타 검증</span>
+                        </button>
+                    </div>
+
+                    <!-- 숨겨진 sidebar 호환용 (JS가 sidebar ID를 참조할 수 있음) -->
+                    <div id="sidebar" style="display:none;">
+                        <div id="sidebarContent"></div>
+                    </div>
+                    <button id="sidebarToggle" style="display:none;" onclick="toggleSidebar()">
+                        <span id="sidebarToggleIcon">◀</span>
+                    </button>
+                    <!-- scheduleGrid ID 호환용 -->
+                    <div id="scheduleGrid" style="display:none;"></div>
+                </div>
+            </section>
+
+        </main>
     </div>
 
-    <!-- ============================================ -->
-    <!-- 모달들 -->
-    <!-- ============================================ -->
+    <!-- ============================
+         모바일 하단 탭바
+         ============================ -->
+    <nav class="bottom-tabbar">
+        <button class="tab-item active" data-tab="schedule" onclick="switchTab('schedule')">
+            <span class="tab-icon">🗓️</span>
+            <span class="tab-label">시간표</span>
+        </button>
+        <button class="tab-item" data-tab="lectures" onclick="switchTab('lectures')">
+            <span class="tab-icon">📚</span>
+            <span class="tab-label">강의목록</span>
+        </button>
+        <button class="tab-item tab-add-btn" data-tab="add" onclick="switchTab('add')">
+            <span class="tab-add-circle">➕</span>
+            <span class="tab-label">강의추가</span>
+        </button>
+        <button class="tab-item" data-tab="speaker" onclick="switchTab('speaker')">
+            <span class="tab-icon">👤</span>
+            <span class="tab-label">연자</span>
+        </button>
+        <button class="tab-item" data-tab="settings" onclick="switchTab('settings')">
+            <span class="tab-icon">⚙️</span>
+            <span class="tab-label">설정</span>
+        </button>
+    </nav>
+
+    <!-- ============================================
+         모달들 (모든 ID 보존)
+         ============================================ -->
 
     <!-- 전체 시간표 크게 보기 모달 -->
     <div class="modal" id="fullScheduleModal">
-        <div class="modal-content" style="max-width: 95vw; max-height: 95vh; width: 95vw;">
+        <div class="modal-content" style="max-width:95vw;max-height:95vh;width:95vw;">
             <div class="modal-header">
                 <h2>🔍 전체 시간표</h2>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <span id="fullScheduleDateLabel" style="font-size: 0.9rem; color: #666;"></span>
+                <div style="display:flex;gap:0.5rem;align-items:center;">
+                    <span id="fullScheduleDateLabel" style="font-size:0.9rem;color:#666;"></span>
                     <button class="modal-close" onclick="closeFullScheduleModal()">×</button>
                 </div>
             </div>
-            <div id="fullScheduleContent" style="overflow: auto; max-height: calc(95vh - 100px); padding: 1rem;"></div>
+            <div id="fullScheduleContent" style="overflow:auto;max-height:calc(95vh - 100px);padding:1rem;"></div>
         </div>
     </div>
-    
+
     <!-- 룸별 시간표 모달 -->
     <div class="modal" id="roomScheduleModal">
-        <div class="modal-content" style="max-width: 600px; max-height: 90vh;">
+        <div class="modal-content" style="max-width:600px;max-height:90vh;">
             <div class="modal-header">
                 <h2 id="roomScheduleTitle">🏠 룸 시간표</h2>
                 <button class="modal-close" onclick="closeRoomScheduleModal()">×</button>
             </div>
-            <div id="roomScheduleContent" style="overflow: auto; max-height: calc(90vh - 100px); padding: 1rem;"></div>
+            <div id="roomScheduleContent" style="overflow:auto;max-height:calc(90vh - 100px);padding:1rem;"></div>
         </div>
     </div>
 
     <!-- 인쇄 설정 모달 -->
     <div class="modal" id="printModal">
-        <div class="modal-content" style="max-width: 500px; max-height: 90vh;">
+        <div class="modal-content" style="max-width:500px;max-height:90vh;">
             <div class="modal-header">
                 <h2>🖨️ 인쇄 설정</h2>
                 <button class="modal-close" onclick="closePrintModal()">×</button>
             </div>
-            <div style="padding: 1rem; overflow-y: auto; max-height: calc(90vh - 80px);">
-                <!-- 현재 날짜 표시 -->
-                <div id="printDateLabel" style="margin-bottom: 1rem; padding: 0.5rem; background: #E8F4FD; border-radius: 6px; text-align: center;">
-                    <span style="font-weight: bold;">📅 날짜 로딩...</span>
+            <div style="padding:1rem;overflow-y:auto;max-height:calc(90vh - 80px);">
+                <div id="printDateLabel" style="margin-bottom:1rem;padding:0.5rem;background:#E8F4FD;border-radius:6px;text-align:center;">
+                    <span style="font-weight:bold;">📅 날짜 로딩...</span>
                 </div>
-                
-                <!-- 출력 형식 선택 -->
-                <div class="form-group" style="margin-bottom: 1.5rem;">
-                    <label style="font-weight: bold; margin-bottom: 0.75rem; display: block;">📋 출력 형식</label>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-                        <label class="print-format-option" id="formatSchedule" onclick="selectPrintFormat('schedule')" style="display: flex; flex-direction: column; align-items: center; padding: 1rem; border: 2px solid #667eea; border-radius: 8px; cursor: pointer; background: #f0f4ff;">
-                            <span style="font-size: 2rem; margin-bottom: 0.5rem;">📊</span>
-                            <span style="font-weight: bold;">시간표</span>
-                            <span style="font-size: 0.75rem; color: #666;">기존 형식</span>
+                <div class="form-group" style="margin-bottom:1.5rem;">
+                    <label style="font-weight:bold;margin-bottom:0.75rem;display:block;">📋 출력 형식</label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                        <label class="print-format-option" id="formatSchedule" onclick="selectPrintFormat('schedule')" style="display:flex;flex-direction:column;align-items:center;padding:1rem;border:2px solid #667eea;border-radius:8px;cursor:pointer;background:#f0f4ff;">
+                            <span style="font-size:2rem;margin-bottom:0.5rem;">📊</span>
+                            <span style="font-weight:bold;">시간표</span>
+                            <span style="font-size:0.75rem;color:#666;">기존 형식</span>
                         </label>
-                        <label class="print-format-option" id="formatLeaflet" onclick="selectPrintFormat('leaflet')" style="display: flex; flex-direction: column; align-items: center; padding: 1rem; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; background: #f5f5f5;">
-                            <span style="font-size: 2rem; margin-bottom: 0.5rem;">📄</span>
-                            <span style="font-weight: bold;">리플렛</span>
-                            <span style="font-size: 0.75rem; color: #666;">학술대회 양식</span>
+                        <label class="print-format-option" id="formatLeaflet" onclick="selectPrintFormat('leaflet')" style="display:flex;flex-direction:column;align-items:center;padding:1rem;border:2px solid #ddd;border-radius:8px;cursor:pointer;background:#f5f5f5;">
+                            <span style="font-size:2rem;margin-bottom:0.5rem;">📄</span>
+                            <span style="font-weight:bold;">리플렛</span>
+                            <span style="font-size:0.75rem;color:#666;">학술대회 양식</span>
                         </label>
                     </div>
                 </div>
-                
-                <!-- 키비주얼 업로드 (리플렛 선택 시에만 표시) -->
-                <div id="keyVisualSection" style="display: none; margin-bottom: 1.5rem; padding: 1rem; background: #fafafa; border-radius: 8px; border: 1px dashed #ddd;">
-                    <label style="font-weight: bold; margin-bottom: 0.75rem; display: block;">🖼️ 키비주얼 이미지</label>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                        <div style="text-align: center;">
-                            <p style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">좌측</p>
-                            <div id="leftKeyVisualPreview" style="min-height: 80px; display: flex; align-items: center; justify-content: center; background: #eee; border-radius: 6px; margin-bottom: 0.5rem;">
-                                <span style="color: #999; font-size: 0.75rem;">미등록</span>
+                <div id="keyVisualSection" style="display:none;margin-bottom:1.5rem;padding:1rem;background:#fafafa;border-radius:8px;border:1px dashed #ddd;">
+                    <label style="font-weight:bold;margin-bottom:0.75rem;display:block;">🖼️ 키비주얼 이미지</label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                        <div style="text-align:center;">
+                            <p style="font-size:0.8rem;color:#666;margin-bottom:0.5rem;">좌측</p>
+                            <div id="leftKeyVisualPreview" style="min-height:80px;display:flex;align-items:center;justify-content:center;background:#eee;border-radius:6px;margin-bottom:0.5rem;">
+                                <span style="color:#999;font-size:0.75rem;">미등록</span>
                             </div>
-                            <button class="btn btn-secondary btn-small" onclick="uploadKeyVisual('left')" style="font-size: 0.75rem;">📤 업로드</button>
+                            <button class="btn btn-secondary btn-small" onclick="uploadKeyVisual('left')" style="font-size:0.75rem;">📤 업로드</button>
                         </div>
-                        <div style="text-align: center;">
-                            <p style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem;">우측</p>
-                            <div id="rightKeyVisualPreview" style="min-height: 80px; display: flex; align-items: center; justify-content: center; background: #eee; border-radius: 6px; margin-bottom: 0.5rem;">
-                                <span style="color: #999; font-size: 0.75rem;">미등록</span>
+                        <div style="text-align:center;">
+                            <p style="font-size:0.8rem;color:#666;margin-bottom:0.5rem;">우측</p>
+                            <div id="rightKeyVisualPreview" style="min-height:80px;display:flex;align-items:center;justify-content:center;background:#eee;border-radius:6px;margin-bottom:0.5rem;">
+                                <span style="color:#999;font-size:0.75rem;">미등록</span>
                             </div>
-                            <button class="btn btn-secondary btn-small" onclick="uploadKeyVisual('right')" style="font-size: 0.75rem;">📤 업로드</button>
+                            <button class="btn btn-secondary btn-small" onclick="uploadKeyVisual('right')" style="font-size:0.75rem;">📤 업로드</button>
                         </div>
                     </div>
                 </div>
-                
-                <!-- 출력 언어 (리플렛 선택 시에만 표시) -->
-                <div id="languageSection" style="margin-bottom: 1.5rem;">
-                    <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">🌐 출력 언어</label>
-                    <div style="display: flex; gap: 1rem;">
-                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="radio" name="printLanguage" value="ko" checked style="width: 16px; height: 16px;">
+                <div id="languageSection" style="margin-bottom:1.5rem;">
+                    <label style="font-weight:bold;margin-bottom:0.5rem;display:block;">🌐 출력 언어</label>
+                    <div style="display:flex;gap:1rem;">
+                        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                            <input type="radio" name="printLanguage" value="ko" checked style="width:16px;height:16px;">
                             <span>한글</span>
                         </label>
-                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="radio" name="printLanguage" value="en" style="width: 16px; height: 16px;">
+                        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                            <input type="radio" name="printLanguage" value="en" style="width:16px;height:16px;">
                             <span>English</span>
                         </label>
                     </div>
-                    <p style="font-size: 0.75rem; color: #888; margin-top: 0.5rem;">
-                        * English 선택 시: 영문이름 (국가명) 형태로 출력됩니다
-                    </p>
+                    <p style="font-size:0.75rem;color:#888;margin-top:0.5rem;">* English 선택 시: 영문이름 (국가명) 형태로 출력됩니다</p>
                 </div>
-                
-                <!-- 룸 선택 -->
                 <div class="form-group">
-                    <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">🏠 출력할 룸 선택</label>
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 250px; overflow-y: auto;" id="printRoomCheckboxes">
-                        <!-- 동적으로 생성됨 -->
-                    </div>
+                    <label style="font-weight:bold;margin-bottom:0.5rem;display:block;">🏠 출력할 룸 선택</label>
+                    <div style="display:flex;flex-direction:column;gap:0.5rem;max-height:250px;overflow-y:auto;" id="printRoomCheckboxes"></div>
                 </div>
-                
-                <!-- 인쇄 버튼 -->
-                <div style="margin-top: 1.5rem;">
-                    <button class="btn btn-primary" onclick="executePrintWithFormat()" style="width: 100%; padding: 0.75rem; font-size: 1rem;">
-                        🖨️ 인쇄/PDF
-                    </button>
+                <div style="margin-top:1.5rem;">
+                    <button class="btn btn-primary" onclick="executePrintWithFormat()" style="width:100%;padding:0.75rem;font-size:1rem;">🖨️ 인쇄/PDF</button>
                 </div>
             </div>
         </div>
@@ -394,28 +529,24 @@
 
     <!-- 오타 검증 모달 -->
     <div class="modal" id="typoCheckModal">
-        <div class="modal-content" style="max-width: 900px; max-height: 90vh;">
+        <div class="modal-content" style="max-width:900px;max-height:90vh;">
             <div class="modal-header">
                 <h2>✏️ 오타 검증</h2>
                 <button class="modal-close" onclick="closeTypoCheckModal()">×</button>
             </div>
-            <div style="padding: 1rem;">
-                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <div style="padding:1rem;">
+                <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
                     <button class="btn btn-primary" onclick="runTypoCheck()">🔍 검사 시작</button>
-                    <span style="font-size: 0.85rem; color: #666; align-self: center;">
-                        전체 강의의 제목과 연자명을 검사합니다
-                    </span>
+                    <span style="font-size:0.85rem;color:#666;align-self:center;">전체 강의의 제목과 연자명을 검사합니다</span>
                 </div>
-                
-                <div id="typoCheckProgress" style="display: none; margin-bottom: 1rem;">
-                    <div style="background: #e0e0e0; border-radius: 8px; height: 8px; overflow: hidden;">
-                        <div id="typoProgressBar" style="background: var(--primary); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                <div id="typoCheckProgress" style="display:none;margin-bottom:1rem;">
+                    <div style="background:#e0e0e0;border-radius:8px;height:8px;overflow:hidden;">
+                        <div id="typoProgressBar" style="background:var(--primary);height:100%;width:0%;transition:width 0.3s;"></div>
                     </div>
-                    <p style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;" id="typoProgressText">검사 중...</p>
+                    <p style="font-size:0.8rem;color:#666;margin-top:0.25rem;" id="typoProgressText">검사 중...</p>
                 </div>
-                
-                <div id="typoResults" style="max-height: calc(90vh - 250px); overflow-y: auto;">
-                    <p style="text-align: center; color: #999; padding: 2rem;">🔍 검사 시작 버튼을 눌러주세요</p>
+                <div id="typoResults" style="max-height:calc(90vh - 250px);overflow-y:auto;">
+                    <p style="text-align:center;color:#999;padding:2rem;">🔍 검사 시작 버튼을 눌러주세요</p>
                 </div>
             </div>
         </div>
@@ -423,80 +554,73 @@
 
     <!-- 분류 관리 모달 -->
     <div class="modal" id="categoryModal">
-        <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-content" style="max-width:700px;">
             <div class="modal-header">
                 <h2>📂 분류 관리</h2>
                 <button class="modal-close" onclick="closeCategoryModal()">×</button>
             </div>
-            
             <div class="form-group">
                 <label>새 분류 추가</label>
-                <div style="display: flex; gap: 0.5rem;">
-                    <input type="text" id="newCategoryName" placeholder="분류명 (영문)" style="flex: 1;">
-                    <input type="color" id="newCategoryColor" value="#9B59B6" style="width: 60px; height: 42px; border: none; cursor: pointer;">
+                <div style="display:flex;gap:0.5rem;">
+                    <input type="text" id="newCategoryName" placeholder="분류명 (영문)" style="flex:1;">
+                    <input type="color" id="newCategoryColor" value="#9B59B6" style="width:60px;height:42px;border:none;cursor:pointer;">
                     <button class="btn btn-primary" onclick="addCategory()">추가</button>
                 </div>
             </div>
-
-            <div style="margin: 1rem 0; padding: 0.75rem; background: #FFF3CD; border-radius: 8px; border-left: 4px solid #FFC107;">
+            <div style="margin:1rem 0;padding:0.75rem;background:#FFF3CD;border-radius:8px;border-left:4px solid #FFC107;">
                 <small>⚠️ 분류를 삭제하면 해당 분류의 강의는 "Others"로 변경됩니다.</small>
             </div>
-
-            <div class="speaker-list" id="categoryList" style="max-height: 400px;"></div>
+            <div class="speaker-list" id="categoryList" style="max-height:400px;"></div>
         </div>
     </div>
 
     <!-- 세션 관리 모달 -->
     <div class="modal" id="sessionModal">
-        <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-content" style="max-width:700px;">
             <div class="modal-header">
                 <h2>📋 세션 관리</h2>
                 <button class="modal-close" onclick="closeSessionModal()">×</button>
             </div>
-            
-            <div style="background: #E3F2FD; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #2196F3;">
-                <p style="margin: 0; font-size: 0.9rem;">💡 <strong>시간표에서 셀 위에 마우스를 올리면 "+ 세션" 버튼이 나타납니다.</strong></p>
-                <p style="margin: 0.5rem 0 0 0; font-size: 0.85rem; color: #666;">버튼을 클릭하여 해당 시간/룸에 세션을 추가하세요. 세션 헤더를 클릭하면 수정할 수 있습니다.</p>
+            <div style="background:#E3F2FD;padding:1rem;border-radius:8px;margin-bottom:1rem;border-left:4px solid #2196F3;">
+                <p style="margin:0;font-size:0.9rem;">💡 <strong>시간표에서 셀 위에 마우스를 올리면 "+ 세션" 버튼이 나타납니다.</strong></p>
+                <p style="margin:0.5rem 0 0 0;font-size:0.85rem;color:#666;">버튼을 클릭하여 해당 시간/룸에 세션을 추가하세요. 세션 헤더를 클릭하면 수정할 수 있습니다.</p>
             </div>
-
             <div class="form-group">
                 <label><strong>현재 세션 목록</strong></label>
-                <div id="sessionList" style="max-height: 400px; overflow-y: auto;"></div>
+                <div id="sessionList" style="max-height:400px;overflow-y:auto;"></div>
             </div>
         </div>
     </div>
 
-    <!-- 연자 관리 모달 -->
+    <!-- 연자 관리 모달 (speakerModal — 모달 버전, tab-speaker와 별도) -->
     <div class="modal" id="speakerModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>👥 연자 관리</h2>
                 <button class="modal-close" onclick="closeSpeakerModal()">×</button>
             </div>
-            
             <div class="form-group">
                 <label>새 연자 추가</label>
                 <div class="form-grid-4">
-                    <input type="text" id="newSpeakerName" placeholder="연자명 (한글)">
-                    <input type="text" id="newSpeakerNameEn" placeholder="연자명 (영문)">
-                    <input type="text" id="newSpeakerAffiliation" placeholder="소속 (한글)">
-                    <input type="text" id="newSpeakerAffiliationEn" placeholder="소속 (영문)">
+                    <input type="text" id="newSpeakerName2" placeholder="연자명 (한글)">
+                    <input type="text" id="newSpeakerNameEn2" placeholder="연자명 (영문)">
+                    <input type="text" id="newSpeakerAffiliation2" placeholder="소속 (한글)">
+                    <input type="text" id="newSpeakerAffiliationEn2" placeholder="소속 (영문)">
                 </div>
-                <div style="margin-top: 0.5rem;">
-                    <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="checkbox" id="newSpeakerASLS" style="width: 18px; height: 18px; accent-color: #8E24AA;">
-                        <span style="color: #8E24AA; font-weight: bold; font-size: 0.85rem;">🏅 ASLS 학회 멤버</span>
+                <div style="margin-top:0.5rem;">
+                    <label class="checkbox-label" style="color:#8E24AA;">
+                        <input type="checkbox" id="newSpeakerASLS2" style="width:18px;height:18px;accent-color:#8E24AA;">
+                        🏅 ASLS 학회 멤버
                     </label>
                 </div>
-                <button class="btn btn-primary" onclick="addSpeaker()" style="margin-top: 0.5rem; width: 100%;">추가</button>
+                <button class="btn btn-primary" onclick="addSpeaker()" style="margin-top:0.5rem;width:100%;">추가</button>
             </div>
-
-            <div style="margin: 1.5rem 0;">
+            <div style="margin:1.5rem 0;">
                 <div class="search-sort-container">
-                    <input type="text" id="speakerSearch" class="search-input" 
-                           placeholder="🔍 연자명 또는 소속으로 검색..." 
+                    <input type="text" id="speakerSearch2" class="search-input"
+                           placeholder="🔍 연자명 또는 소속으로 검색..."
                            oninput="searchSpeakers()">
-                    <select id="speakerSort" class="sort-select" onchange="updateSpeakerList()">
+                    <select id="speakerSort2" class="sort-select" onchange="updateSpeakerList()">
                         <option value="name-ko">가나다순 (한글)</option>
                         <option value="name-en">ABC순 (영문)</option>
                         <option value="affiliation">소속순</option>
@@ -505,16 +629,15 @@
                         <option value="time-asc">활동시간 적은순</option>
                     </select>
                 </div>
-                <div style="margin-top: 0.5rem; display: flex; gap: 1rem; align-items: center;">
-                    <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
-                        <input type="checkbox" id="speakerFilterOvertime" onchange="updateSpeakerList()" style="width: 16px; height: 16px; accent-color: #E53935;">
-                        <span style="color: #E53935;">⚠️ 2시간 초과자만 보기</span>
+                <div style="margin-top:0.5rem;display:flex;gap:1rem;align-items:center;">
+                    <label class="checkbox-label" style="font-size:0.85rem;color:#E53935;">
+                        <input type="checkbox" id="speakerFilterOvertime2" onchange="updateSpeakerList()" style="width:16px;height:16px;accent-color:#E53935;">
+                        ⚠️ 2시간 초과자만 보기
                     </label>
-                    <span id="speakerOvertimeCount" style="font-size: 0.8rem; color: #666;"></span>
+                    <span id="speakerOvertimeCount2" style="font-size:0.8rem;color:#666;"></span>
                 </div>
             </div>
-
-            <div class="speaker-list" id="speakerList"></div>
+            <div class="speaker-list" id="speakerList2"></div>
         </div>
     </div>
 
@@ -525,24 +648,20 @@
                 <h2>✏️ 강의 수정</h2>
                 <button class="modal-close" onclick="confirmCloseEditModal()">×</button>
             </div>
-            
             <form class="lecture-form" id="editForm" onsubmit="return false;">
                 <input type="hidden" id="editLectureId">
                 <div class="form-group">
                     <label>분류</label>
                     <select id="editCategory" required></select>
                 </div>
-                
                 <div class="form-group">
                     <label>제목 (한글)</label>
                     <input type="text" id="editTitleKo" required>
                 </div>
-                
                 <div class="form-group">
                     <label>제목 (영문)</label>
                     <input type="text" id="editTitleEn">
                 </div>
-                
                 <div class="form-row">
                     <div class="form-group">
                         <label>연자 (한글)</label>
@@ -553,12 +672,10 @@
                         <input type="text" id="editSpeakerEn">
                     </div>
                 </div>
-                
                 <div class="form-group">
                     <label>소속</label>
                     <input type="text" id="editAffiliation">
                 </div>
-                
                 <div class="form-group">
                     <label>강의 시간</label>
                     <select id="editDuration">
@@ -571,41 +688,36 @@
                         <option value="60">60분</option>
                     </select>
                 </div>
-                
-                <!-- 런천강의 체크박스 -->
-                <div class="form-group" style="border-top: 1px dashed var(--border); padding-top: 0.5rem; margin-top: 0.5rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="checkbox" id="editIsLuncheon" style="width: 18px; height: 18px; accent-color: #FF8F00;">
-                        <span style="color: #FF8F00; font-weight: bold;">⭐ 런천강의 (Luncheon Lecture)</span>
+                <div class="form-section-divider">
+                    <label class="checkbox-label" style="color:#FF8F00;">
+                        <input type="checkbox" id="editIsLuncheon" style="width:18px;height:18px;accent-color:#FF8F00;">
+                        ⭐ 런천강의 (Luncheon Lecture)
                     </label>
                 </div>
-                
-                <!-- 파트너사 정보 -->
-                <div class="form-group" style="border-top: 1px dashed var(--border); padding-top: 0.5rem; margin-top: 0.5rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <label style="color: var(--accent);">🏢 파트너사/제품 정보 (선택)</label>
-                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" id="editIsAcademicLecture" style="width: 16px; height: 16px; accent-color: #8E24AA;">
-                            <span style="color: #8E24AA; font-weight: bold; font-size: 0.85rem;">🎓 학회강의</span>
+                <div class="form-section-divider">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <label style="color:var(--accent);">🏢 파트너사/제품 정보 (선택)</label>
+                        <label class="checkbox-label" style="color:#8E24AA;">
+                            <input type="checkbox" id="editIsAcademicLecture" style="width:16px;height:16px;accent-color:#8E24AA;">
+                            🎓 학회강의
                         </label>
                     </div>
-                    <div class="form-row" style="margin-top: 0.5rem;">
-                        <div class="form-group" style="flex: 1; position: relative;">
-                            <label style="font-size: 0.8rem;">회사명</label>
+                    <div class="form-row" style="margin-top:0.5rem;">
+                        <div class="form-group" style="flex:1;position:relative;">
+                            <label style="font-size:0.8rem;">회사명</label>
                             <input type="text" id="editCompanyName" placeholder="예: 원텍" autocomplete="off">
                             <div id="editCompanyAutocomplete" class="autocomplete-dropdown"></div>
                         </div>
-                        <div class="form-group" style="flex: 1;">
-                            <label style="font-size: 0.8rem;">제품명</label>
+                        <div class="form-group" style="flex:1;">
+                            <label style="font-size:0.8rem;">제품명</label>
                             <input type="text" id="editProductName" placeholder="예: 올리지오키스">
                         </div>
                     </div>
                 </div>
-                
-                <div style="display: flex; gap: 0.5rem;">
-                    <button type="button" class="btn btn-primary" id="saveEditBtn" style="flex: 1;">수정 완료</button>
-                    <button type="button" class="btn btn-secondary" onclick="confirmCloseEditModal()" style="flex: 0.5;">취소</button>
-                    <button type="button" class="btn btn-secondary" id="deleteEditBtn" style="background: #E74C3C; color: white;" onclick="deleteLectureFromModal()">🗑️ 삭제</button>
+                <div style="display:flex;gap:0.5rem;">
+                    <button type="button" class="btn btn-primary" id="saveEditBtn" style="flex:1;">수정 완료</button>
+                    <button type="button" class="btn btn-secondary" onclick="confirmCloseEditModal()" style="flex:0.5;">취소</button>
+                    <button type="button" class="btn btn-secondary" id="deleteEditBtn" style="background:#E74C3C;color:white;" onclick="deleteLectureFromModal()">🗑️ 삭제</button>
                 </div>
             </form>
         </div>
@@ -625,70 +737,49 @@
 
     <!-- 세션 추가/수정 모달 -->
     <div class="modal" id="cellSessionModal" data-lock="true">
-        <div class="modal-content" style="max-width: 550px;">
+        <div class="modal-content" style="max-width:550px;">
             <div class="modal-header">
                 <h2 id="cellSessionModalTitle">📋 세션/런치 추가</h2>
                 <button class="modal-close" onclick="confirmCloseCellSessionModal()">×</button>
             </div>
-            
             <form class="lecture-form" onsubmit="return false;">
                 <input type="hidden" id="cellSessionTime">
                 <input type="hidden" id="cellSessionRoom">
                 <input type="hidden" id="cellSessionId">
-                
-                <!-- 빠른 입력 버튼 -->
-                <div class="form-group" style="margin-bottom: 1rem;">
-                    <label style="margin-bottom: 0.5rem;">빠른 입력</label>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button type="button" class="btn btn-secondary" onclick="fillLunchSession()" style="background: #5D4037; color: white; flex: 1;">
-                            🍽️ 런치 (60분)
-                        </button>
+                <div class="form-group" style="margin-bottom:1rem;">
+                    <label style="margin-bottom:0.5rem;">빠른 입력</label>
+                    <div style="display:flex;gap:0.5rem;">
+                        <button type="button" class="btn btn-secondary" onclick="fillLunchSession()" style="background:#5D4037;color:white;flex:1;">🍽️ 런치 (60분)</button>
                     </div>
                 </div>
-                
                 <div class="form-group">
-                    <label>세션명 (한글) <span style="color: #E74C3C;">*</span></label>
+                    <label>세션명 (한글) <span style="color:#E74C3C;">*</span></label>
                     <input type="text" id="cellSessionName" required placeholder="예: 레이저 치료의 최신 동향">
                 </div>
-                
                 <div class="form-group">
                     <label>세션명 (영문)</label>
                     <input type="text" id="cellSessionNameEn" placeholder="예: Latest Trends in Laser Treatment">
                 </div>
-                
-                <!-- 세션 내 강의 분류 태그 표시 -->
-                <div class="form-group" style="background: #f8f9fa; padding: 0.75rem; border-radius: 8px; border: 1px dashed #ddd;">
-                    <label style="font-size: 0.8rem; color: #666; margin-bottom: 0.5rem; display: block;">
-                        📊 세션 내 강의 분류
-                    </label>
+                <div class="form-group" style="background:#f8f9fa;padding:0.75rem;border-radius:8px;border:1px dashed #ddd;">
+                    <label style="font-size:0.8rem;color:#666;margin-bottom:0.5rem;display:block;">📊 세션 내 강의 분류</label>
                     <div id="sessionTagsDisplay">
-                        <span style="color: #999; font-size: 0.75rem;">배치된 강의가 없습니다</span>
+                        <span style="color:#999;font-size:0.75rem;">배치된 강의가 없습니다</span>
                     </div>
                 </div>
-                
-                <!-- 좌장 선택 영역 -->
-                <div class="form-group" style="border: 2px solid #e3f2fd; border-radius: 8px; padding: 0.75rem; background: #fafafa;">
-                    <label style="font-weight: bold; color: var(--primary); margin-bottom: 0.5rem; display: block;">
-                        👤 좌장 선택
-                    </label>
-                    
-                    <div class="form-row" style="margin-bottom: 0.75rem;">
-                        <div class="form-group" style="margin-bottom: 0; flex: 1;">
-                            <select id="cellSessionModerator" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem;">
+                <div class="form-group" style="border:2px solid #e3f2fd;border-radius:8px;padding:0.75rem;background:#fafafa;">
+                    <label style="font-weight:bold;color:var(--primary);margin-bottom:0.5rem;display:block;">👤 좌장 선택</label>
+                    <div class="form-row" style="margin-bottom:0.75rem;">
+                        <div class="form-group" style="margin-bottom:0;flex:1;">
+                            <select id="cellSessionModerator" style="width:100%;padding:0.5rem;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;">
                                 <option value="">-- 좌장 선택 --</option>
                             </select>
                         </div>
-                        <div class="form-group" style="margin-bottom: 0; flex: 1;">
-                            <input type="text" id="cellSessionModeratorEn" placeholder="좌장명 (영문)" readonly style="background: #f5f5f5;">
+                        <div class="form-group" style="margin-bottom:0;flex:1;">
+                            <input type="text" id="cellSessionModeratorEn" placeholder="좌장명 (영문)" readonly style="background:#f5f5f5;">
                         </div>
                     </div>
-                    
-                    <!-- 좌장 추천 목록 -->
-                    <div id="moderatorRecommendations" style="border-top: 1px dashed #ddd; padding-top: 0.75rem; margin-top: 0.5rem;">
-                        <!-- JS에서 동적 생성 -->
-                    </div>
+                    <div id="moderatorRecommendations" style="border-top:1px dashed #ddd;padding-top:0.75rem;margin-top:0.5rem;"></div>
                 </div>
-                
                 <div class="form-row">
                     <div class="form-group">
                         <label>세션 시간 (분)</label>
@@ -703,32 +794,30 @@
                     </div>
                     <div class="form-group">
                         <label>세션 색상</label>
-                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;" id="sessionColorPicker">
-                            <button type="button" class="color-btn" data-color="#3498DB" style="background: #3498DB;"></button>
-                            <button type="button" class="color-btn" data-color="#E74C3C" style="background: #E74C3C;"></button>
-                            <button type="button" class="color-btn" data-color="#2ECC71" style="background: #2ECC71;"></button>
-                            <button type="button" class="color-btn" data-color="#9B59B6" style="background: #9B59B6;"></button>
-                            <button type="button" class="color-btn" data-color="#F39C12" style="background: #F39C12;"></button>
-                            <button type="button" class="color-btn" data-color="#1ABC9C" style="background: #1ABC9C;"></button>
-                            <button type="button" class="color-btn" data-color="#E91E63" style="background: #E91E63;"></button>
-                            <button type="button" class="color-btn" data-color="#5D4037" style="background: #5D4037;" title="런치"></button>
+                        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="sessionColorPicker">
+                            <button type="button" class="color-btn" data-color="#3498DB" style="background:#3498DB;"></button>
+                            <button type="button" class="color-btn" data-color="#E74C3C" style="background:#E74C3C;"></button>
+                            <button type="button" class="color-btn" data-color="#2ECC71" style="background:#2ECC71;"></button>
+                            <button type="button" class="color-btn" data-color="#9B59B6" style="background:#9B59B6;"></button>
+                            <button type="button" class="color-btn" data-color="#F39C12" style="background:#F39C12;"></button>
+                            <button type="button" class="color-btn" data-color="#1ABC9C" style="background:#1ABC9C;"></button>
+                            <button type="button" class="color-btn" data-color="#E91E63" style="background:#E91E63;"></button>
+                            <button type="button" class="color-btn" data-color="#5D4037" style="background:#5D4037;" title="런치"></button>
                         </div>
                         <input type="hidden" id="cellSessionColor" value="#3498DB">
                     </div>
                 </div>
-                
-                <!-- 패널 토의 설정 -->
-                <div class="form-group" style="border-top: 1px solid #eee; padding-top: 12px; margin-top: 4px;">
-                    <div id="cellSessionPanelRow" style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
-                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:500;">
+                <div class="form-group" style="border-top:1px solid #eee;padding-top:12px;margin-top:4px;">
+                    <div id="cellSessionPanelRow" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:500;">
                             <input type="checkbox" id="cellSessionHasPanel"
                                 onchange="document.getElementById('cellSessionPanelDurationRow').style.display=this.checked?'flex':'none'">
                             💬 세션 마지막에 패널 토의 추가
                         </label>
                     </div>
-                    <div id="cellSessionPanelDurationRow" style="display:none; align-items:center; gap:8px; padding-left:22px;">
-                        <label style="font-size:0.85rem; color:#666; white-space:nowrap;">패널 시간</label>
-                        <select id="cellSessionPanelDuration" style="padding:4px 8px; border:1px solid #ddd; border-radius:4px; font-size:0.85rem;">
+                    <div id="cellSessionPanelDurationRow" style="display:none;align-items:center;gap:8px;padding-left:22px;">
+                        <label style="font-size:0.85rem;color:#666;white-space:nowrap;">패널 시간</label>
+                        <select id="cellSessionPanelDuration" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;">
                             <option value="10">10분</option>
                             <option value="15">15분</option>
                             <option value="20" selected>20분</option>
@@ -736,13 +825,12 @@
                             <option value="40">40분</option>
                             <option value="60">60분</option>
                         </select>
-                        <span style="font-size:0.8rem; color:#888;">세션 연자 전원 자동 포함 · 중복 체크 적용</span>
+                        <span style="font-size:0.8rem;color:#888;">세션 연자 전원 자동 포함 · 중복 체크 적용</span>
                     </div>
                 </div>
-
-                <div style="display: flex; gap: 0.5rem;">
-                    <button type="button" class="btn btn-primary" onclick="saveCellSession()" style="flex: 1;">저장</button>
-                    <button type="button" class="btn btn-secondary" onclick="confirmCloseCellSessionModal()" style="flex: 0.5;">취소</button>
+                <div style="display:flex;gap:0.5rem;">
+                    <button type="button" class="btn btn-primary" onclick="saveCellSession()" style="flex:1;">저장</button>
+                    <button type="button" class="btn btn-secondary" onclick="confirmCloseCellSessionModal()" style="flex:0.5;">취소</button>
                 </div>
             </form>
         </div>
@@ -750,38 +838,27 @@
 
     <!-- 연자 수정 모달 -->
     <div class="modal" id="editSpeakerModal">
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content" style="max-width:600px;">
             <div class="modal-header">
                 <h2>✏️ 연자 정보 수정</h2>
                 <button class="modal-close" onclick="closeEditSpeakerModal()">×</button>
             </div>
-            
             <form class="lecture-form" onsubmit="return false;">
                 <input type="hidden" id="editSpeakerIndex">
-
-                <!-- 사진 업로드 -->
-                <div class="form-group" style="display:flex; align-items:center; gap:16px; padding-bottom:12px; border-bottom:1px dashed var(--border); margin-bottom:12px;">
-                    <div id="editSpeakerPhotoPreview" style="position:relative; cursor:pointer;" onclick="document.getElementById('editSpeakerPhotoInput').click()">
+                <div class="form-group" style="display:flex;align-items:center;gap:16px;padding-bottom:12px;border-bottom:1px dashed var(--border);margin-bottom:12px;">
+                    <div id="editSpeakerPhotoPreview" style="position:relative;cursor:pointer;" onclick="document.getElementById('editSpeakerPhotoInput').click()">
                         <div style="width:60px;height:60px;border-radius:50%;background:#e8e8e8;display:flex;align-items:center;justify-content:center;font-size:22px;color:#aaa;">👤</div>
                     </div>
                     <div style="flex:1;">
-                        <div style="font-weight:500; margin-bottom:4px;">프로필 사진</div>
-                        <div style="display:flex; gap:8px;">
-                            <button type="button" onclick="document.getElementById('editSpeakerPhotoInput').click()"
-                                style="font-size:0.8rem; padding:4px 10px; border:1px solid #ddd; border-radius:4px; background:white; cursor:pointer;">
-                                📷 사진 선택
-                            </button>
-                            <button type="button" onclick="clearSpeakerPhoto()"
-                                style="font-size:0.8rem; padding:4px 10px; border:1px solid #fcc; border-radius:4px; background:white; cursor:pointer; color:#c00;">
-                                삭제
-                            </button>
+                        <div style="font-weight:500;margin-bottom:4px;">프로필 사진</div>
+                        <div style="display:flex;gap:8px;">
+                            <button type="button" onclick="document.getElementById('editSpeakerPhotoInput').click()" style="font-size:0.8rem;padding:4px 10px;border:1px solid #ddd;border-radius:4px;background:white;cursor:pointer;">📷 사진 선택</button>
+                            <button type="button" onclick="clearSpeakerPhoto()" style="font-size:0.8rem;padding:4px 10px;border:1px solid #fcc;border-radius:4px;background:white;cursor:pointer;color:#c00;">삭제</button>
                         </div>
-                        <div style="font-size:0.75rem; color:#999; margin-top:4px;">JPG/PNG · 최대 2MB · 강의 카드에 표시됩니다</div>
-                        <input type="file" id="editSpeakerPhotoInput" accept="image/*" style="display:none;"
-                            onchange="handleSpeakerPhotoUpload(this)">
+                        <div style="font-size:0.75rem;color:#999;margin-top:4px;">JPG/PNG · 최대 2MB · 강의 카드에 표시됩니다</div>
+                        <input type="file" id="editSpeakerPhotoInput" accept="image/*" style="display:none;" onchange="handleSpeakerPhotoUpload(this)">
                     </div>
                 </div>
-
                 <div class="form-row">
                     <div class="form-group">
                         <label>연자명 (한글)</label>
@@ -802,62 +879,40 @@
                         <input type="text" id="editSpeakerAffiliationEnField">
                     </div>
                 </div>
-                
-                <!-- ASLS 멤버 체크박스 -->
-                <div class="form-group" style="border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-top: 0.5rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="checkbox" id="editSpeakerASLS" style="width: 18px; height: 18px; accent-color: #8E24AA;">
-                        <span style="color: #8E24AA; font-weight: bold;">🏅 ASLS 학회 멤버</span>
+                <div class="form-section-divider">
+                    <label class="checkbox-label" style="color:#8E24AA;">
+                        <input type="checkbox" id="editSpeakerASLS" style="width:18px;height:18px;accent-color:#8E24AA;">
+                        🏅 ASLS 학회 멤버
                     </label>
-                    <small style="color: #666; display: block; margin-top: 0.3rem;">학회 멤버는 좌장 추천 시 우선 표시됩니다.</small>
+                    <small style="color:#666;display:block;margin-top:0.3rem;">학회 멤버는 좌장 추천 시 우선 표시됩니다.</small>
                 </div>
-                
-                <!-- 전문 분야 태그 -->
-                <div class="form-group" style="border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-top: 0.5rem;">
-                    <label style="margin-bottom: 0.5rem; display: block;">
-                        🏷️ 전문 분야 (해당 분야 모두 선택)
-                    </label>
-                    <small style="color: #666; display: block; margin-bottom: 0.5rem;">강의 이력 기반으로 자동 계산되며, 수동으로 수정할 수 있습니다.</small>
-                    <div id="expertiseTagsContainer" style="display: flex; flex-wrap: wrap; gap: 0.2rem;">
-                        <!-- JS에서 동적 생성 -->
-                    </div>
+                <div class="form-section-divider">
+                    <label style="margin-bottom:0.5rem;display:block;">🏷️ 전문 분야 (해당 분야 모두 선택)</label>
+                    <small style="color:#666;display:block;margin-bottom:0.5rem;">강의 이력 기반으로 자동 계산되며, 수동으로 수정할 수 있습니다.</small>
+                    <div id="expertiseTagsContainer" style="display:flex;flex-wrap:wrap;gap:0.2rem;"></div>
                 </div>
-                
-                <button type="button" class="btn btn-primary" onclick="saveEditedSpeaker()" style="width: 100%; margin-top: 1rem;">저장</button>
+                <button type="button" class="btn btn-primary" onclick="saveEditedSpeaker()" style="width:100%;margin-top:1rem;">저장</button>
             </form>
         </div>
     </div>
 
     <!-- 사용자 관리 모달 -->
     <div class="modal" id="userManagementModal">
-        <div class="modal-content" style="max-width: 550px;">
+        <div class="modal-content" style="max-width:550px;">
             <div class="modal-header">
                 <h2>👥 사용자 관리</h2>
                 <button class="modal-close" onclick="closeUserManagementModal()">×</button>
             </div>
-            
-            <div style="padding: 1rem;">
+            <div style="padding:1rem;">
                 <div class="user-section">
-                    <div class="user-section-title">
-                        🔔 승인 대기
-                        <span class="count" id="pendingCount">0명</span>
-                    </div>
-                    <div class="user-list" id="pendingUsersList">
-                        <p style="color:#999; text-align:center; padding:1rem;">로딩 중...</p>
-                    </div>
+                    <div class="user-section-title">🔔 승인 대기 <span class="count" id="pendingCount">0명</span></div>
+                    <div class="user-list" id="pendingUsersList"><p style="color:#999;text-align:center;padding:1rem;">로딩 중...</p></div>
                 </div>
-                
                 <div class="user-section">
-                    <div class="user-section-title">
-                        ✅ 승인된 사용자
-                        <span class="count" id="approvedCount">0명</span>
-                    </div>
-                    <div class="user-list" id="approvedUsersList">
-                        <p style="color:#999; text-align:center; padding:1rem;">로딩 중...</p>
-                    </div>
+                    <div class="user-section-title">✅ 승인된 사용자 <span class="count" id="approvedCount">0명</span></div>
+                    <div class="user-list" id="approvedUsersList"><p style="color:#999;text-align:center;padding:1rem;">로딩 중...</p></div>
                 </div>
-                
-                <div style="margin-top: 1rem; padding: 1rem; background: #f0f7ff; border-radius: 8px; font-size: 0.85rem;">
+                <div style="margin-top:1rem;padding:1rem;background:#f0f7ff;border-radius:8px;font-size:0.85rem;">
                     <strong>💡 권한 안내</strong><br>
                     <span style="color:#f39c12;">👑 관리자</span>: 모든 기능 + 사용자 관리<br>
                     <span style="color:#27ae60;">✏️ 편집자</span>: 강의/시간표 편집 가능<br>
@@ -869,39 +924,29 @@
 
     <!-- 백업 관리 모달 -->
     <div class="modal" id="backupModal">
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content" style="max-width:600px;">
             <div class="modal-header">
                 <h2>💾 백업 관리</h2>
                 <button class="modal-close" onclick="closeBackupModal()">×</button>
             </div>
-            
-            <div style="padding: 1rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <div style="font-size: 0.85rem; color: #666;">
-                        🔄 자동 백업: 매시간 · 최대 24개 유지
-                    </div>
-                    <button class="btn btn-primary btn-small" onclick="createManualBackup()">
-                        💾 지금 백업
-                    </button>
+            <div style="padding:1rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                    <div style="font-size:0.85rem;color:#666;">🔄 자동 백업: 매시간 · 최대 24개 유지</div>
+                    <button class="btn btn-primary btn-small" onclick="createManualBackup()">💾 지금 백업</button>
                 </div>
-                
-                <!-- 백업 암호화 설정 -->
-                <div style="background: #E3F2FD; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="checkbox" id="encryptBackup" checked style="width: 18px; height: 18px;">
-                        <span style="font-size: 0.85rem;">🔒 백업 파일 암호화 (다운로드 시)</span>
+                <div style="background:#E3F2FD;padding:0.75rem;border-radius:8px;margin-bottom:1rem;">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="encryptBackup" checked style="width:18px;height:18px;">
+                        🔒 백업 파일 암호화 (다운로드 시)
                     </label>
                 </div>
-                
-                <div style="background: #f5f5f5; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
-                    <p style="font-size: 0.8rem; color: #666; margin: 0;">
-                        ℹ️ 복원 시 현재 데이터가 백업 시점으로 대체됩니다.<br>
-                        복원 전 자동으로 현재 상태가 백업됩니다.
+                <div style="background:#f5f5f5;padding:0.75rem;border-radius:8px;margin-bottom:1rem;">
+                    <p style="font-size:0.8rem;color:#666;margin:0;">
+                        ℹ️ 복원 시 현재 데이터가 백업 시점으로 대체됩니다.<br>복원 전 자동으로 현재 상태가 백업됩니다.
                     </p>
                 </div>
-                
-                <div id="backupList" style="max-height: 400px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px;">
-                    <p style="text-align: center; padding: 2rem; color: #999;">로딩 중...</p>
+                <div id="backupList" style="max-height:400px;overflow-y:auto;border:1px solid #eee;border-radius:8px;">
+                    <p style="text-align:center;padding:2rem;color:#999;">로딩 중...</p>
                 </div>
             </div>
         </div>
@@ -909,35 +954,27 @@
 
     <!-- 시간 설정 모달 -->
     <div class="modal" id="timeSettingsModal">
-        <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-content" style="max-width:500px;">
             <div class="modal-header">
                 <h2>⏰ 시간대 설정</h2>
                 <button class="modal-close" onclick="closeTimeSettingsModal()">×</button>
             </div>
-            
-            <div style="padding: 1rem;">
-                <p style="margin-bottom: 1rem; color: #666; font-size: 0.9rem;">
-                    현재 선택된 날짜: <strong id="timeSettingsDateLabel">-</strong>
-                </p>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+            <div style="padding:1rem;">
+                <p style="margin-bottom:1rem;color:#666;font-size:0.9rem;">현재 선택된 날짜: <strong id="timeSettingsDateLabel">-</strong></p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
                     <div class="form-group">
                         <label>시작 시간</label>
-                        <select id="startTimeSelect" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem;"></select>
+                        <select id="startTimeSelect" style="width:100%;padding:0.75rem;border:1px solid var(--border);border-radius:8px;font-size:1rem;"></select>
                     </div>
                     <div class="form-group">
                         <label>종료 시간</label>
-                        <select id="endTimeSelect" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem;"></select>
+                        <select id="endTimeSelect" style="width:100%;padding:0.75rem;border:1px solid var(--border);border-radius:8px;font-size:1rem;"></select>
                     </div>
                 </div>
-                
-                <div style="background: #FFF3E0; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
-                    <p style="font-size: 0.85rem; color: #E65100;">
-                        ⚠️ 시간대를 줄이면 해당 시간의 배치된 강의가 삭제될 수 있습니다.
-                    </p>
+                <div style="background:#FFF3E0;padding:0.75rem;border-radius:8px;margin-bottom:1rem;">
+                    <p style="font-size:0.85rem;color:#E65100;">⚠️ 시간대를 줄이면 해당 시간의 배치된 강의가 삭제될 수 있습니다.</p>
                 </div>
-                
-                <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
                     <button class="btn btn-secondary" onclick="closeTimeSettingsModal()">취소</button>
                     <button class="btn btn-primary" onclick="applyTimeSettings()">✅ 적용</button>
                 </div>
@@ -947,40 +984,30 @@
 
     <!-- 행사 날짜 관리 모달 -->
     <div class="modal" id="eventDateModal">
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content" style="max-width:600px;">
             <div class="modal-header">
                 <h2>📅 행사 날짜 관리</h2>
                 <button class="modal-close" onclick="closeEventDateModal()">×</button>
             </div>
-            
-            <div style="padding: 1rem;">
-                <div style="background: #E8F4FD; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                    <p style="margin: 0; font-size: 0.9rem;">여러 행사의 날짜를 추가하고 관리할 수 있습니다.</p>
-                    <p style="margin: 0.5rem 0 0 0; font-size: 0.85rem; color: #666;">예: ASLS춘계(4/11), ASLS추계(10/5), ASLS도쿄(6/28)</p>
+            <div style="padding:1rem;">
+                <div style="background:#E8F4FD;padding:1rem;border-radius:8px;margin-bottom:1rem;">
+                    <p style="margin:0;font-size:0.9rem;">여러 행사의 날짜를 추가하고 관리할 수 있습니다.</p>
+                    <p style="margin:0.5rem 0 0 0;font-size:0.85rem;color:#666;">예: ASLS춘계(4/11), ASLS추계(10/5), ASLS도쿄(6/28)</p>
                 </div>
-                
-                <!-- 새 날짜 추가 -->
                 <div class="form-group">
                     <label>새 행사 날짜 추가</label>
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <input type="date" id="newEventDate" style="flex: 1; min-width: 150px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px;">
-                        <input type="text" id="newEventLabel" placeholder="행사명 (예: ASLS춘계)" style="flex: 1; min-width: 150px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px;">
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                        <input type="date" id="newEventDate" style="flex:1;min-width:150px;padding:0.5rem;border:1px solid #ddd;border-radius:6px;">
+                        <input type="text" id="newEventLabel" placeholder="행사명 (예: ASLS춘계)" style="flex:1;min-width:150px;padding:0.5rem;border:1px solid #ddd;border-radius:6px;">
                         <button class="btn btn-primary" onclick="addEventDate()">추가</button>
                     </div>
                 </div>
-                
-                <!-- 현재 날짜 목록 -->
-                <div style="margin-top: 1rem;">
-                    <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">현재 등록된 행사 날짜</label>
-                    <div id="eventDateList" style="max-height: 300px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px;">
-                        <!-- 동적 생성 -->
-                    </div>
+                <div style="margin-top:1rem;">
+                    <label style="font-weight:bold;margin-bottom:0.5rem;display:block;">현재 등록된 행사 날짜</label>
+                    <div id="eventDateList" style="max-height:300px;overflow-y:auto;border:1px solid #eee;border-radius:8px;"></div>
                 </div>
-                
-                <div style="margin-top: 1rem; padding: 0.75rem; background: #FFF3E0; border-radius: 8px;">
-                    <p style="font-size: 0.8rem; color: #E65100; margin: 0;">
-                        ⚠️ 날짜를 삭제하면 해당 날짜의 모든 강의와 세션이 삭제됩니다.
-                    </p>
+                <div style="margin-top:1rem;padding:0.75rem;background:#FFF3E0;border-radius:8px;">
+                    <p style="font-size:0.8rem;color:#E65100;margin:0;">⚠️ 날짜를 삭제하면 해당 날짜의 모든 강의와 세션이 삭제됩니다.</p>
                 </div>
             </div>
         </div>
@@ -988,118 +1015,101 @@
 
     <!-- 파트너사 강의 관리 모달 -->
     <div class="modal" id="sponsorManagementModal">
-        <div class="modal-content" style="max-width: 900px; max-height: 90vh;">
+        <div class="modal-content" style="max-width:900px;max-height:90vh;">
             <div class="modal-header">
                 <h2>🏢 파트너사 강의 관리</h2>
                 <button class="modal-close" onclick="closeSponsorManagementModal()">×</button>
             </div>
-            
-            <div style="padding: 1rem;">
-                <!-- 탭 네비게이션 -->
-                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 2px solid #eee; padding-bottom: 0.5rem;">
+            <div style="padding:1rem;">
+                <div style="display:flex;gap:0.5rem;margin-bottom:1rem;border-bottom:2px solid #eee;padding-bottom:0.5rem;">
                     <button class="btn btn-small sponsor-tab active" data-tab="overview" onclick="switchSponsorTab('overview')">📊 전체 현황</button>
                     <button class="btn btn-small sponsor-tab" data-tab="unscheduled" onclick="switchSponsorTab('unscheduled')">📌 미배치 강의</button>
                     <button class="btn btn-small sponsor-tab" data-tab="lectureTypes" onclick="switchSponsorTab('lectureTypes')">⚙️ 강의 종류 설정</button>
                 </div>
-                
-                <!-- 탭 컨텐츠 -->
-                <div id="sponsorTabContent" style="max-height: calc(90vh - 200px); overflow-y: auto;">
-                    <!-- 동적 생성 -->
-                </div>
+                <div id="sponsorTabContent" style="max-height:calc(90vh - 200px);overflow-y:auto;"></div>
             </div>
         </div>
     </div>
 
     <!-- 업체 관리 모달 -->
     <div class="modal" id="companyModal">
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content" style="max-width:600px;">
             <div class="modal-header">
                 <h2>🏢 업체 관리</h2>
                 <button class="modal-close" onclick="closeCompanyModal()">×</button>
             </div>
-            
-            <div class="form-group" style="padding: 1rem 1rem 0 1rem;">
+            <div class="form-group" style="padding:1rem 1rem 0 1rem;">
                 <label>새 업체 추가</label>
-                <div style="display: flex; gap: 0.5rem;">
-                    <input type="text" id="newCompanyName" placeholder="업체명 입력" style="flex: 1;">
+                <div style="display:flex;gap:0.5rem;">
+                    <input type="text" id="newCompanyName" placeholder="업체명 입력" style="flex:1;">
                     <button class="btn btn-primary" onclick="addCompany()">추가</button>
                 </div>
             </div>
-            
-            <div style="padding: 0 1rem;">
-                <div style="margin: 0.75rem 0; padding: 0.5rem; background: #E8F4FD; border-radius: 8px;">
+            <div style="padding:0 1rem;">
+                <div style="margin:0.75rem 0;padding:0.5rem;background:#E8F4FD;border-radius:8px;">
                     <small>📊 총 <strong id="companyCount">0</strong>개 업체 등록됨</small>
                 </div>
-                
-                <div style="margin-bottom: 0.75rem;">
-                    <input type="text" id="companySearchInput" placeholder="🔍 업체 검색..." oninput="filterCompanyList()" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 8px;">
+                <div style="margin-bottom:0.75rem;">
+                    <input type="text" id="companySearchInput" placeholder="🔍 업체 검색..." oninput="filterCompanyList()" style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:8px;">
                 </div>
             </div>
-
-            <div class="speaker-list" id="companyList" style="max-height: 400px; margin: 0 1rem 1rem 1rem;"></div>
+            <div class="speaker-list" id="companyList" style="max-height:400px;margin:0 1rem 1rem 1rem;"></div>
         </div>
     </div>
 
     <!-- 강의 일괄 업로드 모달 -->
     <div class="modal" id="uploadModal">
-        <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-content" style="max-width:800px;">
             <div class="modal-header">
                 <h2>📤 강의 일괄 업로드</h2>
                 <button class="modal-close" onclick="closeUploadModal()">×</button>
             </div>
-            
-            <div style="padding: 1rem;">
-                <div style="background: #E8F4FD; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                    <p style="margin-bottom: 0.5rem;"><strong>📋 강의 목록 파일 업로드</strong></p>
-                    <p style="font-size: 0.85rem; color: #666;">지원 형식: Excel (.xlsx, .xls), CSV (.csv)</p>
-                    <p style="font-size: 0.85rem; color: #666; margin-top: 0.25rem;">필수 컬럼: 제목(국문) 또는 제목, 연자명 또는 연자</p>
+            <div style="padding:1rem;">
+                <div style="background:#E8F4FD;padding:1rem;border-radius:8px;margin-bottom:1rem;">
+                    <p style="margin-bottom:0.5rem;"><strong>📋 강의 목록 파일 업로드</strong></p>
+                    <p style="font-size:0.85rem;color:#666;">지원 형식: Excel (.xlsx, .xls), CSV (.csv)</p>
+                    <p style="font-size:0.85rem;color:#666;margin-top:0.25rem;">필수 컬럼: 제목(국문) 또는 제목, 연자명 또는 연자</p>
                 </div>
-                
-                <div style="border: 2px dashed var(--border); border-radius: 12px; padding: 2rem; text-align: center; margin-bottom: 1rem; background: var(--bg);" id="dropZone">
-                    <div style="font-size: 3rem; margin-bottom: 0.5rem;">📁</div>
-                    <p style="margin-bottom: 1rem;">파일을 여기에 드래그하거나 클릭하여 선택</p>
-                    <input type="file" id="uploadFileInput" accept=".xlsx,.xls,.csv" style="display: none;" onchange="handleFileSelect(event)">
+                <div style="border:2px dashed var(--border);border-radius:12px;padding:2rem;text-align:center;margin-bottom:1rem;background:var(--bg);" id="dropZone">
+                    <div style="font-size:3rem;margin-bottom:0.5rem;">📁</div>
+                    <p style="margin-bottom:1rem;">파일을 여기에 드래그하거나 클릭하여 선택</p>
+                    <input type="file" id="uploadFileInput" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleFileSelect(event)">
                     <button class="btn btn-primary" id="selectFileBtn" onclick="document.getElementById('uploadFileInput').click()">파일 선택</button>
                 </div>
-                
-                <div id="uploadPreview" style="display: none;">
-                    <div id="duplicateWarning" style="display: none; background: #FFF3E0; border: 1px solid #FFB74D; border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem;">
-                        <span style="color: #E65100; font-weight: 600;">⚠️ <span id="duplicateCount">0</span>개 중복 발견</span>
+                <div id="uploadPreview" style="display:none;">
+                    <div id="duplicateWarning" style="display:none;background:#FFF3E0;border:1px solid #FFB74D;border-radius:8px;padding:0.75rem;margin-bottom:0.75rem;">
+                        <span style="color:#E65100;font-weight:600;">⚠️ <span id="duplicateCount">0</span>개 중복 발견</span>
                     </div>
-                    
-                    <h4 style="margin-bottom: 0.5rem;">📊 미리보기 (<span id="previewCount">0</span>개 강의)</h4>
-                    <div style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
-                            <thead style="background: var(--primary); color: white; position: sticky; top: 0;">
+                    <h4 style="margin-bottom:0.5rem;">📊 미리보기 (<span id="previewCount">0</span>개 강의)</h4>
+                    <div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
+                        <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+                            <thead style="background:var(--primary);color:white;position:sticky;top:0;">
                                 <tr id="previewTableHeader">
-                                    <th style="padding: 0.5rem; text-align: left; width: 30px;"></th>
-                                    <th style="padding: 0.5rem; text-align: left;">분류</th>
-                                    <th style="padding: 0.5rem; text-align: left;">제목</th>
-                                    <th style="padding: 0.5rem; text-align: left;">연자</th>
-                                    <th style="padding: 0.5rem; text-align: left;">시간</th>
+                                    <th style="padding:0.5rem;text-align:left;width:30px;"></th>
+                                    <th style="padding:0.5rem;text-align:left;">분류</th>
+                                    <th style="padding:0.5rem;text-align:left;">제목</th>
+                                    <th style="padding:0.5rem;text-align:left;">연자</th>
+                                    <th style="padding:0.5rem;text-align:left;">시간</th>
                                 </tr>
                             </thead>
                             <tbody id="previewTableBody"></tbody>
                         </table>
                     </div>
-                    
-                    <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                        <div id="duplicateOptionsSection" style="display: none; padding: 0.75rem; background: #E3F2FD; border-radius: 8px; border: 1px solid #64B5F6;">
-                            <p style="margin: 0; font-size: 0.85rem; color: #1565C0;">
+                    <div style="margin-top:1rem;display:flex;flex-direction:column;gap:0.5rem;">
+                        <div id="duplicateOptionsSection" style="display:none;padding:0.75rem;background:#E3F2FD;border-radius:8px;border:1px solid #64B5F6;">
+                            <p style="margin:0;font-size:0.85rem;color:#1565C0;">
                                 ℹ️ 기존 강의 <strong><span id="skipDuplicateCount">0</span>개</strong>가 감지되었습니다.<br>
-                                <span style="color: #666;">→ 새 강의는 추가되고, 기존 강의는 회사/제품 정보만 업데이트됩니다.</span>
+                                <span style="color:#666;">→ 새 강의는 추가되고, 기존 강의는 회사/제품 정보만 업데이트됩니다.</span>
                             </p>
                         </div>
-                        <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                        <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;">
                             <input type="checkbox" id="replaceAllMode">
-                            <span style="color: #D32F2F;">⚠️ 전체 교체 모드 (기존 강의 삭제 후 새로 업로드)</span>
+                            <span style="color:#D32F2F;">⚠️ 전체 교체 모드 (기존 강의 삭제 후 새로 업로드)</span>
                         </label>
-                        <!-- 숨겨진 기존 옵션 (호환성 유지) -->
-                        <input type="checkbox" id="appendMode" checked style="display: none;">
-                        <input type="radio" name="duplicateAction" value="update" checked style="display: none;">
+                        <input type="checkbox" id="appendMode" checked style="display:none;">
+                        <input type="radio" name="duplicateAction" value="update" checked style="display:none;">
                     </div>
-                    
-                    <div style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
+                    <div style="margin-top:1rem;display:flex;gap:0.5rem;justify-content:flex-end;">
                         <button class="btn btn-secondary" onclick="clearUploadPreview()">취소</button>
                         <button class="btn btn-primary" onclick="confirmUpload()">✅ 업로드 확정</button>
                     </div>
@@ -1108,9 +1118,9 @@
         </div>
     </div>
 
-    <!-- ============================================ -->
-    <!-- JavaScript 모듈 로드 (순서 중요!) -->
-    <!-- ============================================ -->
+    <!-- ============================================
+         JavaScript 모듈 로드 (순서 중요!)
+         ============================================ -->
     <script src="js/config.js"></script>
     <script src="js/state.js"></script>
     <script src="js/utils.js"></script>
@@ -1126,34 +1136,55 @@
     <script src="js/leaflet.js"></script>
     <script src="js/app.js"></script>
 
-    <!-- 모달 드래그 이탈 방지 + 안전한 배경 클릭 닫기 -->
+    <!-- 탭 전환 + 모달 드래그 이탈 방지 -->
     <script>
-    // ── v3: 모달 드래그 이탈 방지 + 폼 입력 보호 + 잠금 모달 ──
+    // ── 탭 전환 ──
+    function switchTab(tabName) {
+        // 패널
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        const panel = document.getElementById('tab-' + tabName);
+        if (panel) panel.classList.add('active');
+
+        // 하단 탭바
+        document.querySelectorAll('.bottom-tabbar .tab-item').forEach(b => {
+            b.classList.toggle('active', b.dataset.tab === tabName);
+        });
+
+        // 사이드 네비
+        document.querySelectorAll('.side-nav .side-nav-item').forEach(b => {
+            b.classList.toggle('active', b.dataset.tab === tabName);
+        });
+
+        // 스크롤 최상단
+        const mainEl = document.querySelector('.app-main');
+        if (mainEl) mainEl.scrollTop = 0;
+    }
+
+    // speakerModal이 열릴 때 tab-speaker의 필드로 포커스 유지
+    // (speakerModal은 별도 모달이므로 JS의 openSpeakerModal()이 그대로 동작)
+
+    // ── 모달 드래그 이탈 방지 + 배경 클릭 닫기 ──
     (function() {
         let mouseDownTarget = null;
-        
+
         document.addEventListener('mousedown', function(e) {
             mouseDownTarget = e.target;
         }, true);
-        
+
         document.addEventListener('mouseup', function(e) {
-            const downOnBackdrop = mouseDownTarget && 
-                mouseDownTarget.classList.contains('modal') && 
+            const downOnBackdrop = mouseDownTarget &&
+                mouseDownTarget.classList.contains('modal') &&
                 mouseDownTarget.classList.contains('active');
-            const upOnBackdrop = e.target.classList.contains('modal') && 
+            const upOnBackdrop = e.target.classList.contains('modal') &&
                 e.target.classList.contains('active');
-            
+
             if (downOnBackdrop && upOnBackdrop) {
-                // data-lock="true"인 모달은 배경 클릭으로 닫지 않음
-                if (e.target.dataset.lock === 'true') {
-                    // 무시 — 수정완료/취소 버튼으로만 닫기 가능
-                    return;
-                }
+                if (e.target.dataset.lock === 'true') return;
                 e.target.classList.remove('active');
             }
             mouseDownTarget = null;
         }, true);
-        
+
         document.addEventListener('mousedown', function(e) {
             const isFormElement = e.target.matches('input, textarea, select, button, [contenteditable]');
             const insideModal = e.target.closest('.modal-content');
