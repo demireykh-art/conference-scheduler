@@ -28,44 +28,14 @@ window.AppConfig = {
     // Undo 최대 횟수
     MAX_UNDO: 5,
 
-    // 학회 날짜
-    CONFERENCE_DATES: [
-        { date: '2026-04-11', label: '토요일 (4/11)', day: 'sat' },
-        { date: '2026-04-12', label: '일요일 (4/12)', day: 'sun' }
-    ],
+    // 학회 날짜 — Firebase /settings/dates 에서 로드, 여기선 빈 배열
+    CONFERENCE_DATES: [],
 
-    // 날짜별 룸 설정
-    ROOMS_BY_DATE: {
-        '2026-04-11': [
-            '(토)1층 전시장A Combination Lab',
-            '(토)1층 전시장B Regional Blueprint',
-            '(토)4층 NextWave Insight',
-            '(토)4층 Scientific Forum',
-            '(토)4층 International Session - Indonesia',
-            '(토)4층 International Session - Philippines',
-            '(토)3층 Injectables Studio(LIVE)',
-            '(토)3층 개원방'
-        ],
-        '2026-04-12': [
-            '(일)1층 전시장A Combination Lab',
-            '(일)1층 전시장B Regional Blueprint',
-            '(일)4층 LASER Suite',
-            '(일)4층 Injectables Forum',
-            '(일)4층 Regeneration Matrix',
-            '(일)4층 Contour Mapping',
-            '(일)4층 Body Metabolic Lab',
-            '(일)4층 Surgical Theater',
-            '(일)3층 LASER Studio(LIVE)',
-            '(일)Openlecture1',
-            '(일)Openlecture2'
-        ]
-    },
+    // 날짜별 룸 설정 — Firebase /settings/roomsByDate 에서 로드
+    ROOMS_BY_DATE: {},
 
-    // 날짜별 기본 시간 설정
-    DEFAULT_TIME_SETTINGS: {
-        '2026-04-11': { startTime: '13:00', endTime: '18:30' },
-        '2026-04-12': { startTime: '08:30', endTime: '17:00' }
-    },
+    // 날짜별 기본 시간 설정 — Firebase /settings/timeSettings 에서 로드
+    DEFAULT_TIME_SETTINGS: {},
 
     // 카테고리 색상
     // 카테고리 그룹 (3개씩 행 배열용)
@@ -128,18 +98,8 @@ window.AppConfig = {
     // Break 타입 정의 (중복 배치 가능)
     BREAK_TYPES: ['Coffee Break', 'Lunch', 'Opening/Closing', 'Panel Discussion'],
 
-    // 초기 업체 목록
-    INITIAL_COMPANIES: [
-        "AMSC", "BODA MEDI", "DMS득진", "DSE INC", "JSDR", "LABINCUBE", "LG화학",
-        "갈더마코리아", "강남언니", "굿피플메디", "그린코스코", "글로벌텍스프리", "나스메디", "네오팜",
-        "노무법인 율암", "노보노디스크제약", "녹십자웰빙", "뉴퐁", "다나음", "닥터팔레트", "대웅제약",
-        "대화제약", "더데이랩스", "더마라인", "더마로직", "더블유에스메디칼", "더에쓰씨", "데카코리아",
-        "덱스레보", "동국제약", "동방메디컬", "디에이컴퍼니", "디엔컴퍼니", "디티에스엠지", "라온메디칼",
-        "라이텍", "라플레", "레겐보겐", "레보메드", "레이저옵텍", "루메니스 코리아", "리메드", "리본메디칼",
-        "멀츠에스테틱스", "메디버스", "메디솔브AI", "메디어트코리아", "메디얼라이언스", "메디온셀",
-        "메디위즈", "메디코", "메디트렌드", "메디팔", "메디팹", "메딕콘", "메타바이오메드", "메타약품"
-        // ... 나머지 업체들
-    ]
+    // 업체 목록 — Firebase /companies 에서 로드
+    INITIAL_COMPANIES: [],
 };
 
 // Firebase 초기화
