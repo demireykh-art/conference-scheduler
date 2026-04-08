@@ -536,24 +536,173 @@ window.handleSpeakerPhotoUpload = function(input) {
         Toast.warning('이미지 파일만 업로드할 수 있습니다.');
         return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-        Toast.warning('이미지 크기는 2MB 이하여야 합니다.');
-        return;
-    }
-
     const reader = new FileReader();
     reader.onload = function(e) {
-        const dataURL = e.target.result;
-        window._editingSpeakerPhotoURL = dataURL;
-        const photoPreview = document.getElementById('editSpeakerPhotoPreview');
-        if (photoPreview) {
-            photoPreview.style.position = 'relative';
-            photoPreview.innerHTML = `<img src="${dataURL}" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid #3498db;">
-                <button onclick="clearSpeakerPhoto()" style="position:absolute;top:-4px;right:-4px;background:#e74c3c;color:white;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;line-height:1;">×</button>`;
-        }
-        Toast.success('사진이 선택되었습니다. 저장 버튼을 눌러 확정하세요.');
+        openPhotoCropModal(e.target.result);
     };
     reader.readAsDataURL(file);
+};
+
+/**
+ * 사진 크롭 모달 - 드래그/핀치로 얼굴 위치·크기 조정, Canvas로 압축
+ */
+window.openPhotoCropModal = function(imageSrc) {
+    let modal = document.getElementById('photoCropModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'photoCropModal';
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:99999;display:flex;align-items:center;justify-content:center;';
+        modal.innerHTML = [
+            '<div style="background:white;border-radius:16px;padding:1.5rem;width:92%;max-width:340px;text-align:center;">',
+            '<h3 style="margin-bottom:0.5rem;font-size:1rem;color:#2E1A47;">📷 사진 편집</h3>',
+            '<p style="font-size:0.75rem;color:#888;margin-bottom:0.75rem;">드래그로 위치 · 핀치/슬라이더로 크기 조정</p>',
+            '<div id="cropWrapper" style="position:relative;width:240px;height:240px;margin:0 auto;border-radius:50%;overflow:hidden;border:3px solid #2E1A47;cursor:move;touch-action:none;background:#eee;">',
+            '<img id="cropImg" style="position:absolute;transform-origin:0 0;user-select:none;" draggable="false">',
+            '</div>',
+            '<div style="margin-top:0.75rem;display:flex;align-items:center;justify-content:center;gap:0.5rem;">',
+            '<span style="font-size:0.75rem;color:#666;">🔍</span>',
+            '<input id="cropScale" type="range" min="50" max="300" value="100" style="width:140px;">',
+            '</div>',
+            '<div style="margin-top:1rem;display:flex;gap:0.75rem;justify-content:center;">',
+            '<button onclick="closePhotoCropModal()" style="padding:0.6rem 1.2rem;border:1px solid #ddd;border-radius:8px;background:white;cursor:pointer;font-size:0.9rem;">취소</button>',
+            '<button onclick="confirmPhotoCrop()" style="padding:0.6rem 1.4rem;background:#2E1A47;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.9rem;">✓ 적용</button>',
+            '</div></div>'
+        ].join('');
+        document.body.appendChild(modal);
+    }
+    modal.style.display = 'flex';
+
+    const img = document.getElementById('cropImg');
+    const wrapper = document.getElementById('cropWrapper');
+    const slider = document.getElementById('cropScale');
+
+    window._crop = { x: 0, y: 0, scale: 1, baseScale: 1, naturalW: 0, naturalH: 0 };
+
+    img.onload = function() {
+        const c = window._crop;
+        c.naturalW = img.naturalWidth;
+        c.naturalH = img.naturalHeight;
+        // 240px 원에 꽉 차도록 초기 스케일
+        c.baseScale = Math.max(240 / c.naturalW, 240 / c.naturalH);
+        c.scale = c.baseScale;
+        c.x = (240 - c.naturalW * c.scale) / 2;
+        c.y = (240 - c.naturalH * c.scale) / 2;
+        slider.value = 100;
+        _applyCrop();
+    };
+    img.src = imageSrc;
+    window._cropSrc = imageSrc;
+
+    slider.oninput = function() {
+        const c = window._crop;
+        const cx = 120, cy = 120;
+        const prevScale = c.scale;
+        c.scale = c.baseScale * (parseInt(this.value) / 100);
+        // 중심점 기준으로 확대/축소
+        c.x = cx - (cx - c.x) * (c.scale / prevScale);
+        c.y = cy - (cy - c.y) * (c.scale / prevScale);
+        _applyCrop();
+    };
+
+    // 마우스 드래그
+    let drag = false, mx, my, ox, oy;
+    wrapper.onmousedown = function(e) {
+        drag = true; mx = e.clientX; my = e.clientY;
+        ox = window._crop.x; oy = window._crop.y;
+        e.preventDefault();
+    };
+    window._cropMouseMove = function(e) {
+        if (!drag) return;
+        window._crop.x = ox + (e.clientX - mx);
+        window._crop.y = oy + (e.clientY - my);
+        _applyCrop();
+    };
+    window._cropMouseUp = function() { drag = false; };
+    document.addEventListener('mousemove', window._cropMouseMove);
+    document.addEventListener('mouseup', window._cropMouseUp);
+
+    // 터치 드래그 + 핀치줌
+    let t0x, t0y, t0tx, t0ty, pinch0 = 0, pinchScale0 = 1;
+    wrapper.ontouchstart = function(e) {
+        if (e.touches.length === 1) {
+            t0x = e.touches[0].clientX; t0y = e.touches[0].clientY;
+            t0tx = window._crop.x; t0ty = window._crop.y;
+        } else if (e.touches.length === 2) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            pinch0 = Math.sqrt(dx*dx + dy*dy);
+            pinchScale0 = window._crop.scale;
+        }
+        e.preventDefault();
+    };
+    wrapper.ontouchmove = function(e) {
+        const c = window._crop;
+        if (e.touches.length === 1) {
+            c.x = t0tx + (e.touches[0].clientX - t0x);
+            c.y = t0ty + (e.touches[0].clientY - t0y);
+        } else if (e.touches.length === 2) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            c.scale = pinchScale0 * (dist / pinch0);
+            slider.value = Math.round((c.scale / c.baseScale) * 100);
+        }
+        _applyCrop();
+        e.preventDefault();
+    };
+};
+
+function _applyCrop() {
+    const img = document.getElementById('cropImg');
+    const c = window._crop;
+    if (!img || !c) return;
+    img.style.width  = (c.naturalW * c.scale) + 'px';
+    img.style.height = (c.naturalH * c.scale) + 'px';
+    img.style.left   = c.x + 'px';
+    img.style.top    = c.y + 'px';
+}
+
+window.closePhotoCropModal = function() {
+    const modal = document.getElementById('photoCropModal');
+    if (modal) modal.style.display = 'none';
+    // 이벤트 리스너 정리
+    if (window._cropMouseMove) document.removeEventListener('mousemove', window._cropMouseMove);
+    if (window._cropMouseUp)   document.removeEventListener('mouseup',   window._cropMouseUp);
+};
+
+window.confirmPhotoCrop = function() {
+    const img = document.getElementById('cropImg');
+    const c = window._crop;
+    if (!img || !c) return;
+
+    // 240x240 canvas에 원형 클리핑 후 렌더링
+    const canvas = document.createElement('canvas');
+    canvas.width = 240; canvas.height = 240;
+    const ctx = canvas.getContext('2d');
+    ctx.beginPath();
+    ctx.arc(120, 120, 120, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(img,
+        c.x, c.y,
+        c.naturalW * c.scale,
+        c.naturalH * c.scale
+    );
+
+    // JPEG 압축 - 카메라 원본도 ~50-80KB로
+    let dataURL = canvas.toDataURL('image/jpeg', 0.82);
+    if (dataURL.length > 100000) dataURL = canvas.toDataURL('image/jpeg', 0.6);
+    if (dataURL.length > 100000) dataURL = canvas.toDataURL('image/jpeg', 0.4);
+
+    window._editingSpeakerPhotoURL = dataURL;
+
+    const preview = document.getElementById('editSpeakerPhotoPreview');
+    if (preview) {
+        preview.style.position = 'relative';
+        preview.innerHTML = '<img src="' + dataURL + '" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid #3498db;">'
+            + '<button onclick="clearSpeakerPhoto()" style="position:absolute;top:-4px;right:-4px;background:#e74c3c;color:white;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;line-height:1;">×</button>';
+    }
+    closePhotoCropModal();
+    Toast.success('사진이 적용되었습니다. 저장 버튼을 눌러 확정하세요.');
 };
 
 window.clearSpeakerPhoto = function() {
