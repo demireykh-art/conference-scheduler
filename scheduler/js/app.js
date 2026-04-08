@@ -123,6 +123,10 @@ window.startRealtimeListeners = function() {
                 updateLectureList();
                 updateScheduleDisplay();
                 updateCategoryDropdowns();
+                // 연자 탭이 활성화 상태면 즉시 렌더, 아니면 다음 진입 시 렌더
+                if (typeof window.updateSpeakerList === 'function') {
+                    window.updateSpeakerList();
+                }
             }, 100);
 
             updateSyncStatus('synced', '동기화됨');
