@@ -373,6 +373,18 @@ function createLectureItem(lecture, lectureId, isScheduled, isBreak) {
 window.addLectureToList = function() {
     if (!checkEditPermission()) return;
 
+    // 안전장치: 필수값 재확인 (탭 숨김 상태에서도 동작)
+    const _cat = (document.getElementById('category') || {}).value;
+    const _title = ((document.getElementById('titleKo') || {}).value || '').trim();
+    if (!_cat) {
+        if (typeof Toast !== 'undefined') Toast.warning('분류를 선택해주세요.');
+        return;
+    }
+    if (!_title) {
+        if (typeof Toast !== 'undefined') Toast.warning('제목(한글)을 입력해주세요.');
+        return;
+    }
+
     const category = document.getElementById('category').value;
     const speakerKo = document.getElementById('speakerKo').value.trim();
     const speakerEn = document.getElementById('speakerEn').value.trim();
