@@ -1229,6 +1229,11 @@
         if (mainEl) mainEl.scrollTop = 0;
     }
 
+    // ── 초기 탭 활성화 ──
+    document.addEventListener('DOMContentLoaded', function() {
+        switchTab('schedule');
+    });
+
     // speakerModal이 열릴 때 tab-speaker의 필드로 포커스 유지
     // (speakerModal은 별도 모달이므로 JS의 openSpeakerModal()이 그대로 동작)
 
