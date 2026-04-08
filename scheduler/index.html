@@ -1212,6 +1212,14 @@
         // 스크롤 최상단
         const mainEl = document.querySelector('.app-main');
         if (mainEl) mainEl.scrollTop = 0;
+
+        // 탭별 진입 시 데이터 갱신
+        if (tabName === 'speaker' && typeof window.updateSpeakerList === 'function') {
+            window.updateSpeakerList();
+        }
+        if (tabName === 'lectures' && typeof window.updateLectureList === 'function') {
+            window.updateLectureList();
+        }
     }
 
     // ── 초기 탭 활성화 ──
