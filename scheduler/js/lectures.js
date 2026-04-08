@@ -352,8 +352,12 @@ function createLectureItem(lecture, lectureId, isScheduled, isBreak) {
         </div>
     `;
 
-    item.addEventListener('dragstart', handleDragStart);
-    item.addEventListener('dragend', handleDragEnd);
+    item.addEventListener('dragstart', function(e) {
+        if (typeof window.handleDragStart === 'function') window.handleDragStart(e);
+    });
+    item.addEventListener('dragend', function(e) {
+        if (typeof window.handleDragEnd === 'function') window.handleDragEnd(e);
+    });
     
     // Break 항목은 더블클릭 시 편집 불가 (기본 항목이므로)
     if (!isBreak) {
