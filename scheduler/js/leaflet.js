@@ -6,7 +6,8 @@
 window.leafletConfig = {
     leftKeyVisual: null,
     rightKeyVisual: null,
-    printFormat: 'schedule'  // 'schedule' 또는 'leaflet'
+    printFormat: 'schedule',  // 'schedule' 또는 'leaflet'
+    includeSpeakerPhoto: false  // 연자 사진 포함 여부
 };
 
 // ============================================
@@ -42,6 +43,15 @@ function initPrintModalExtras() {
     // 기본 형식 선택 (시간표)
     window.leafletConfig.printFormat = 'schedule';
     selectPrintFormat('schedule');
+    
+    // 연자 사진 체크박스 초기화
+    const photoCheckbox = document.getElementById('includeSpeakerPhoto');
+    if (photoCheckbox) {
+        photoCheckbox.checked = window.leafletConfig.includeSpeakerPhoto;
+        photoCheckbox.onchange = function() {
+            window.leafletConfig.includeSpeakerPhoto = this.checked;
+        };
+    }
 }
 
 // ============================================
@@ -167,6 +177,9 @@ function selectPrintFormat(format) {
         leafletOption.style.background = '#f5f5f5';
         keyVisualSection.style.display = 'none';
         languageSection.style.display = 'none';
+        if (document.getElementById('speakerPhotoSection')) {
+            document.getElementById('speakerPhotoSection').style.display = 'none';
+        }
     } else {
         scheduleOption.style.border = '2px solid #ddd';
         scheduleOption.style.background = '#f5f5f5';
@@ -174,6 +187,9 @@ function selectPrintFormat(format) {
         leafletOption.style.background = '#f0f4ff';
         keyVisualSection.style.display = 'block';
         languageSection.style.display = 'block';
+        if (document.getElementById('speakerPhotoSection')) {
+            document.getElementById('speakerPhotoSection').style.display = 'block';
+        }
         updateKeyVisualPreviews();
     }
 }
@@ -212,15 +228,223 @@ function executePrintWithFormat() {
     const selectedDate = window.leafletConfig.selectedPrintDate || window.AppState?.currentDate || window.AppState?.selectedDate;
     
     if (format === 'leaflet') {
-        // 리플렛 형식으로 출력
+        // 리플렛 형식 → 미리보기 창 먼저 표시
         const language = document.querySelector('input[name="printLanguage"]:checked')?.value || 'ko';
-        generateLeafletPDFWithDate(selectedRooms, language, selectedDate);
+        closePrintModal();
+        openLeafletPreview(selectedRooms, language, selectedDate);
     } else {
         // 기존 시간표 형식으로 출력
         executeSchedulePrint(selectedRooms);
+        closePrintModal();
     }
-    
-    closePrintModal();
+}
+
+// ============================================
+// 리플렛 미리보기 모달 열기 (인쇄 전 브라우저 내 확인)
+// ============================================
+function openLeafletPreview(selectedRooms, language, selectedDate) {
+    if (!selectedDate) {
+        Toast.warning('날짜를 선택해주세요.');
+        return;
+    }
+    if (selectedRooms.length === 0) {
+        Toast.warning('출력할 룸을 선택해주세요.');
+        return;
+    }
+
+    try {
+        const leafletHTML = generateLeafletHTML(selectedDate, selectedRooms, language);
+
+        // 미리보기 오버레이 생성
+        const overlay = document.createElement('div');
+        overlay.id = 'leafletPreviewOverlay';
+        overlay.style.cssText = `
+            position: fixed; inset: 0; z-index: 99999;
+            background: rgba(0,0,0,0.75);
+            display: flex; flex-direction: column;
+            align-items: center;
+            overflow-y: auto;
+            padding: 20px;
+        `;
+
+        // 툴바
+        overlay.innerHTML = `
+            <div style="
+                width: 100%; max-width: 860px;
+                display: flex; justify-content: space-between; align-items: center;
+                background: #1e293b; color: white;
+                border-radius: 10px 10px 0 0;
+                padding: 10px 20px;
+                flex-shrink: 0;
+            ">
+                <span style="font-size: 14px; font-weight: bold;">📄 리플렛 미리보기 (A4 기준)</span>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; color: #94a3b8;">
+                        <input type="checkbox" id="previewPhotoToggle"
+                            ${window.leafletConfig.includeSpeakerPhoto ? 'checked' : ''}
+                            style="width:15px; height:15px; accent-color:#667eea;"
+                            onchange="togglePreviewSpeakerPhoto(this.checked)">
+                        연자 사진 포함
+                    </label>
+                    <button onclick="printLeafletPreview()" style="
+                        background: #667eea; color: white; border: none;
+                        padding: 7px 18px; border-radius: 6px;
+                        font-size: 13px; cursor: pointer; font-weight: bold;
+                    ">🖨️ 인쇄 / PDF 저장</button>
+                    <button onclick="closeLeafletPreview()" style="
+                        background: #64748b; color: white; border: none;
+                        padding: 7px 14px; border-radius: 6px;
+                        font-size: 13px; cursor: pointer;
+                    ">✕ 닫기</button>
+                </div>
+            </div>
+            <div id="leafletPreviewPages" style="
+                width: 100%; max-width: 860px;
+                background: #f1f5f9;
+                padding: 20px;
+                border-radius: 0 0 10px 10px;
+            "></div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        // 현재 설정 저장 (재렌더링용)
+        window._leafletPreviewParams = { selectedRooms, language, selectedDate };
+
+        // A4 페이지 렌더링
+        renderPreviewPages(leafletHTML);
+
+    } catch (error) {
+        console.error('미리보기 생성 오류:', error);
+        Toast.error('미리보기 생성 중 오류가 발생했습니다.');
+    }
+}
+
+// ============================================
+// A4 페이지 분할 미리보기 렌더링
+// ============================================
+function renderPreviewPages(leafletHTML) {
+    const container = document.getElementById('leafletPreviewPages');
+    if (!container) return;
+
+    // A4 비율: 297mm x 210mm (landscape) → 화면에서는 820px x 580px 기준
+    const A4_W = 820, A4_H = 580;
+
+    // iframe으로 렌더 후 높이를 기준으로 페이지 분할 표시
+    container.innerHTML = '';
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = `position: relative;`;
+
+    // iframe
+    const iframe = document.createElement('iframe');
+    iframe.id = 'leafletPreviewIframe';
+    iframe.style.cssText = `
+        width: ${A4_W}px;
+        border: none;
+        display: block;
+        background: white;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        border-radius: 4px;
+    `;
+    iframe.srcdoc = leafletHTML;
+
+    // 높이 자동 조절 + 페이지 구분선 표시
+    iframe.onload = function() {
+        try {
+            const bodyH = iframe.contentDocument?.body?.scrollHeight || A4_H;
+            iframe.style.height = bodyH + 'px';
+
+            // 페이지 구분선 (A4 높이마다)
+            const pageOverlay = wrapper.querySelector('.page-dividers');
+            if (pageOverlay) pageOverlay.remove();
+
+            const dividerContainer = document.createElement('div');
+            dividerContainer.className = 'page-dividers';
+            dividerContainer.style.cssText = `
+                position: absolute; top: 0; left: 0;
+                width: ${A4_W}px; height: ${bodyH}px;
+                pointer-events: none;
+            `;
+
+            let pageNum = 1;
+            for (let y = A4_H; y < bodyH; y += A4_H) {
+                const line = document.createElement('div');
+                line.style.cssText = `
+                    position: absolute; left: 0; top: ${y}px;
+                    width: 100%; height: 2px;
+                    background: repeating-linear-gradient(90deg, #e53e3e 0 8px, transparent 8px 16px);
+                `;
+                const label = document.createElement('div');
+                label.style.cssText = `
+                    position: absolute; right: 4px; top: ${y - 18}px;
+                    font-size: 10px; color: #e53e3e; background: white;
+                    padding: 1px 5px; border-radius: 3px; border: 1px solid #e53e3e;
+                `;
+                label.textContent = `${pageNum}페이지 끝`;
+                pageNum++;
+                dividerContainer.appendChild(line);
+                dividerContainer.appendChild(label);
+            }
+
+            wrapper.appendChild(dividerContainer);
+
+            // 페이지 수 안내
+            const totalPages = Math.ceil(bodyH / A4_H);
+            const info = document.getElementById('previewPageInfo');
+            if (info) info.textContent = `총 ${totalPages}페이지`;
+        } catch (e) {
+            console.warn('미리보기 높이 계산 오류:', e);
+        }
+    };
+
+    wrapper.appendChild(iframe);
+    container.innerHTML = `
+        <div style="text-align:center; color:#64748b; font-size:12px; margin-bottom:10px;">
+            <span id="previewPageInfo">페이지 계산 중...</span>
+            &nbsp;·&nbsp; 빨간 점선 = A4 페이지 구분선 &nbsp;·&nbsp; 실제 인쇄 시 자동 분할됩니다
+        </div>
+    `;
+    container.appendChild(wrapper);
+}
+
+// ============================================
+// 미리보기에서 연자 사진 토글 (재렌더링)
+// ============================================
+function togglePreviewSpeakerPhoto(checked) {
+    window.leafletConfig.includeSpeakerPhoto = checked;
+    // 모달 체크박스도 동기화
+    const modalCb = document.getElementById('includeSpeakerPhoto');
+    if (modalCb) modalCb.checked = checked;
+
+    const p = window._leafletPreviewParams;
+    if (!p) return;
+    const newHTML = generateLeafletHTML(p.selectedDate, p.selectedRooms, p.language);
+    renderPreviewPages(newHTML);
+}
+
+// ============================================
+// 미리보기 창에서 인쇄 실행
+// ============================================
+function printLeafletPreview() {
+    const iframe = document.getElementById('leafletPreviewIframe');
+    if (iframe?.contentWindow) {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+    } else {
+        // fallback
+        const p = window._leafletPreviewParams;
+        if (p) generateLeafletPDFWithDate(p.selectedRooms, p.language, p.selectedDate);
+    }
+}
+
+// ============================================
+// 미리보기 모달 닫기
+// ============================================
+function closeLeafletPreview() {
+    const overlay = document.getElementById('leafletPreviewOverlay');
+    if (overlay) overlay.remove();
+    window._leafletPreviewParams = null;
 }
 
 // ============================================
@@ -673,6 +897,11 @@ function generateSessionBlockHTML(session) {
         session.lectures.map(lecture => `
             <div class="lecture-item">
                 <div class="lecture-time">${lecture.startTime}~${lecture.endTime}</div>
+                ${window.leafletConfig.includeSpeakerPhoto && lecture.speakerPhotoUrl ? `
+                <div class="lecture-photo">
+                    <img src="${lecture.speakerPhotoUrl}" alt="${lecture.speaker || ''}" 
+                         style="width:28px; height:28px; border-radius:50%; object-fit:cover; flex-shrink:0; margin-right:3px; border:1px solid #ddd;">
+                </div>` : ''}
                 <div class="lecture-info">
                     <div class="lecture-title">${lecture.title || ''}</div>
                     <div class="lecture-speaker">${lecture.speaker || ''}</div>
@@ -759,7 +988,8 @@ function getSessionsForRoom(date, room, allSessions, allLectures, language) {
                     endTime: calculateEndTime(l.startTime, l.duration || 15),
                     title: language === 'en' ? (l.titleEn || l.titleKo || l.title) : (l.titleKo || l.title),
                     speaker: language === 'en' ? (l.speakerEn || l.speaker) : l.speaker,
-                    affiliation: l.affiliation || ''
+                    affiliation: l.affiliation || '',
+                    speakerPhotoUrl: l.speakerPhotoUrl || l.photoUrl || null
                 })),
                 panelDiscussion: panelDiscussion
             });
@@ -778,7 +1008,8 @@ function getSessionsForRoom(date, room, allSessions, allLectures, language) {
                 endTime: calculateEndTime(l.startTime, l.duration || 15),
                 title: language === 'en' ? (l.titleEn || l.titleKo || l.title) : (l.titleKo || l.title),
                 speaker: language === 'en' ? (l.speakerEn || l.speaker) : l.speaker,
-                affiliation: l.affiliation || ''
+                affiliation: l.affiliation || '',
+                speakerPhotoUrl: l.speakerPhotoUrl || l.photoUrl || null
             })),
             panelDiscussion: null
         });
@@ -816,3 +1047,7 @@ window.toggleAllPrintRooms = toggleAllPrintRooms;
 window.executePrintWithFormat = executePrintWithFormat;
 window.generateLeafletPDF = generateLeafletPDF;
 window.selectPrintDate = selectPrintDate;
+window.openLeafletPreview = openLeafletPreview;
+window.closeLeafletPreview = closeLeafletPreview;
+window.printLeafletPreview = printLeafletPreview;
+window.togglePreviewSpeakerPhoto = togglePreviewSpeakerPhoto;
