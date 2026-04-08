@@ -1524,3 +1524,75 @@ input[type="radio"] {
         background: var(--bg);
     }
 }
+
+/* ============================================
+   햄버거 메뉴
+   ============================================ */
+.hamburger-btn {
+    font-size: 1.3rem;
+    padding: 0.4rem 0.6rem;
+    background: var(--primary);
+    color: white;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+}
+.hamburger-menu {
+    position: fixed;
+    top: 56px;
+    right: 0;
+    width: 100%;
+    max-width: 420px;
+    background: white;
+    box-shadow: 0 8px 32px rgba(46,26,71,0.18);
+    z-index: 1100;
+    border-radius: 0 0 0 16px;
+    animation: slideDown 0.18s ease;
+}
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.hamburger-menu-inner {
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.hm-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border);
+}
+.hm-label {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    font-weight: 600;
+}
+.hm-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+}
+.hm-btn {
+    padding: 0.6rem 0.4rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.15s;
+    position: relative;
+}
+.hm-btn:hover { background: var(--primary-light); color: white; }
+.hm-btn.danger-btn { color: #e74c3c; border-color: #e74c3c; }
+.hm-btn.danger-btn:hover { background: #e74c3c; color: white; }
+.hamburger-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1099;
+}
