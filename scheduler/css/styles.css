@@ -594,6 +594,7 @@ body {
 .schedule-table-wrapper {
     flex: 1;
     overflow: auto;
+    overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     padding: 0.75rem;
@@ -1536,6 +1537,79 @@ body {
 
     .form-row { flex-direction: column; }
     .form-grid-4 { grid-template-columns: 1fr 1fr; }
+
+    /* ── 모바일 시간표 가로 스크롤 ── */
+    .schedule-table-wrapper {
+        overflow-x: auto;
+        padding: 0.4rem;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* 시간 열 sticky 강화 */
+    .schedule-table td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 5;
+        background: var(--bg);
+        min-width: 52px;
+        max-width: 52px;
+    }
+    .schedule-table th:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 21;
+    }
+
+    /* 셀 최소 높이 40px */
+    .schedule-table td,
+    .schedule-table th {
+        min-width: 120px;
+    }
+    .schedule-table td.hour-mark,
+    .schedule-table td.quarter-mark {
+        min-height: 40px;
+    }
+    /* scheduled-lecture 최소 높이 */
+    .scheduled-lecture {
+        min-height: 38px;
+    }
+
+    /* 강의 제목 2줄 말줄임 */
+    .lecture-title-display {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: normal !important;
+        font-size: 0.71rem;
+        line-height: 1.3;
+    }
+
+    /* 연자명 1줄 말줄임 */
+    .speaker-name {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+
+    /* 날짜 버튼 가로 스크롤 */
+    .panel-toolbar {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        gap: 0.35rem;
+        padding: 0.45rem 0.65rem;
+    }
+    .date-selector-btns {
+        flex-shrink: 0;
+    }
+    .toolbar-actions {
+        flex-shrink: 0;
+        margin-left: 0;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1667,3 +1741,4 @@ input[type="radio"]    { accent-color: var(--primary); cursor: pointer; }
     border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--primary-light); }
+
