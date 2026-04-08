@@ -283,6 +283,21 @@
                         </div>
 
                         <button type="button" class="btn btn-primary btn-full" id="addLectureBtn">강의 추가</button>
+                        <!-- 진단 버튼 (임시) -->
+                        <button type="button" class="btn btn-secondary btn-full" style="margin-top:0.5rem;background:#f0f0f0;font-size:0.8rem;" onclick="
+                            var log = [];
+                            log.push('로그인: ' + (AppState.currentUser ? AppState.currentUser.email : '❌없음'));
+                            log.push('권한: ' + (AppState.currentUserRole || '❌없음'));
+                            log.push('날짜: ' + (AppState.currentDate || '❌없음'));
+                            log.push('분류: ' + (document.getElementById('category').value || '❌없음'));
+                            log.push('제목: ' + (document.getElementById('titleKo').value || '❌없음'));
+                            log.push('연자: ' + (document.getElementById('speakerKo').value || '없음'));
+                            log.push('canEdit: ' + (typeof canEdit !== 'undefined' ? canEdit() : '함수없음'));
+                            log.push('addLectureToList: ' + (typeof window.addLectureToList));
+                            log.push('addLectureBtn: ' + (document.getElementById('addLectureBtn') ? '있음' : '❌없음'));
+                            alert(log.join('
+'));
+                        ">🔍 진단 (눌러보세요)</button>
                         <div class="form-row" style="margin-top:0.5rem;">
                             <button type="button" class="btn btn-secondary" onclick="openCategoryModal()" style="flex:1;">📂 분류 관리</button>
                             <button type="button" class="btn btn-secondary" onclick="openCompanyModal()" style="flex:1;">🏢 업체 관리</button>
