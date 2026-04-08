@@ -965,10 +965,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const addBtn = document.getElementById('addLectureBtn');
     if (addBtn) {
         addBtn.addEventListener('click', async function() {
-            const form = document.getElementById('lectureForm');
+            // HTML form.checkValidity() 대신 직접 검증 (숨겨진 탭 패널 오작동 방지)
+            const category = document.getElementById('category').value;
+            const titleKo = document.getElementById('titleKo').value.trim();
 
-            if (!form.checkValidity()) {
-                form.reportValidity();
+            if (!category) {
+                if (typeof Toast !== 'undefined') Toast.warning('분류를 선택해주세요.');
+                else alert('분류를 선택해주세요.');
+                return;
+            }
+            if (!titleKo) {
+                if (typeof Toast !== 'undefined') Toast.warning('제목(한글)을 입력해주세요.');
+                else alert('제목(한글)을 입력해주세요.');
                 return;
             }
 
