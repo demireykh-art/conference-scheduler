@@ -1277,25 +1277,7 @@
     }
     </script>
 
-    <script>
-    // 강의추가 디버그 패치: currentDate 없을 때 날짜 선택 안내
-    document.addEventListener('DOMContentLoaded', function() {
-        const origAdd = window.addLectureToList;
-        if (origAdd) {
-            window.addLectureToList = function() {
-                if (!AppState.currentDate) {
-                    if (typeof Toast !== 'undefined') {
-                        Toast.warning('날짜를 먼저 선택해주세요.');
-                    } else {
-                        alert('날짜를 먼저 선택해주세요.');
-                    }
-                    return;
-                }
-                return origAdd.apply(this, arguments);
-            };
-        }
-    });
-    </script>
+
 
 </body>
 </html>
