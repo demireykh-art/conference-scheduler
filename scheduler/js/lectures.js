@@ -1094,54 +1094,89 @@ document.addEventListener('DOMContentLoaded', function() {
 console.log('✅ lectures.js 로드 완료 (수정본 - ID 타입 문제 해결 + 연자 자동완성 추가 + 모바일 터치 UX 재설계)');
 
 // ── 모바일 액션 메뉴 (강의목록) ──────────────────────────────────────────────
+// 현재 메뉴 대상 강의를 전역 변수로 보관 (onclick 인라인 따옴표 충돌 방지)
+window._mobileMenuLecture = null;
+
 function _showMobileLectureMenu(lecture, anchorEl) {
     document.getElementById('mobileLectureMenu')?.remove();
     document.getElementById('mobileLectureMenuOverlay')?.remove();
 
-    const short = lecture.titleKo.length > 24
-        ? lecture.titleKo.slice(0, 24) + '…' : lecture.titleKo;
+    // 강의 객체를 전역에 보관
+    window._mobileMenuLecture = lecture;
+
+    const short = (lecture.titleKo || '').length > 24
+        ? lecture.titleKo.slice(0, 24) + '…' : (lecture.titleKo || '');
 
     const menu = document.createElement('div');
     menu.id = 'mobileLectureMenu';
     menu.innerHTML = `
         <div class="mob-menu-title">${short}</div>
-        <button class="mob-menu-btn" onclick="
-            document.getElementById('mobileLectureMenu')?.remove();
-            document.getElementById('mobileLectureMenuOverlay')?.remove();
-            window.selectLectureForPlacement(${JSON.stringify(lecture)}, false);">
-            📌 시간표에 배치
-        </button>
-        <button class="mob-menu-btn" onclick="
-            document.getElementById('mobileLectureMenu')?.remove();
-            document.getElementById('mobileLectureMenuOverlay')?.remove();
-            openEditModal(${lecture.id});">
-            ✏️ 수정
-        </button>
-        <button class="mob-menu-btn mob-menu-danger" onclick="
-            document.getElementById('mobileLectureMenu')?.remove();
-            document.getElementById('mobileLectureMenuOverlay')?.remove();
-            _confirmDeleteLecture(${lecture.id}, '${lecture.titleKo.replace(/'/g, "\\'").slice(0, 20)}');">
-            🗑️ 삭제
-        </button>
-        <button class="mob-menu-btn mob-menu-cancel" onclick="
-            document.getElementById('mobileLectureMenu')?.remove();
-            document.getElementById('mobileLectureMenuOverlay')?.remove();">
-            취소
-        </button>`;
+        <button class="mob-menu-btn" id="mobBtnPlace">📌 시간표에 배치</button>
+        <button class="mob-menu-btn" id="mobBtnEdit">✏️ 수정</button>
+        <button class="mob-menu-btn mob-menu-danger" id="mobBtnDelete">🗑️ 삭제</button>
+        <button class="mob-menu-btn mob-menu-cancel" id="mobBtnCancel">취소</button>
+    `;
     menu.style.cssText = [
-        'position:fixed', 'bottom:calc(var(--tabbar-h,64px) + 8px)',
-        'left:12px', 'right:12px', 'background:white',
-        'border-radius:16px', 'padding:1rem', 'z-index:9500',
+        'position:fixed',
+        'bottom:calc(var(--tabbar-h,64px) + 8px)',
+        'left:12px', 'right:12px',
+        'background:white',
+        'border-radius:16px',
+        'padding:1rem',
+        'z-index:9500',
         'box-shadow:0 -4px 30px rgba(0,0,0,0.2)',
-        'display:flex', 'flex-direction:column', 'gap:0.25rem'
+        'display:flex',
+        'flex-direction:column',
+        'gap:0.25rem'
     ].join(';');
+
     document.body.appendChild(menu);
 
+    function closeMenu() {
+        document.getElementById('mobileLectureMenu')?.remove();
+        document.getElementById('mobileLectureMenuOverlay')?.remove();
+        window._mobileMenuLecture = null;
+    }
+
+    // 배치 버튼
+    document.getElementById('mobBtnPlace').addEventListener('click', function() {
+        const lec = window._mobileMenuLecture;
+        closeMenu();
+        if (lec && typeof window.selectLectureForPlacement === 'function') {
+            window.selectLectureForPlacement(lec, false);
+        }
+    });
+
+    // 수정 버튼
+    document.getElementById('mobBtnEdit').addEventListener('click', function() {
+        const lec = window._mobileMenuLecture;
+        closeMenu();
+        if (lec && typeof openEditModal === 'function') {
+            openEditModal(lec.id);
+        }
+    });
+
+    // 삭제 버튼
+    document.getElementById('mobBtnDelete').addEventListener('click', function() {
+        const lec = window._mobileMenuLecture;
+        closeMenu();
+        if (lec && typeof window._confirmDeleteLecture === 'function') {
+            window._confirmDeleteLecture(lec.id, lec.titleKo || '');
+        }
+    });
+
+    // 취소 버튼
+    document.getElementById('mobBtnCancel').addEventListener('click', closeMenu);
+
+    // 배경 오버레이
     const overlay = document.createElement('div');
     overlay.id = 'mobileLectureMenuOverlay';
-    overlay.style.cssText =
-        'position:fixed;inset:0;z-index:9499;background:rgba(0,0,0,0.3);';
-    overlay.onclick = () => { menu.remove(); overlay.remove(); };
+    overlay.style.cssText = [
+        'position:fixed', 'inset:0',
+        'z-index:9499',
+        'background:rgba(0,0,0,0.3)'
+    ].join(';');
+    overlay.addEventListener('click', closeMenu);
     document.body.insertBefore(overlay, menu);
 }
 
