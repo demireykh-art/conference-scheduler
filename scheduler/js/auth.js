@@ -239,6 +239,11 @@ window.updatePendingBadge = function() {
         } else {
             badge.style.display = 'none';
         }
+    }).catch((error) => {
+        // Firebase Rules에서 /users 전체 읽기 권한 없을 때 조용히 처리
+        console.warn('pendingBadge 조회 권한 없음 (Firebase Rules 확인 필요):', error.code);
+        const badge = document.getElementById('pendingBadge');
+        if (badge) badge.style.display = 'none';
     });
 };
 
