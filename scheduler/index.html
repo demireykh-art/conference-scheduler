@@ -168,7 +168,7 @@
                     </div>
                     <div class="lecture-sidebar-body">
                         <!-- lectureList와 동일한 데이터를 공유 -->
-                        <div id="pcLectureList"></div>
+                        <div class="lecture-list" id="lectureList"></div>
                     </div>
                 </div>
 
@@ -206,7 +206,7 @@
                     <div class="category-filters-wrapper" id="categoryFiltersWrapper">
                         <div class="category-filters" id="categoryFilters"></div>
                     </div>
-                    <div class="lecture-list" id="lectureList"></div>
+                    <div class="lecture-list" id="lectureListTabMobile"></div>
                 </div>
             </section>
 
@@ -1242,8 +1242,24 @@
         if (tabName === 'speaker' && typeof window.updateSpeakerList === 'function') {
             window.updateSpeakerList();
         }
-        if (tabName === 'lectures' && typeof window.updateLectureList === 'function') {
-            window.updateLectureList();
+        if (tabName === 'lectures') {
+            // 모바일 탭에서 강의목록 표시: lectureListTabMobile에 동기화
+            const sidebar = document.getElementById('lectureList');
+            const mobile  = document.getElementById('lectureListTabMobile');
+            if (sidebar && mobile) {
+                mobile.innerHTML = sidebar.innerHTML;
+                // 드래그 이벤트 재연결
+                mobile.querySelectorAll('.lecture-item[draggable]').forEach(item => {
+                    item.addEventListener('dragstart', e => { if(window.handleDragStart) window.handleDragStart(e); });
+                    item.addEventListener('dragend',   e => { if(window.handleDragEnd)   window.handleDragEnd(e);   });
+                    item.addEventListener('dblclick', function() {
+                        const id = this.dataset.lectureId;
+                        if (id && window.openEditModal) window.openEditModal(id);
+                    });
+                });
+            } else if (typeof window.updateLectureList === 'function') {
+                window.updateLectureList();
+            }
         }
     }
 
@@ -1458,7 +1474,7 @@
                 origUpdate.apply(this, arguments);
                 // 모바일 탭용 목록 업데이트
                 const sidebar = document.getElementById('lectureList');
-                const mobile  = document.getElementById('lectureListMobile');
+                const mobile  = document.getElementById('lectureListTabMobile');
                 if (sidebar && mobile) {
                     mobile.innerHTML = sidebar.innerHTML;
                     // 이벤트 재연결 (드래그)
@@ -1476,7 +1492,7 @@
                     });
                 }
                 // 강의수 표시
-                const count = sidebar ? sidebar.querySelectorAll('.lecture-item').length : 0;
+                const count = sidebar ? sidebar.querySelectorAll('.lecture-item:not(.break-section .lecture-item)').length : 0;
                 const countEl = document.getElementById('pcLectureCount');
                 if (countEl) countEl.textContent = count + '개';
             };
