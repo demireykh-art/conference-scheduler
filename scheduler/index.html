@@ -148,17 +148,44 @@
 
             <!-- ===== 탭: 시간표 ===== -->
             <section class="tab-panel active" id="tab-schedule">
-                <div class="panel-toolbar">
-                    <div class="date-selector-btns" id="dateSelectorBtns"></div>
-                    <div class="toolbar-actions">
-                        <button class="tool-btn" onclick="openEventDateModal()" title="날짜 관리">📅+</button>
-                        <button class="tool-btn" onclick="openTimeSettingsModal()" title="시간대 설정">⏰</button>
-                        <button class="tool-btn" onclick="addRoom()" title="룸 추가">➕룸</button>
-                        <button class="tool-btn" onclick="openFullScheduleModal()" title="크게 보기">🔍크게보기</button>
+                <!-- PC: 강의목록 사이드바 (모바일에서는 숨김) -->
+                <div class="lecture-sidebar" id="pcLectureSidebar">
+                    <div class="lecture-sidebar-header">
+                        📚 강의목록
+                        <span id="pcLectureCount" style="font-size:0.75rem;color:var(--text-light);margin-left:auto;"></span>
+                    </div>
+                    <div class="lecture-sidebar-filters">
+                        <input type="text" id="pcLectureSearch"
+                            placeholder="🔍 검색..."
+                            style="width:100%;padding:0.4rem 0.6rem;border:1px solid var(--border);border-radius:8px;font-size:0.82rem;"
+                            oninput="filterLecturesBySearch()"
+                            onfocus="document.getElementById('lectureSearchInput') && (document.getElementById('lectureSearchInput').value=this.value)">
+                        <div style="display:flex;gap:0.3rem;margin-top:0.4rem;flex-wrap:wrap;">
+                            <button class="filter-chip active" onclick="toggleQuickFilter('')" id="pcFilterAll">전체</button>
+                            <button class="filter-chip" onclick="toggleQuickFilter('unscheduled')" id="pcFilterUnscheduled">미배치</button>
+                            <button class="filter-chip" onclick="toggleQuickFilter('noSpeaker')" id="pcFilterNoSpeaker">미정</button>
+                        </div>
+                    </div>
+                    <div class="lecture-sidebar-body">
+                        <!-- lectureList와 동일한 데이터를 공유 -->
+                        <div id="pcLectureList"></div>
                     </div>
                 </div>
-                <div class="schedule-table-wrapper">
-                    <table class="schedule-table" id="scheduleTable"></table>
+
+                <!-- 시간표 영역 -->
+                <div class="schedule-area">
+                    <div class="panel-toolbar">
+                        <div class="date-selector-btns" id="dateSelectorBtns"></div>
+                        <div class="toolbar-actions">
+                            <button class="tool-btn" onclick="openEventDateModal()" title="날짜 관리">📅+</button>
+                            <button class="tool-btn" onclick="openTimeSettingsModal()" title="시간대 설정">⏰</button>
+                            <button class="tool-btn" onclick="addRoom()" title="룸 추가">➕룸</button>
+                            <button class="tool-btn" onclick="openFullScheduleModal()" title="크게 보기">🔍크게보기</button>
+                        </div>
+                    </div>
+                    <div class="schedule-table-wrapper">
+                        <table class="schedule-table" id="scheduleTable"></table>
+                    </div>
                 </div>
             </section>
 
@@ -1421,5 +1448,22 @@
     }
     </script>
 
+
+    <script>
+    // updateLectureList 후 PC 사이드바 자동 동기화
+    document.addEventListener('DOMContentLoaded', function() {
+        const origUpdate = window.updateLectureList;
+        if (origUpdate) {
+            window.updateLectureList = function() {
+                origUpdate.apply(this, arguments);
+                setTimeout(() => {
+                    if (typeof window._syncPcLectureList === 'function') {
+                        window._syncPcLectureList();
+                    }
+                }, 50);
+            };
+        }
+    });
+    </script>
 </body>
 </html>
