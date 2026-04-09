@@ -1245,6 +1245,9 @@
         if (tabName === 'lectures' && typeof window.updateLectureList === 'function') {
             window.updateLectureList();
         }
+        if (tabName === 'schedule' && typeof window._syncPcLectureList === 'function') {
+            setTimeout(window._syncPcLectureList, 100);
+        }
     }
 
     // ── 초기 탭 활성화 (DOMContentLoaded) ──
