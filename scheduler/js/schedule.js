@@ -803,10 +803,10 @@ window.autoPlacePanelDiscussions = function() {
  * 드래그 시작 (강의 목록에서)
  */
 window.handleDragStart = function(e) {
-    const el = e.currentTarget || this;
-    const lectureId = el.dataset.lectureId;
-    const isBreak = el.dataset.isBreak === 'true';
-    
+    const el = e.currentTarget || e.target;
+    const lectureId = el ? el.dataset.lectureId : null;
+    const isBreak = el ? el.dataset.isBreak === 'true' : false;
+
     // Break 항목이면 DEFAULT_BREAK_ITEMS에서 찾기
     if (isBreak) {
         AppState.draggedLecture = DEFAULT_BREAK_ITEMS.find(l => l.id === lectureId);
@@ -815,12 +815,13 @@ window.handleDragStart = function(e) {
         AppState.draggedLecture = AppState.lectures.find(l => l.id == lectureId);
         AppState.draggedIsBreak = false;
     }
-    
-    this.classList.add('dragging');
+
+    if (el) el.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', lectureId);
 
-    document.querySelector('.schedule-grid').classList.add('dragging');
+    const grid = document.querySelector('.schedule-grid');
+    if (grid) grid.classList.add('dragging');
 
     const tooltip = document.getElementById('dragTooltip');
     if (tooltip && AppState.draggedLecture) {
@@ -835,7 +836,8 @@ window.handleDragStart = function(e) {
 window.handleDragEnd = function(e) {
     const el = e.currentTarget || this;
     el.classList.remove('dragging');
-    document.querySelector('.schedule-grid').classList.remove('dragging');
+    const egrid = document.querySelector('.schedule-grid');
+    if (egrid) egrid.classList.remove('dragging');
 
     const tooltip = document.getElementById('dragTooltip');
     if (tooltip) {
@@ -878,7 +880,8 @@ window.handleScheduleDragEnd = function(e) {
     this.classList.remove('is-dragging'); // 드래그 종료 시 클래스 제거
     AppState.draggedScheduleKey = null;
 
-    document.querySelector('.schedule-grid').classList.remove('dragging');
+    const egrid = document.querySelector('.schedule-grid');
+    if (egrid) egrid.classList.remove('dragging');
 
     const tooltip = document.getElementById('dragTooltip');
     if (tooltip) {
@@ -948,7 +951,8 @@ window.handleDrop = function(e) {
     this.classList.remove('drag-over');
     this.classList.remove('drag-target');
 
-    document.querySelector('.schedule-grid').classList.remove('dragging');
+    const egrid = document.querySelector('.schedule-grid');
+    if (egrid) egrid.classList.remove('dragging');
 
     const tooltip = document.getElementById('dragTooltip');
     if (tooltip) {
