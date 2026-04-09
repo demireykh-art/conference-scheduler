@@ -451,4 +451,15 @@ window.formatMinutesToHM = function(minutes) {
     }
 };
 
+// ============================================
+// 온라인 / 오프라인 상태 표시
+// ============================================
+window.addEventListener('online', () => {
+    Toast.success('🌐 온라인 연결됨');
+});
+
+window.addEventListener('offline', () => {
+    Toast.warning('📵 오프라인 모드 - 변경사항은 연결 후 동기화됩니다');
+});
+
 console.log('✅ utils.js 로드 완료');
