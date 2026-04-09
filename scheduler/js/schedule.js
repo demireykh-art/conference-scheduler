@@ -1722,7 +1722,7 @@ window.selectLectureForPlacement = function(lecture, isBreak) {
 
     // 선택 하이라이트
     document.querySelectorAll('.lecture-item').forEach(el => el.classList.remove('tap-selected'));
-    const el = document.querySelector(\`.lecture-item[data-lecture-id="\${lecture.id}"]\`);
+    const el = document.querySelector(`.lecture-item[data-lecture-id="\${lecture.id}"]`);
     if (el) el.classList.add('tap-selected');
 
     // 하단 토스트
@@ -1764,7 +1764,7 @@ window.executeTapToPlace = function(cell) {
     handleDrop.call(cell, { preventDefault: () => {}, stopPropagation: () => {} });
 
     cancelTapToPlace();
-    Toast.success(\`📌 "\${lectureName}" 배치 완료!\`);
+    Toast.success(`📌 "\${lectureName}" 배치 완료!`);
 };
 
 // ── 배치 중 토스트 ──
@@ -1775,8 +1775,8 @@ function _showPlacementToast(title) {
     const el = document.createElement('div');
     el.id = 'tapPlacementToast';
     const short = title.length > 22 ? title.slice(0, 22) + '…' : title;
-    el.innerHTML = \`<span>📌 <b>\${short}</b> 배치 중… 시간표에서 셀을 탭하세요</span>
-        <button onclick="cancelTapToPlace()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:0.8rem;flex-shrink:0;line-height:1;">✕</button>\`;
+    el.innerHTML = `<span>📌 <b>\${short}</b> 배치 중… 시간표에서 셀을 탭하세요</span>
+        <button onclick="cancelTapToPlace()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:0.8rem;flex-shrink:0;line-height:1;">✕</button>`;
     el.style.cssText = [
         'position:fixed',
         'bottom:calc(var(--tabbar-h,64px) + 12px)',
