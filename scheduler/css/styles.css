@@ -1424,10 +1424,16 @@ body {
 }
 .autocomplete-list div {
     padding: 0.5rem 0.75rem;
+    min-height: 48px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     transition: background var(--transition);
+    border-bottom: 1px solid var(--border);
 }
+.autocomplete-list div:last-child { border-bottom: none; }
 .autocomplete-list div:hover { background: var(--bg); }
 
 .autocomplete-dropdown {
@@ -1741,4 +1747,66 @@ input[type="radio"]    { accent-color: var(--primary); cursor: pointer; }
     border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--primary-light); }
+
+/* ============================================
+   강의추가 성공 토스트 (체크 애니메이션)
+   ============================================ */
+.add-success-toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #2e7d32;
+    color: #fff;
+    padding: 0.6rem 1.4rem 0.6rem 1rem;
+    border-radius: 2rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    z-index: 9999;
+    opacity: 0;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.22);
+    pointer-events: none;
+    transition: opacity 0.22s, transform 0.22s;
+}
+.add-success-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+.add-success-toast .check-circle {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2.5px solid #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    animation: checkPop 0.35s ease forwards;
+}
+@keyframes checkPop {
+    0%   { transform: scale(0.5); opacity: 0; }
+    70%  { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1);   opacity: 1; }
+}
+.add-success-toast .check-circle svg {
+    stroke-dasharray: 20;
+    stroke-dashoffset: 20;
+    animation: checkDraw 0.35s 0.1s ease forwards;
+}
+@keyframes checkDraw {
+    to { stroke-dashoffset: 0; }
+}
+
+/* ============================================
+   분류 select 시각 피드백
+   ============================================ */
+#category.has-value {
+    border-width: 2px;
+    font-weight: 600;
+    transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
 
