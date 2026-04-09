@@ -358,6 +358,16 @@ function createLectureItem(lecture, lectureId, isScheduled, isBreak) {
     item.addEventListener('dragend', function(e) {
         if (typeof window.handleDragEnd === 'function') window.handleDragEnd(e);
     });
+
+    // 모바일 탭-투-플레이스: 강의 탭 → 선택 모드 진입
+    item.addEventListener('touchend', function(e) {
+        const isMob = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        if (!isMob) return;
+        e.preventDefault();
+        if (typeof window.selectLectureForPlacement === 'function') {
+            window.selectLectureForPlacement(lecture, isBreak);
+        }
+    }, { passive: false });
     
     // Break 항목은 더블클릭 시 편집 불가 (기본 항목이므로)
     if (!isBreak) {
