@@ -33,6 +33,19 @@
 
     <!-- Styles -->
     <link rel="stylesheet" href="css/styles.css">
+    <style>
+    /* 탭-투-플레이스: 선택된 강의 하이라이트 */
+    .lecture-item.tap-selected {
+        outline: 2.5px solid #7C3AED;
+        box-shadow: 0 0 0 4px rgba(124,58,237,0.2);
+        background: #F5F0FF !important;
+        animation: tapPulse 1.2s ease-in-out infinite;
+    }
+    @keyframes tapPulse {
+        0%,100% { box-shadow: 0 0 0 4px rgba(124,58,237,0.2); }
+        50%      { box-shadow: 0 0 0 8px rgba(124,58,237,0.08); }
+    }
+    </style>
 </head>
 <body>
 
