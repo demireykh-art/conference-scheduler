@@ -512,6 +512,20 @@ body {
 }
 
 /* ============================================
+   시간표 탭 레이아웃 기반 요소
+   ============================================ */
+
+/* 기본(모바일): 사이드바 숨김, schedule-area 전체 차지 */
+.lecture-sidebar { display: none; }
+.schedule-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+}
+
+/* ============================================
    시간표 탭
    ============================================ */
 
@@ -1515,8 +1529,6 @@ body {
     .bottom-tabbar { display: none; }
     .app-layout { bottom: 0; }
     .side-nav { display: flex; }
-    /* PC에서 강의목록 사이드바 표시 */
-    .lecture-sidebar { display: flex; flex-direction: column; }
 
     /* PC: 시간표 탭에서 강의목록 사이드바 함께 표시 */
     #tab-schedule {
@@ -1524,7 +1536,7 @@ body {
         overflow: hidden;
     }
 
-    /* PC 강의목록 사이드바 (시간표 탭 내부) */
+    /* PC 강의목록 사이드바 */
     .lecture-sidebar {
         width: 300px;
         min-width: 260px;
@@ -1700,6 +1712,7 @@ body {
     .app-header,
     .bottom-tabbar,
     .side-nav,
+    .lecture-sidebar,
     .panel-toolbar { display: none !important; }
     .app-layout {
         position: static;
@@ -1861,9 +1874,7 @@ input[type="radio"]    { accent-color: var(--primary); cursor: pointer; }
 
 
 
-/* 강의목록 사이드바: 기본 숨김 (모바일) */
-.lecture-sidebar { display: none; }
-.schedule-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+/* 필터 칩 추가 스타일 (하단 추가분) */
 
 /* 필터 칩 */
 .filter-chip {
