@@ -1,8 +1,11 @@
 // ============================================
 // Service Worker - conference-scheduler
-// 버전을 올리면 기존 캐시 자동 삭제 후 재캐싱
+// 캐시 버전: 날짜 기반 자동 관리 (YYYYMMDD-N 형식)
+// 파일을 수정할 때 BUILD_DATE 또는 BUILD_NUM을 올리면 캐시 자동 갱신
 // ============================================
-const CACHE_VERSION = 'scheduler-v4';
+const BUILD_DATE = '20250409';  // 오늘 날짜로 갱신
+const BUILD_NUM  = 1;               // 같은 날 여러 번 배포 시 증가
+const CACHE_VERSION = `scheduler-${BUILD_DATE}-${BUILD_NUM}`;
 const OFFLINE_URL   = '/conference-scheduler/scheduler/offline.html';
 
 const STATIC_ASSETS = [
@@ -30,6 +33,7 @@ const STATIC_ASSETS = [
 // Install: 정적 자산 캐싱
 // ============================================
 self.addEventListener('install', e => {
+  console.log(`[SW] 설치: ${CACHE_VERSION}`);
   e.waitUntil(
     caches.open(CACHE_VERSION)
       .then(cache => cache.addAll(STATIC_ASSETS))
@@ -42,6 +46,7 @@ self.addEventListener('install', e => {
 // Activate: 구버전 캐시 모두 삭제
 // ============================================
 self.addEventListener('activate', e => {
+  console.log(`[SW] 활성화: ${CACHE_VERSION}`);
   e.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
@@ -114,3 +119,4 @@ self.addEventListener('message', e => {
     e.source?.postMessage({ type: 'VERSION', version: CACHE_VERSION });
   }
 });
+
