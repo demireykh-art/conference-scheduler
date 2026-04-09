@@ -159,15 +159,18 @@
                             placeholder="🔍 검색..."
                             style="width:100%;padding:0.4rem 0.6rem;border:1px solid var(--border);border-radius:8px;font-size:0.82rem;"
                             id="lectureSearchInput"
-                            oninput="filterLecturesBySearch()">
+                            oninput="filterLecturesBySearch(); syncMobileSearch(this.value);">
                         <div style="display:flex;gap:0.3rem;margin-top:0.4rem;flex-wrap:wrap;">
                             <button class="filter-chip active" id="filterAllBtn" onclick="toggleQuickFilter('all')">전체</button>
                             <button class="filter-chip" id="filterUnscheduledBtn" onclick="toggleQuickFilter('unscheduled')">미배치</button>
                             <button class="filter-chip" id="filterNoSpeakerBtn" onclick="toggleQuickFilter('noSpeaker')">미정</button>
                         </div>
+                        <div class="category-filters-wrapper" id="categoryFiltersWrapper" style="margin-top:0.4rem;">
+                            <div class="category-filters" id="categoryFilters" style="display:flex;flex-wrap:wrap;gap:0.25rem;"></div>
+                        </div>
                     </div>
                     <div class="lecture-sidebar-body">
-                        <!-- lectureList와 동일한 데이터를 공유 -->
+                        <!-- JS(lectures.js)가 document.getElementById('lectureList')로 직접 렌더링 -->
                         <div class="lecture-list" id="lectureList"></div>
                     </div>
                 </div>
@@ -189,22 +192,22 @@
                 </div>
             </section>
 
-            <!-- ===== 탭: 강의목록 ===== -->
+            <!-- ===== 탭: 강의목록 (모바일 전용) ===== -->
             <section class="tab-panel" id="tab-lectures">
                 <div id="lectureListCard" class="tab-inner">
                     <div class="lecture-toolbar">
                         <div class="lecture-search-box">
-                            <input type="text" id="lectureSearchInput" placeholder="🔍 제목, 연자명, 회사명 검색..." oninput="filterLecturesBySearch()">
+                            <input type="text" id="lectureSearchMobile" placeholder="🔍 제목, 연자명, 회사명 검색..." oninput="syncSidebarSearch(this.value); filterLecturesBySearch();">
                             <button class="search-clear-btn" onclick="clearLectureSearch()" title="검색 초기화">✕</button>
                         </div>
                         <div class="lecture-filter-btns">
-                            <button class="filter-chip filter-quick-btn" id="filterUnscheduledBtn" onclick="toggleQuickFilter('unscheduled')" title="미배치 강의만 보기">📌 미배치</button>
-                            <button class="filter-chip filter-quick-btn" id="filterNoSpeakerBtn" onclick="toggleQuickFilter('noSpeaker')" title="연자 미정만 보기">❓ 미정</button>
+                            <button class="filter-chip filter-quick-btn" id="filterUnscheduledMobileBtn" onclick="toggleQuickFilter('unscheduled')" title="미배치 강의만 보기">📌 미배치</button>
+                            <button class="filter-chip filter-quick-btn" id="filterNoSpeakerMobileBtn" onclick="toggleQuickFilter('noSpeaker')" title="연자 미정만 보기">❓ 미정</button>
                             <button class="filter-chip" id="toggleFiltersBtn" onclick="toggleCategoryFilters()">📂 분류</button>
                         </div>
                     </div>
-                    <div class="category-filters-wrapper" id="categoryFiltersWrapper">
-                        <div class="category-filters" id="categoryFilters"></div>
+                    <div class="category-filters-wrapper" id="categoryFiltersWrapperMobile">
+                        <div class="category-filters" id="categoryFiltersMobile"></div>
                     </div>
                     <div class="lecture-list" id="lectureListTabMobile"></div>
                 </div>
@@ -1466,35 +1469,113 @@
 
 
     <script>
-    // 모바일 강의목록 탭: lectureList(사이드바) 내용을 lectureListMobile에 미러링
+    // ────────────────────────────────────────────────
+    // PC 사이드바 ↔ 모바일 탭 강의목록 동기화
+    // ────────────────────────────────────────────────
+
+    // 검색창 동기화: 사이드바 → 모바일
+    window.syncMobileSearch = function(val) {
+        const mob = document.getElementById('lectureSearchMobile');
+        if (mob && mob.value !== val) mob.value = val;
+    };
+    // 검색창 동기화: 모바일 → 사이드바
+    window.syncSidebarSearch = function(val) {
+        const sb = document.getElementById('lectureSearchInput');
+        if (sb && sb.value !== val) sb.value = val;
+    };
+
+    // 모바일 필터버튼 상태 동기화 (사이드바 기준)
+    function syncMobileFilterBtns() {
+        ['Unscheduled', 'NoSpeaker'].forEach(function(key) {
+            var src  = document.getElementById('filter' + key + 'Btn');
+            var dest = document.getElementById('filter' + key + 'MobileBtn');
+            if (src && dest) {
+                dest.classList.toggle('active', src.classList.contains('active'));
+            }
+        });
+    }
+
+    // lectureList → lectureListTabMobile 미러링
+    function mirrorToMobile() {
+        const sidebar = document.getElementById('lectureList');
+        const mobile  = document.getElementById('lectureListTabMobile');
+        if (!sidebar || !mobile) return;
+        mobile.innerHTML = sidebar.innerHTML;
+        // 이벤트 재연결 (드래그, 더블클릭)
+        mobile.querySelectorAll('.lecture-item').forEach(item => {
+            item.addEventListener('dragstart', function(e) {
+                if (typeof window.handleDragStart === 'function') window.handleDragStart(e);
+            });
+            item.addEventListener('dragend', function(e) {
+                if (typeof window.handleDragEnd === 'function') window.handleDragEnd(e);
+            });
+            item.addEventListener('dblclick', function() {
+                const id = this.dataset.lectureId;
+                if (id && typeof window.openEditModal === 'function') window.openEditModal(id);
+            });
+        });
+    }
+
+    // categoryFilters → categoryFiltersMobile 미러링
+    function mirrorCategoryFilters() {
+        const src  = document.getElementById('categoryFilters');
+        const dest = document.getElementById('categoryFiltersMobile');
+        if (!src || !dest) return;
+        dest.innerHTML = src.innerHTML;
+        // onclick 이벤트는 인라인 onclick="..." 그대로 복사되므로 별도 연결 불필요
+    }
+
+    // 강의수 표시 업데이트
+    function updatePcLectureCount() {
+        const sidebar  = document.getElementById('lectureList');
+        const countEl  = document.getElementById('pcLectureCount');
+        if (!sidebar || !countEl) return;
+        const count = sidebar.querySelectorAll('.lecture-item').length;
+        countEl.textContent = count + '개';
+    }
+
+    // updateLectureList 후킹 (lectures.js 수정 없이)
     document.addEventListener('DOMContentLoaded', function() {
         const origUpdate = window.updateLectureList;
-        if (origUpdate) {
+        if (typeof origUpdate === 'function') {
             window.updateLectureList = function() {
                 origUpdate.apply(this, arguments);
-                // 모바일 탭용 목록 업데이트
-                const sidebar = document.getElementById('lectureList');
-                const mobile  = document.getElementById('lectureListTabMobile');
-                if (sidebar && mobile) {
-                    mobile.innerHTML = sidebar.innerHTML;
-                    // 이벤트 재연결 (드래그)
-                    mobile.querySelectorAll('.lecture-item').forEach(item => {
-                        item.addEventListener('dragstart', function(e) {
-                            if (typeof window.handleDragStart === 'function') window.handleDragStart(e);
-                        });
-                        item.addEventListener('dragend', function(e) {
-                            if (typeof window.handleDragEnd === 'function') window.handleDragEnd(e);
-                        });
-                        item.addEventListener('dblclick', function() {
-                            const id = this.dataset.lectureId;
-                            if (id && typeof window.openEditModal === 'function') window.openEditModal(id);
-                        });
-                    });
+                mirrorToMobile();
+                mirrorCategoryFilters();
+                updatePcLectureCount();
+                syncMobileFilterBtns();
+            };
+        } else {
+            // lectures.js 보다 늦게 로드된 경우를 대비한 폴백
+            const _origDesc = Object.getOwnPropertyDescriptor(window, 'updateLectureList');
+            Object.defineProperty(window, 'updateLectureList', {
+                configurable: true,
+                set: function(fn) {
+                    const wrapped = function() {
+                        fn.apply(this, arguments);
+                        mirrorToMobile();
+                        mirrorCategoryFilters();
+                        updatePcLectureCount();
+                    };
+                    Object.defineProperty(window, 'updateLectureList', { value: wrapped, writable: true, configurable: true });
+                },
+                get: function() { return undefined; }
+            });
+        }
+
+        // switchTab 'lectures' 진입 시 항상 최신 동기화
+        const _origSwitch2 = window.switchTab;
+        if (typeof _origSwitch2 === 'function') {
+            window.switchTab = function(tabName) {
+                _origSwitch2.apply(this, arguments);
+                if (tabName === 'lectures') {
+                    mirrorToMobile();
+                    mirrorCategoryFilters();
+                    // 검색어 동기화
+                    const sb  = document.getElementById('lectureSearchInput');
+                    const mob = document.getElementById('lectureSearchMobile');
+                    if (sb && mob) mob.value = sb.value;
                 }
-                // 강의수 표시
-                const count = sidebar ? sidebar.querySelectorAll('.lecture-item:not(.break-section .lecture-item)').length : 0;
-                const countEl = document.getElementById('pcLectureCount');
-                if (countEl) countEl.textContent = count + '개';
             };
         }
     });
