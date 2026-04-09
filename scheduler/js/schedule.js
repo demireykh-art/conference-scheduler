@@ -31,6 +31,7 @@ window.createScheduleTable = function() {
         roomHeader.style.position = 'relative';
         roomHeader.style.width = roomWidth + 'px';
         roomHeader.style.minWidth = roomWidth + 'px';
+        roomHeader.dataset.room = room; // 탭투플레이스 룸 강조용
 
         // 크게보기 버튼
         const expandBtn = document.createElement('button');
@@ -1712,7 +1713,7 @@ window.updateRoomManagerDropdowns = function() {
 const _isMobileDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
 /**
- * 강의목록에서 강의를 탭 → 배치 모드 진입
+ * 강의목록에서 강의를 탭 → 1단계: 룸 선택 토스트 표시
  * lectures.js의 touchend에서 호출
  */
 window.selectLectureForPlacement = function(lecture, isBreak) {
@@ -1727,21 +1728,35 @@ window.selectLectureForPlacement = function(lecture, isBreak) {
 
     AppState.selectedLectureForPlacement = lecture;
     AppState.selectedLectureIsBreak = !!isBreak;
+    AppState.selectedRoomForPlacement = null;
 
     // 선택 하이라이트
     document.querySelectorAll('.lecture-item').forEach(el => el.classList.remove('tap-selected'));
-    const el = document.querySelector(`.lecture-item[data-lecture-id="\${lecture.id}"]`);
+    const el = document.querySelector(`.lecture-item[data-lecture-id="${lecture.id}"]`);
     if (el) el.classList.add('tap-selected');
 
-    // 하단 토스트
-    _showPlacementToast(lecture.titleKo);
-
-    // 시간표 탭으로 자동 이동
-    setTimeout(() => {
-        if (typeof switchTab === 'function') switchTab('schedule');
-    }, 280);
+    // 1단계: 룸 선택 토스트 표시 (자동 탭전환 제거)
+    _showRoomSelectToast(lecture);
 
     return true;
+};
+
+/**
+ * 2단계: 룸 선택 → 시간표 탭으로 이동 후 해당 룸 강조
+ */
+window.selectRoomForPlacement = function(room) {
+    AppState.selectedRoomForPlacement = room;
+
+    // 시간표 탭으로 이동
+    if (typeof switchTab === 'function') switchTab('schedule');
+
+    // DOM 준비 후 룸 강조 + 힌트 표시
+    setTimeout(() => {
+        _highlightRoomColumn(room);
+        _showPlacementHints(room);
+        _hidePlacementToast();
+        _showSimpleToast(AppState.selectedLectureForPlacement ? AppState.selectedLectureForPlacement.titleKo : '', room);
+    }, 150);
 };
 
 /**
@@ -1750,12 +1765,15 @@ window.selectLectureForPlacement = function(lecture, isBreak) {
 window.cancelTapToPlace = function() {
     AppState.selectedLectureForPlacement = null;
     AppState.selectedLectureIsBreak = false;
+    AppState.selectedRoomForPlacement = null;
     document.querySelectorAll('.lecture-item').forEach(el => el.classList.remove('tap-selected'));
+    _clearRoomHighlight();
+    _clearPlacementHints();
     _hidePlacementToast();
 };
 
 /**
- * 셀 탭 → handleDrop 로직 재사용하여 실제 배치
+ * 3단계: 셀 탭 → handleDrop 로직 재사용하여 실제 배치
  */
 window.executeTapToPlace = function(cell) {
     const lecture = AppState.selectedLectureForPlacement;
@@ -1767,42 +1785,108 @@ window.executeTapToPlace = function(cell) {
     AppState.draggedScheduleKey = null;
 
     const lectureName = lecture.titleKo;
+    const room = cell.dataset.room || '';
+    const time = cell.dataset.time || '';
 
     // handleDrop 재사용 (call로 this = cell 전달)
     handleDrop.call(cell, { preventDefault: () => {}, stopPropagation: () => {} });
 
+    // 룸 강조 해제
+    _clearRoomHighlight();
+    _clearPlacementHints();
     cancelTapToPlace();
-    Toast.success(`📌 "\${lectureName}" 배치 완료!`);
+
+    // Haptic 피드백
+    if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+
+    const roomStr = room ? ` → ${room}` : '';
+    const timeStr = time ? ` ${time}` : '';
+    Toast.success(`✅ "${lectureName}"${roomStr}${timeStr} 배치 완료!`);
 };
 
 // ── 배치 중 토스트 ──
 let _placementToastEl = null;
 
-function _showPlacementToast(title) {
+/**
+ * 1단계 토스트: 룸 선택 버튼 포함
+ */
+function _showRoomSelectToast(lecture) {
     _hidePlacementToast();
     const el = document.createElement('div');
     el.id = 'tapPlacementToast';
-    const short = title.length > 22 ? title.slice(0, 22) + '…' : title;
-    el.innerHTML = `<span>📌 <b>\${short}</b> 배치 중… 시간표에서 셀을 탭하세요</span>
-        <button onclick="cancelTapToPlace()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:0.8rem;flex-shrink:0;line-height:1;">✕</button>`;
+
+    const short = lecture.titleKo.length > 18
+        ? lecture.titleKo.slice(0, 18) + '\u2026'
+        : lecture.titleKo;
+
+    // 룸 버튼 생성
+    const roomBtns = (AppState.rooms || []).map(function(room) {
+        const safeRoom = room.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        return `<button class="room-select-btn"
+                 onclick="selectRoomForPlacement('${safeRoom}')"
+                 style="padding:0.4rem 0.8rem;background:rgba(255,255,255,0.15);
+                        border:1px solid rgba(255,255,255,0.3);color:white;
+                        border-radius:20px;font-size:0.8rem;cursor:pointer;
+                        white-space:nowrap;flex-shrink:0;transition:background 0.15s;">
+            ${room}
+         </button>`;
+    }).join('');
+
+    el.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+            <span style="font-weight:600;font-size:0.85rem;">\ud83d\udccc ${short}</span>
+            <button onclick="cancelTapToPlace()"
+                    style="background:rgba(255,255,255,0.2);border:none;color:white;
+                           border-radius:50%;width:22px;height:22px;cursor:pointer;
+                           font-size:0.8rem;line-height:1;flex-shrink:0;">\u2715</button>
+        </div>
+        <div style="font-size:0.75rem;opacity:0.8;margin-bottom:0.5rem;">\ub8f8\uc744 \uc120\ud0dd\ud558\uc138\uc694</div>
+        <div style="display:flex;gap:0.4rem;overflow-x:auto;
+                    padding-bottom:2px;-webkit-overflow-scrolling:touch;">
+            ${roomBtns}
+        </div>
+    `;
+
     el.style.cssText = [
         'position:fixed',
-        'bottom:calc(var(--tabbar-h,64px) + 12px)',
-        'left:50%',
-        'transform:translateX(-50%)',
+        'bottom:calc(var(--tabbar-h,64px) + 8px)',
+        'left:8px', 'right:8px',
         'background:#2E1A47',
         'color:white',
-        'padding:0.6rem 1rem',
-        'border-radius:20px',
-        'font-size:0.82rem',
+        'padding:0.75rem 1rem',
+        'border-radius:16px',
         'z-index:9000',
-        'display:flex',
-        'align-items:center',
-        'gap:0.6rem',
+        'box-shadow:0 4px 20px rgba(46,26,71,0.5)',
+    ].join(';');
+
+    document.body.appendChild(el);
+    _placementToastEl = el;
+}
+
+/**
+ * 2단계 토스트: 룸 선택 완료 후 간소화 안내
+ */
+function _showSimpleToast(title, room) {
+    _hidePlacementToast();
+    const el = document.createElement('div');
+    el.id = 'tapPlacementToast';
+    const short = (title || '').length > 16 ? title.slice(0, 16) + '\u2026' : (title || '');
+    el.innerHTML = `
+        <span>\ud83d\udccc <b>${short}</b> \u2192 ${room} \uc2dc\uac04\ub300\ub97c \ud0ed\ud558\uc138\uc694</span>
+        <button onclick="cancelTapToPlace()"
+                style="background:rgba(255,255,255,0.2);border:none;color:white;
+                       border-radius:50%;width:22px;height:22px;cursor:pointer;
+                       font-size:0.8rem;flex-shrink:0;line-height:1;">\u2715</button>`;
+    el.style.cssText = [
+        'position:fixed',
+        'bottom:calc(var(--tabbar-h,64px) + 8px)',
+        'left:50%', 'transform:translateX(-50%)',
+        'background:#2E1A47', 'color:white',
+        'padding:0.6rem 1rem', 'border-radius:20px',
+        'font-size:0.82rem', 'z-index:9000',
+        'display:flex', 'align-items:center', 'gap:0.6rem',
         'box-shadow:0 4px 20px rgba(46,26,71,0.45)',
-        'max-width:90vw',
-        'white-space:nowrap',
-        'overflow:hidden'
+        'max-width:90vw', 'white-space:nowrap',
     ].join(';');
     document.body.appendChild(el);
     _placementToastEl = el;
@@ -1812,6 +1896,45 @@ function _hidePlacementToast() {
     if (_placementToastEl) { _placementToastEl.remove(); _placementToastEl = null; }
     const ex = document.getElementById('tapPlacementToast');
     if (ex) ex.remove();
+}
+
+/**
+ * 선택된 룸 열만 강조, 나머지 흐리게
+ */
+function _highlightRoomColumn(selectedRoom) {
+    document.querySelectorAll('.schedule-table th[data-room]').forEach(function(th) {
+        th.style.opacity = th.dataset.room === selectedRoom ? '1' : '0.3';
+    });
+    document.querySelectorAll('.schedule-cell[data-room]').forEach(function(cell) {
+        const isSelected = cell.dataset.room === selectedRoom;
+        cell.style.opacity = isSelected ? '1' : '0.35';
+        cell.style.pointerEvents = isSelected ? 'auto' : 'none';
+    });
+}
+
+function _clearRoomHighlight() {
+    document.querySelectorAll('.schedule-table th[data-room]')
+        .forEach(function(th) { th.style.opacity = ''; });
+    document.querySelectorAll('.schedule-cell[data-room]').forEach(function(cell) {
+        cell.style.opacity = '';
+        cell.style.pointerEvents = '';
+    });
+}
+
+/**
+ * 선택 룸의 빈 셀에 배치 힌트 표시
+ */
+function _showPlacementHints(room) {
+    document.querySelectorAll('.schedule-cell[data-room]').forEach(function(cell) {
+        if (cell.dataset.room === room && !cell.querySelector('.scheduled-lecture')) {
+            cell.classList.add('placement-hint');
+        }
+    });
+}
+
+function _clearPlacementHints() {
+    document.querySelectorAll('.placement-hint')
+        .forEach(function(el) { el.classList.remove('placement-hint'); });
 }
 
 console.log('✅ schedule.js 로드 완료');

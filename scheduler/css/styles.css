@@ -2041,3 +2041,37 @@ input[type="radio"]    { accent-color: var(--primary); cursor: pointer; }
         padding-bottom: env(safe-area-inset-bottom);
     }
 }
+
+/* ====================================================
+   모바일 탭투플레이스 UX v2 (룸 선택 → 배치 힌트)
+   ==================================================== */
+
+/* 배치 힌트 셀 - 선택된 룸의 빈 슬롯 강조 */
+.schedule-cell.placement-hint {
+    background: rgba(255, 107, 157, 0.12) !important;
+    border: 1.5px dashed #FF6B9D !important;
+    position: relative;
+}
+.schedule-cell.placement-hint::after {
+    content: '📌';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.7rem;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* 룸 선택 버튼 active 피드백 */
+.room-select-btn:active {
+    background: rgba(255, 255, 255, 0.35) !important;
+    transform: scale(0.96);
+}
+
+/* 탭 선택된 강의 하이라이트 */
+.lecture-item.tap-selected {
+    border: 2px solid #FF6B9D !important;
+    background: rgba(255, 107, 157, 0.08) !important;
+    box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.2);
+}
