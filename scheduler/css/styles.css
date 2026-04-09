@@ -1954,3 +1954,90 @@ input[type="radio"]    { accent-color: var(--primary); cursor: pointer; }
     background: #e74c3c;
     color: white;
 }
+
+/* ============================================
+   모바일 UX 추가 개선
+   ============================================ */
+
+/* 드래그 중 스크롤 방지 */
+.schedule-table-wrapper {
+    touch-action: pan-x pan-y;
+}
+.lecture-item[draggable="true"],
+.scheduled-lecture[draggable="true"] {
+    touch-action: none;
+}
+
+/* 강의추가 폼 - 모바일 키보드 올라올 때 스크롤 */
+@media (max-width: 767px) {
+    #tab-add {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* 입력창 포커스 시 확대 방지 (iOS) */
+    input[type="text"],
+    input[type="email"],
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+
+    /* 강의추가 버튼 모바일 크게 */
+    #addLectureBtn {
+        min-height: 52px;
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    /* 하단 탭바 레이블 크기 */
+    .tab-label {
+        font-size: 0.65rem;
+    }
+
+    /* 시간표 셀 터치 영역 */
+    .schedule-cell {
+        min-height: 32px;
+    }
+
+    /* 강의목록 아이템 터치 영역 */
+    .lecture-item {
+        min-height: 52px;
+        padding: 0.6rem 0.75rem;
+    }
+
+    /* 연자 아이템 터치 영역 */
+    .speaker-item {
+        min-height: 52px;
+    }
+
+    /* 모달 모바일 최적화 */
+    .modal-content {
+        max-height: 85dvh;
+        max-height: 85vh;
+        border-radius: 20px 20px 0 0;
+        margin: auto 0 0 0;
+        width: 100%;
+    }
+
+    /* 설정 탭 카드 크기 */
+    .settings-card {
+        min-height: 64px;
+        font-size: 0.85rem;
+    }
+
+    /* 탭투플레이스 토스트 모바일 */
+    .placement-toast {
+        bottom: calc(var(--tabbar-h) + 8px);
+        left: 8px;
+        right: 8px;
+        font-size: 0.85rem;
+    }
+}
+
+/* iOS Safari 하단 안전영역 */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .bottom-tabbar {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+}
