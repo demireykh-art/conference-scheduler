@@ -641,12 +641,14 @@ window.updateScheduleDisplay = function() {
         }
 
         lectureDiv.innerHTML = `
-            <button class="remove-btn" onclick="event.stopPropagation(); removeLecture('${key}')">×</button>
-            <div class="lecture-title-display" style="color: #333;">${titleDisplay}</div>
-            <div class="lecture-meta-display">
-                ${metaDisplay}
+            <div class="lecture-card-inner">
+                <div class="lecture-card-content">
+                    <div class="lecture-title-display">${titleDisplay}</div>
+                    <div class="lecture-meta-display">${metaDisplay}</div>
+                    ${sponsorLine}
+                </div>
+                <button class="remove-btn" onclick="event.stopPropagation(); removeLecture('${key}')" title="삭제">×</button>
             </div>
-            ${sponsorLine}
         `;
 
         lectureDiv.addEventListener('dragstart', handleScheduleDragStart);
