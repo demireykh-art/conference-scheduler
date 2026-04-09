@@ -155,15 +155,15 @@
                         <span id="pcLectureCount" style="font-size:0.75rem;color:var(--text-light);margin-left:auto;"></span>
                     </div>
                     <div class="lecture-sidebar-filters">
-                        <input type="text" id="pcLectureSearch"
+                        <input type="text"
                             placeholder="🔍 검색..."
                             style="width:100%;padding:0.4rem 0.6rem;border:1px solid var(--border);border-radius:8px;font-size:0.82rem;"
-                            oninput="filterLecturesBySearch()"
-                            onfocus="document.getElementById('lectureSearchInput') && (document.getElementById('lectureSearchInput').value=this.value)">
+                            id="lectureSearchInput"
+                            oninput="filterLecturesBySearch()">
                         <div style="display:flex;gap:0.3rem;margin-top:0.4rem;flex-wrap:wrap;">
-                            <button class="filter-chip active" onclick="toggleQuickFilter('')" id="pcFilterAll">전체</button>
-                            <button class="filter-chip" onclick="toggleQuickFilter('unscheduled')" id="pcFilterUnscheduled">미배치</button>
-                            <button class="filter-chip" onclick="toggleQuickFilter('noSpeaker')" id="pcFilterNoSpeaker">미정</button>
+                            <button class="filter-chip active" id="filterAllBtn" onclick="toggleQuickFilter('all')">전체</button>
+                            <button class="filter-chip" id="filterUnscheduledBtn" onclick="toggleQuickFilter('unscheduled')">미배치</button>
+                            <button class="filter-chip" id="filterNoSpeakerBtn" onclick="toggleQuickFilter('noSpeaker')">미정</button>
                         </div>
                     </div>
                     <div class="lecture-sidebar-body">
@@ -1245,9 +1245,6 @@
         if (tabName === 'lectures' && typeof window.updateLectureList === 'function') {
             window.updateLectureList();
         }
-        if (tabName === 'schedule' && typeof window._syncPcLectureList === 'function') {
-            setTimeout(window._syncPcLectureList, 100);
-        }
     }
 
     // ── 초기 탭 활성화 (DOMContentLoaded) ──
@@ -1453,17 +1450,35 @@
 
 
     <script>
-    // updateLectureList 후 PC 사이드바 자동 동기화
+    // 모바일 강의목록 탭: lectureList(사이드바) 내용을 lectureListMobile에 미러링
     document.addEventListener('DOMContentLoaded', function() {
         const origUpdate = window.updateLectureList;
         if (origUpdate) {
             window.updateLectureList = function() {
                 origUpdate.apply(this, arguments);
-                setTimeout(() => {
-                    if (typeof window._syncPcLectureList === 'function') {
-                        window._syncPcLectureList();
-                    }
-                }, 50);
+                // 모바일 탭용 목록 업데이트
+                const sidebar = document.getElementById('lectureList');
+                const mobile  = document.getElementById('lectureListMobile');
+                if (sidebar && mobile) {
+                    mobile.innerHTML = sidebar.innerHTML;
+                    // 이벤트 재연결 (드래그)
+                    mobile.querySelectorAll('.lecture-item').forEach(item => {
+                        item.addEventListener('dragstart', function(e) {
+                            if (typeof window.handleDragStart === 'function') window.handleDragStart(e);
+                        });
+                        item.addEventListener('dragend', function(e) {
+                            if (typeof window.handleDragEnd === 'function') window.handleDragEnd(e);
+                        });
+                        item.addEventListener('dblclick', function() {
+                            const id = this.dataset.lectureId;
+                            if (id && typeof window.openEditModal === 'function') window.openEditModal(id);
+                        });
+                    });
+                }
+                // 강의수 표시
+                const count = sidebar ? sidebar.querySelectorAll('.lecture-item').length : 0;
+                const countEl = document.getElementById('pcLectureCount');
+                if (countEl) countEl.textContent = count + '개';
             };
         }
     });
