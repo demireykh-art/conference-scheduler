@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>오프라인 - 학술대회 스케줄러</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+      background: #f0f2f5;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 48px 40px;
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    .icon { font-size: 64px; margin-bottom: 20px; }
+    h1 { font-size: 22px; color: #1e293b; margin-bottom: 10px; }
+    p  { font-size: 14px; color: #64748b; line-height: 1.6; margin-bottom: 28px; }
+    .retry-btn {
+      display: inline-block;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+      padding: 12px 32px;
+      border-radius: 8px;
+      font-size: 15px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity .2s;
+    }
+    .retry-btn:hover { opacity: .85; }
+    .status {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📵</div>
+    <h1>인터넷 연결 없음</h1>
+    <p>현재 오프라인 상태입니다.<br>인터넷 연결을 확인한 후 다시 시도해주세요.<br><br>캐시된 데이터는 연결 복구 후 자동으로 동기화됩니다.</p>
+    <button class="retry-btn" onclick="location.reload()">🔄 다시 시도</button>
+    <div class="status" id="status">연결 상태 확인 중...</div>
+  </div>
+  <script>
+    function updateStatus() {
+      document.getElementById('status').textContent =
+        navigator.onLine ? '🌐 온라인 상태 감지됨 — 페이지를 새로고침하세요.' : '📵 오프라인';
+    }
+    updateStatus();
+    window.addEventListener('online',  updateStatus);
+    window.addEventListener('offline', updateStatus);
+
+    // 온라인 복구 시 자동 리로드
+    window.addEventListener('online', () => {
+      setTimeout(() => location.reload(), 1000);
+    });
+  </script>
+</body>
+</html>
