@@ -1515,6 +1515,8 @@ body {
     .bottom-tabbar { display: none; }
     .app-layout { bottom: 0; }
     .side-nav { display: flex; }
+    /* PC에서 강의목록 사이드바 표시 */
+    .lecture-sidebar { display: flex; flex-direction: column; }
 
     /* PC: 시간표 탭에서 강의목록 사이드바 함께 표시 */
     #tab-schedule {
@@ -1859,9 +1861,9 @@ input[type="radio"]    { accent-color: var(--primary); cursor: pointer; }
 
 
 
-/* PC 강의목록 사이드바 모바일 숨김 */
+/* 강의목록 사이드바: 기본 숨김 (모바일) */
 .lecture-sidebar { display: none; }
-.schedule-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.schedule-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 
 /* 필터 칩 */
 .filter-chip {
