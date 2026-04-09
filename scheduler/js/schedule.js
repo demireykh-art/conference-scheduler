@@ -1070,6 +1070,42 @@ window.handleDrop = function(e) {
                 return;
             }
             
+            // 동일 시간대 다른 룸 중복 배치 경고 (confirm)
+            const draggedSpeaker = (AppState.draggedLecture.speakerKo || '').trim();
+            const draggedAffil  = (AppState.draggedLecture.affiliation || '').trim();
+            if (draggedSpeaker && draggedSpeaker !== '미정') {
+                const dragStartMin = timeToMinutes(time);
+                const dragEndMin   = dragStartMin + (AppState.draggedLecture.duration || 15);
+
+                for (const [sk, sv] of Object.entries(AppState.schedule)) {
+                    if (AppState.draggedScheduleKey && sk === AppState.draggedScheduleKey) continue;
+                    const existSpeaker = (sv.speakerKo || '').trim();
+                    const existAffil   = (sv.affiliation || '').trim();
+                    if (existSpeaker !== draggedSpeaker || existAffil !== draggedAffil) continue;
+
+                    const existRoom = sk.substring(6);
+                    if (normalizeRoomName(existRoom) === normalizeRoomName(normalizedRoom)) continue; // 같은 룸이면 무시
+
+                    const existTime    = sk.substring(0, 5);
+                    const existStart   = timeToMinutes(existTime);
+                    const existEnd     = existStart + (sv.duration || 15);
+
+                    // 시간 겹침 (이동시간 무관, 순수 overlap 만 체크)
+                    if (dragStartMin < existEnd && dragEndMin > existStart) {
+                        const confirmed = confirm(
+                            `⚠️ ${draggedSpeaker}이(가) 같은 시간에 [${existRoom}]에 배치되어 있습니다.\n계속 배치하시겠습니까?`
+                        );
+                        if (!confirmed) {
+                            AppState.draggedScheduleKey = null;
+                            AppState.draggedLecture     = null;
+                            AppState.draggedIsBreak     = false;
+                            return;
+                        }
+                        break; // 하나만 확인하면 충분
+                    }
+                }
+            }
+
             // 연자 총 활동 시간 체크 (2시간 제한) - 별표 룸에서만 적용
             const speakerName = AppState.draggedLecture.speakerKo;
             if (speakerName) {
