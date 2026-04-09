@@ -614,16 +614,16 @@ window.updateScheduleDisplay = function() {
                 ? `<span style="font-size:0.55rem;background:#f0f0f0;color:#666;border-radius:3px;padding:0 3px;margin-left:2px;">+${speakerNames.length - 1}</span>`
                 : '';
             
-            metaDisplay = \`
+            metaDisplay = `
                 <div style="display:flex;align-items:center;gap:2px;flex-wrap:wrap;">
-                    \${photoHtml}
-                    <span class="speaker-name" style="color:#333;font-size:0.65rem;">\${speaker || '미정'}\${multiSpeakerBadge}</span>
+                    ${photoHtml}
+                    <span class="speaker-name" style="color:#333;font-size:0.65rem;">${speaker || '미정'}${multiSpeakerBadge}</span>
                 </div>
                 <div style="display:flex;align-items:center;gap:3px;margin-top:1px;">
-                    <span style="font-size:0.6rem;color:#888;background:#f5f5f5;border-radius:3px;padding:0 3px;">\${startTime}~\${endTime}</span>
-                    <span style="font-size:0.6rem;color:#aaa;">\${duration}분</span>
+                    <span style="font-size:0.6rem;color:#888;background:#f5f5f5;border-radius:3px;padding:0 3px;">${startTime}~${endTime}</span>
+                    <span style="font-size:0.6rem;color:#aaa;">${duration}분</span>
                 </div>
-            \`;
+            `;
         }
         
         // 파트너사/제품명 별도 줄로 표시
