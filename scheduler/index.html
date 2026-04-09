@@ -1257,6 +1257,143 @@
     })();
     </script>
 
+    </script>
+
+    <!-- 강의추가 UX 개선 스크립트 -->
+    <script>
+    // ── 1. 강의추가 성공 피드백 (custom event 방식) ──
+    (function() {
+        // 토스트 DOM 생성
+        const toast = document.createElement('div');
+        toast.className = 'add-success-toast';
+        toast.innerHTML = `
+            <span class="check-circle">
+                <svg width="13" height="10" viewBox="0 0 13 10" fill="none"
+                     xmlns="http://www.w3.org/2000/svg">
+                    <polyline points="1.5,5 5,8.5 11.5,1.5"
+                              stroke="white" stroke-width="2.2"
+                              stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </span>
+            <span>추가됨</span>
+        `;
+        document.body.appendChild(toast);
+
+        let toastTimer = null;
+        function showAddToast() {
+            // 체크 애니메이션 재실행을 위해 DOM 재삽입
+            toast.classList.remove('show');
+            void toast.offsetWidth; // reflow
+            // check-circle 재애니메이션
+            const cc = toast.querySelector('.check-circle');
+            cc.style.animation = 'none'; void cc.offsetWidth;
+            cc.style.animation = '';
+            const svg = toast.querySelector('svg');
+            svg.style.animation = 'none'; void svg.offsetWidth;
+            svg.style.animation = '';
+
+            toast.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+        }
+
+        // lectures.js의 console.log('강의가 추가되었습니다.') 직후
+        // dispatchEvent로 신호를 받음 — lectures.js 수정 없이 감지
+        // 방법: console.log 오버라이드(target only)
+        const _origLog = console.log.bind(console);
+        console.log = function(...args) {
+            _origLog(...args);
+            if (args[0] === '강의가 추가되었습니다.') {
+                // sessionStorage 폼 내용도 초기화
+                ['category','titleKo','titleEn','speakerKo','speakerEn',
+                 'affiliation','lectureDuration'].forEach(k => sessionStorage.removeItem('addForm_' + k));
+                // 카테고리 select 피드백도 초기화
+                const sel = document.getElementById('category');
+                if (sel) { sel.classList.remove('has-value'); sel.style.cssText = ''; }
+                showAddToast();
+            }
+        };
+    })();
+
+    // ── 2. 분류 select 시각 피드백 ──
+    document.addEventListener('DOMContentLoaded', function() {
+        const catSel = document.getElementById('category');
+        if (!catSel) return;
+
+        function applyCategoryStyle(sel) {
+            const val = sel.value;
+            if (!val) {
+                sel.classList.remove('has-value');
+                sel.style.borderColor = '';
+                sel.style.background = '';
+                sel.style.color = '';
+                return;
+            }
+            const colors = (window.AppConfig && window.AppConfig.categoryColors) || {};
+            const color = colors[val] || '#757575';
+            sel.classList.add('has-value');
+            sel.style.borderColor = color;
+            sel.style.background = color + '18'; // 10% opacity hex
+            sel.style.color = color;
+        }
+
+        catSel.addEventListener('change', function() {
+            applyCategoryStyle(this);
+        });
+
+        // 초기 복원 후에도 적용하도록 MutationObserver로 옵션 로드 감지
+        const obs = new MutationObserver(() => {
+            if (catSel.value) applyCategoryStyle(catSel);
+        });
+        obs.observe(catSel, { childList: true });
+    });
+
+    // ── 3 & 4. sessionStorage 유지 + 탭 진입 시 복원 ──
+    (function() {
+        const FIELDS = ['category','titleKo','titleEn','speakerKo',
+                        'speakerEn','affiliation','lectureDuration'];
+        const PREFIX = 'addForm_';
+
+        function saveFormToSession() {
+            FIELDS.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) sessionStorage.setItem(PREFIX + id, el.value);
+            });
+        }
+
+        function restoreFormFromSession() {
+            FIELDS.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const saved = sessionStorage.getItem(PREFIX + id);
+                if (saved !== null) el.value = saved;
+            });
+            // 카테고리 복원 후 시각 피드백 재적용
+            const catSel = document.getElementById('category');
+            if (catSel && catSel.value) catSel.dispatchEvent(new Event('change'));
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // 이벤트 바인딩 (폼 필드 input/change → 세션 저장)
+            FIELDS.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const evt = (el.tagName === 'SELECT') ? 'change' : 'input';
+                el.addEventListener(evt, saveFormToSession);
+            });
+
+            // switchTab 확장: 'add' 탭 진입 시 복원
+            const _origSwitch = window.switchTab;
+            window.switchTab = function(tabName) {
+                _origSwitch(tabName);
+                if (tabName === 'add') {
+                    restoreFormFromSession();
+                }
+            };
+        });
+    })();
+    </script>
+
     <!-- 햄버거 메뉴 -->
     <script>
     window.toggleHamburgerMenu = function() {
