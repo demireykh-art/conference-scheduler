@@ -2044,41 +2044,53 @@ function _showScheduledLectureMenu(key, lecture) {
     document.getElementById('mobileLectureMenu')?.remove();
     document.getElementById('mobileLectureMenuOverlay')?.remove();
 
+    window._mobileMenuLecture = lecture;
+    window._mobileMenuKey = key;
+
+    const short = (lecture.titleKo || '').slice(0, 24);
+
     const menu = document.createElement('div');
     menu.id = 'mobileLectureMenu';
-    const short = (lecture.titleKo || '').slice(0, 24);
     menu.innerHTML = `
         <div class="mob-menu-title">${short}</div>
-        <button class="mob-menu-btn" onclick="
-            document.getElementById('mobileLectureMenu')?.remove();
-            document.getElementById('mobileLectureMenuOverlay')?.remove();
-            openEditModal(${lecture.id});">
-            ✏️ 수정
-        </button>
-        <button class="mob-menu-btn mob-menu-danger" onclick="
-            document.getElementById('mobileLectureMenu')?.remove();
-            document.getElementById('mobileLectureMenuOverlay')?.remove();
-            removeLecture('${key}');">
-            🗑️ 시간표에서 제거
-        </button>
-        <button class="mob-menu-btn mob-menu-cancel" onclick="
-            document.getElementById('mobileLectureMenu')?.remove();
-            document.getElementById('mobileLectureMenuOverlay')?.remove();">
-            취소
-        </button>`;
+        <button class="mob-menu-btn" id="mobBtnSchedEdit">✏️ 수정</button>
+        <button class="mob-menu-btn mob-menu-danger" id="mobBtnSchedRemove">🗑️ 시간표에서 제거</button>
+        <button class="mob-menu-btn mob-menu-cancel" id="mobBtnSchedCancel">취소</button>
+    `;
     menu.style.cssText = [
-        'position:fixed', 'bottom:calc(var(--tabbar-h,64px) + 8px)',
-        'left:12px', 'right:12px', 'background:white',
-        'border-radius:16px', 'padding:1rem', 'z-index:9500',
+        'position:fixed',
+        'bottom:calc(var(--tabbar-h,64px) + 8px)',
+        'left:12px', 'right:12px',
+        'background:white', 'border-radius:16px',
+        'padding:1rem', 'z-index:9500',
         'box-shadow:0 -4px 30px rgba(0,0,0,0.2)',
         'display:flex', 'flex-direction:column', 'gap:0.25rem'
     ].join(';');
     document.body.appendChild(menu);
 
+    function closeSchedMenu() {
+        document.getElementById('mobileLectureMenu')?.remove();
+        document.getElementById('mobileLectureMenuOverlay')?.remove();
+        window._mobileMenuLecture = null;
+        window._mobileMenuKey = null;
+    }
+
+    document.getElementById('mobBtnSchedEdit').addEventListener('click', function() {
+        const lec = window._mobileMenuLecture;
+        closeSchedMenu();
+        if (lec && typeof openEditModal === 'function') openEditModal(lec.id);
+    });
+    document.getElementById('mobBtnSchedRemove').addEventListener('click', function() {
+        const k = window._mobileMenuKey;
+        closeSchedMenu();
+        if (k && typeof removeLecture === 'function') removeLecture(k);
+    });
+    document.getElementById('mobBtnSchedCancel').addEventListener('click', closeSchedMenu);
+
     const ov = document.createElement('div');
     ov.id = 'mobileLectureMenuOverlay';
     ov.style.cssText = 'position:fixed;inset:0;z-index:9499;background:rgba(0,0,0,0.3);';
-    ov.onclick = () => { menu.remove(); ov.remove(); };
+    ov.addEventListener('click', closeSchedMenu);
     document.body.insertBefore(ov, menu);
 }
 
