@@ -803,8 +803,9 @@ window.autoPlacePanelDiscussions = function() {
  * 드래그 시작 (강의 목록에서)
  */
 window.handleDragStart = function(e) {
-    const lectureId = this.dataset.lectureId;
-    const isBreak = this.dataset.isBreak === 'true';
+    const el = e.currentTarget || this;
+    const lectureId = el.dataset.lectureId;
+    const isBreak = el.dataset.isBreak === 'true';
     
     // Break 항목이면 DEFAULT_BREAK_ITEMS에서 찾기
     if (isBreak) {
@@ -832,7 +833,8 @@ window.handleDragStart = function(e) {
  * 드래그 종료 (강의 목록에서)
  */
 window.handleDragEnd = function(e) {
-    this.classList.remove('dragging');
+    const el = e.currentTarget || this;
+    el.classList.remove('dragging');
     document.querySelector('.schedule-grid').classList.remove('dragging');
 
     const tooltip = document.getElementById('dragTooltip');
