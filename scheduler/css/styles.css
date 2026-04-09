@@ -1516,7 +1516,55 @@ body {
     .app-layout { bottom: 0; }
     .side-nav { display: flex; }
 
-    #tab-schedule { flex-direction: row; }
+    /* PC: 시간표 탭에서 강의목록 사이드바 함께 표시 */
+    #tab-schedule {
+        flex-direction: row;
+        overflow: hidden;
+    }
+
+    /* PC 강의목록 사이드바 (시간표 탭 내부) */
+    .lecture-sidebar {
+        width: 300px;
+        min-width: 260px;
+        max-width: 340px;
+        flex-shrink: 0;
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--white);
+        resize: horizontal;
+    }
+    .lecture-sidebar-header {
+        padding: 0.75rem 1rem;
+        font-weight: 700;
+        font-size: 0.9rem;
+        color: var(--primary);
+        border-bottom: 1px solid var(--border);
+        background: var(--bg2);
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .lecture-sidebar-body {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 0.5rem;
+    }
+    .lecture-sidebar-filters {
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+    }
+    /* 시간표 영역 */
+    .schedule-area {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
 
     .header-title { font-size: 1.1rem; }
     .backup-info, .sync-label { display: inline; }
@@ -1810,3 +1858,23 @@ input[type="radio"]    { accent-color: var(--primary); cursor: pointer; }
 }
 
 
+
+/* PC 강의목록 사이드바 모바일 숨김 */
+.lecture-sidebar { display: none; }
+.schedule-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* 필터 칩 */
+.filter-chip {
+    padding: 0.2rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    background: white;
+    cursor: pointer;
+    color: var(--text-light);
+}
+.filter-chip.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
