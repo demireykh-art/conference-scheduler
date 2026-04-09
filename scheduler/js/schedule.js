@@ -669,6 +669,28 @@ window.updateScheduleDisplay = function() {
             }
         });
 
+        // 모바일 롱프레스 → 수정/삭제 액션시트
+        (function() {
+            let _lpTimer = null;
+            let _lpMoved = false;
+            lectureDiv.addEventListener('touchstart', function(e) {
+                _lpMoved = false;
+                _lpTimer = setTimeout(() => {
+                    if (!_lpMoved) {
+                        e.preventDefault();
+                        _showScheduledLectureActions(key, lecture, isBreak);
+                    }
+                }, 500);
+            }, { passive: true });
+            lectureDiv.addEventListener('touchmove', function() {
+                _lpMoved = true;
+                clearTimeout(_lpTimer);
+            }, { passive: true });
+            lectureDiv.addEventListener('touchend', function() {
+                clearTimeout(_lpTimer);
+            }, { passive: true });
+        })();
+
         startCell.appendChild(lectureDiv);
     });
 };
@@ -1937,4 +1959,76 @@ function _clearPlacementHints() {
         .forEach(function(el) { el.classList.remove('placement-hint'); });
 }
 
+/**
+ * 모바일: 배치된 강의 롱프레스 → 액션시트 (수정/삭제)
+ */
+function _showScheduledLectureActions(key, lecture, isBreak) {
+    // 기존 액션시트 제거
+    const existing = document.getElementById('schedLectureActionSheet');
+    if (existing) existing.remove();
+
+    const title = (AppState.currentLanguage === 'en' && lecture.titleEn)
+        ? lecture.titleEn : lecture.titleKo;
+    const short = title.length > 22 ? title.slice(0, 22) + '…' : title;
+
+    const sheet = document.createElement('div');
+    sheet.id = 'schedLectureActionSheet';
+
+    const editBtn = isBreak
+        ? `<button onclick="_schedActionEdit('${key}', true)" style="${_actionBtnStyle('#f0f4ff','#1976D2')}">⏱️ 시간 수정</button>`
+        : `<button onclick="_schedActionEdit('${key}', false)" style="${_actionBtnStyle('#f0f4ff','#1976D2')}">✏️ 강의 수정</button>`;
+
+    sheet.innerHTML = `
+        <div style="font-weight:700;font-size:0.9rem;padding:0.5rem 0 0.75rem;border-bottom:1px solid #eee;margin-bottom:0.5rem;color:#333;">
+            ${short}
+        </div>
+        ${editBtn}
+        <button onclick="_schedActionDelete('${key}')" style="${_actionBtnStyle('#fff0f0','#e53935')}">🗑️ 배치 삭제</button>
+        <button onclick="document.getElementById('schedLectureActionSheet').remove()" style="${_actionBtnStyle('#f5f5f5','#888')}">취소</button>
+    `;
+    sheet.style.cssText = [
+        'position:fixed', 'bottom:0', 'left:0', 'right:0',
+        'background:white', 'border-radius:20px 20px 0 0',
+        'padding:1rem 1rem calc(1rem + env(safe-area-inset-bottom,0px))',
+        'z-index:9500', 'box-shadow:0 -4px 24px rgba(0,0,0,0.18)',
+        'display:flex', 'flex-direction:column', 'gap:0.5rem',
+    ].join(';');
+
+    // 배경 오버레이
+    const overlay = document.createElement('div');
+    overlay.id = 'schedLectureActionOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:9499;';
+    overlay.onclick = () => { sheet.remove(); overlay.remove(); };
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(sheet);
+}
+
+function _actionBtnStyle(bg, color) {
+    return `width:100%;padding:0.85rem;background:${bg};color:${color};border:none;border-radius:12px;font-size:0.95rem;font-weight:600;cursor:pointer;text-align:left;`;
+}
+
+window._schedActionEdit = function(key, isBreak) {
+    const sheet = document.getElementById('schedLectureActionSheet');
+    const overlay = document.getElementById('schedLectureActionOverlay');
+    if (sheet) sheet.remove();
+    if (overlay) overlay.remove();
+    if (isBreak) {
+        const lecture = AppState.schedule[key];
+        if (lecture) openBreakDurationModal(key, lecture);
+    } else {
+        const lecture = AppState.schedule[key];
+        if (lecture) openEditModal(lecture.id);
+    }
+};
+
+window._schedActionDelete = function(key) {
+    const sheet = document.getElementById('schedLectureActionSheet');
+    const overlay = document.getElementById('schedLectureActionOverlay');
+    if (sheet) sheet.remove();
+    if (overlay) overlay.remove();
+    if (typeof removeLecture === 'function') removeLecture(key);
+};
+
 console.log('✅ schedule.js 로드 완료');
+
