@@ -668,12 +668,47 @@ function _openCropDrag(imageSrc) {
         _applyDragCrop();
     };
 
+    // 마우스 드래그
     let drag=false, mx,my,ox,oy;
     wrapper.onmousedown = function(e) { drag=true; mx=e.clientX; my=e.clientY; ox=window._crop.x; oy=window._crop.y; e.preventDefault(); };
     window._cmm = function(e) { if(!drag) return; window._crop.x=ox+(e.clientX-mx); window._crop.y=oy+(e.clientY-my); _applyDragCrop(); };
     window._cmu = function()  { drag=false; };
     document.addEventListener('mousemove', window._cmm);
     document.addEventListener('mouseup',   window._cmu);
+
+    // 터치 드래그 + 핀치줌 (모바일에서도 드래그크롭 사용 시)
+    let t0x,t0y,t0tx,t0ty, pinch0=0, pinchScale0=1;
+    wrapper.ontouchstart = function(e) {
+        if (e.touches.length === 1) {
+            t0x=e.touches[0].clientX; t0y=e.touches[0].clientY;
+            t0tx=window._crop.x; t0ty=window._crop.y;
+        } else if (e.touches.length === 2) {
+            const dx=e.touches[0].clientX-e.touches[1].clientX;
+            const dy=e.touches[0].clientY-e.touches[1].clientY;
+            pinch0=Math.sqrt(dx*dx+dy*dy);
+            pinchScale0=window._crop.scale;
+        }
+        e.preventDefault();
+    };
+    wrapper.ontouchmove = function(e) {
+        const c=window._crop;
+        if (e.touches.length === 1) {
+            c.x=t0tx+(e.touches[0].clientX-t0x);
+            c.y=t0ty+(e.touches[0].clientY-t0y);
+        } else if (e.touches.length === 2) {
+            const dx=e.touches[0].clientX-e.touches[1].clientX;
+            const dy=e.touches[0].clientY-e.touches[1].clientY;
+            const dist=Math.sqrt(dx*dx+dy*dy);
+            const prev=c.scale;
+            c.scale=pinchScale0*(dist/pinch0);
+            c.x=120-(120-c.x)*(c.scale/prev);
+            c.y=120-(120-c.y)*(c.scale/prev);
+            slider.value=Math.round((c.scale/c.baseScale)*100);
+        }
+        _applyDragCrop();
+        e.preventDefault();
+    };
+    wrapper.ontouchend = function() {};
 }
 
 function _applyDragCrop() {
