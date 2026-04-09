@@ -669,35 +669,34 @@ window.updateScheduleDisplay = function() {
             }
         });
 
-        // 모바일 롱프레스 → 수정/삭제 액션시트
+        // 모바일: 배치된 강의 탭 메뉴 (짧은 탭 → 메뉴, 롱프레스 → 진동)
         lectureDiv.style.webkitUserSelect = 'none';
         lectureDiv.style.userSelect = 'none';
         lectureDiv.style.webkitTouchCallout = 'none';
         lectureDiv.addEventListener('contextmenu', e => e.preventDefault());
-        (function() {
-            let _lpTimer = null;
-            let _lpMoved = false;
-            let _lpStartX = 0, _lpStartY = 0;
-            lectureDiv.addEventListener('touchstart', function(e) {
-                _lpMoved = false;
-                _lpStartX = e.touches[0].clientX;
-                _lpStartY = e.touches[0].clientY;
-                _lpTimer = setTimeout(() => {
-                    if (!_lpMoved) {
-                        if (navigator.vibrate) navigator.vibrate(30);
-                        _showScheduledLectureActions(key, lecture, isBreak);
-                    }
-                }, 500);
+        if (('ontouchstart' in window) || navigator.maxTouchPoints > 0) {
+            let tStart = 0, tY = 0, tMoved = false, tTimer = null;
+            lectureDiv.addEventListener('touchstart', e => {
+                tStart = Date.now(); tY = e.touches[0].clientY; tMoved = false;
+                tTimer = setTimeout(() => {
+                    if (!tMoved && navigator.vibrate) navigator.vibrate(40);
+                }, 400);
             }, { passive: true });
-            lectureDiv.addEventListener('touchmove', function(e) {
-                const dx = Math.abs(e.touches[0].clientX - _lpStartX);
-                const dy = Math.abs(e.touches[0].clientY - _lpStartY);
-                if (dx > 8 || dy > 8) { _lpMoved = true; clearTimeout(_lpTimer); }
+            lectureDiv.addEventListener('touchmove', e => {
+                if (Math.abs(e.touches[0].clientY - tY) > 5) {
+                    tMoved = true; clearTimeout(tTimer);
+                }
             }, { passive: true });
-            lectureDiv.addEventListener('touchend', function() {
-                clearTimeout(_lpTimer);
-            }, { passive: true });
-        })();
+            lectureDiv.addEventListener('touchend', e => {
+                clearTimeout(tTimer);
+                if (tMoved) return;
+                if (Date.now() - tStart < 400) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    _showScheduledLectureMenu(key, lecture);
+                }
+            }, { passive: false });
+        }
 
         startCell.appendChild(lectureDiv);
     });
@@ -2040,5 +2039,48 @@ window._schedActionDelete = function(key) {
     if (typeof removeLecture === 'function') removeLecture(key);
 };
 
-console.log('✅ schedule.js 로드 완료');
+// ── 모바일 탭 메뉴 (시간표 배치강의) ─────────────────────────────────────────
+function _showScheduledLectureMenu(key, lecture) {
+    document.getElementById('mobileLectureMenu')?.remove();
+    document.getElementById('mobileLectureMenuOverlay')?.remove();
+
+    const menu = document.createElement('div');
+    menu.id = 'mobileLectureMenu';
+    const short = (lecture.titleKo || '').slice(0, 24);
+    menu.innerHTML = `
+        <div class="mob-menu-title">${short}</div>
+        <button class="mob-menu-btn" onclick="
+            document.getElementById('mobileLectureMenu')?.remove();
+            document.getElementById('mobileLectureMenuOverlay')?.remove();
+            openEditModal(${lecture.id});">
+            ✏️ 수정
+        </button>
+        <button class="mob-menu-btn mob-menu-danger" onclick="
+            document.getElementById('mobileLectureMenu')?.remove();
+            document.getElementById('mobileLectureMenuOverlay')?.remove();
+            removeLecture('${key}');">
+            🗑️ 시간표에서 제거
+        </button>
+        <button class="mob-menu-btn mob-menu-cancel" onclick="
+            document.getElementById('mobileLectureMenu')?.remove();
+            document.getElementById('mobileLectureMenuOverlay')?.remove();">
+            취소
+        </button>`;
+    menu.style.cssText = [
+        'position:fixed', 'bottom:calc(var(--tabbar-h,64px) + 8px)',
+        'left:12px', 'right:12px', 'background:white',
+        'border-radius:16px', 'padding:1rem', 'z-index:9500',
+        'box-shadow:0 -4px 30px rgba(0,0,0,0.2)',
+        'display:flex', 'flex-direction:column', 'gap:0.25rem'
+    ].join(';');
+    document.body.appendChild(menu);
+
+    const ov = document.createElement('div');
+    ov.id = 'mobileLectureMenuOverlay';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9499;background:rgba(0,0,0,0.3);';
+    ov.onclick = () => { menu.remove(); ov.remove(); };
+    document.body.insertBefore(ov, menu);
+}
+
+console.log('✅ schedule.js 로드 완료 (모바일 터치 UX 재설계)');
 

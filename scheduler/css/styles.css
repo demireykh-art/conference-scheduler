@@ -2082,3 +2082,35 @@ input[type="radio"]    { accent-color: var(--primary); cursor: pointer; }
     user-select: none;
     -webkit-touch-callout: none;
 }
+
+/* 강의 아이템 터치 최적화 */
+.lecture-item {
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: pan-y;
+}
+
+/* 모바일 액션 메뉴 */
+.mob-menu-title {
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 0 0 0.75rem;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 0.5rem;
+    color: #2E1A47;
+}
+.mob-menu-btn {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    background: none;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    text-align: left;
+    cursor: pointer;
+    color: #2E1A47;
+    font-family: 'Noto Sans KR', sans-serif;
+}
+.mob-menu-btn:active { background: #f5f3fa; }
+.mob-menu-danger { color: #e74c3c !important; }
+.mob-menu-cancel { color: #888 !important; }
