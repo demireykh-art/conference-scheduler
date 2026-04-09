@@ -315,6 +315,14 @@ window.createScheduleTable = function() {
             cell.addEventListener('dragleave', handleDragLeave);
             cell.addEventListener('drop', handleDrop);
 
+            // 모바일 탭-투-플레이스: 선택된 강의를 이 셀에 배치
+            cell.addEventListener('touchend', function(e) {
+                if (!AppState.selectedLectureForPlacement) return;
+                e.preventDefault();
+                e.stopPropagation();
+                executeTapToPlace(this);
+            }, { passive: false });
+
             row.appendChild(cell);
         });
 
@@ -1652,5 +1660,114 @@ window.updateRoomManagerDropdowns = function() {
         }
     });
 };
+
+// ====================================================
+// 모바일 탭-투-플레이스 (tap-to-place)
+// ====================================================
+
+const _isMobileDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+/**
+ * 강의목록에서 강의를 탭 → 배치 모드 진입
+ * lectures.js의 touchend에서 호출
+ */
+window.selectLectureForPlacement = function(lecture, isBreak) {
+    if (!_isMobileDevice) return false;
+
+    // 동일 강의 재탭 → 취소
+    if (AppState.selectedLectureForPlacement &&
+        AppState.selectedLectureForPlacement.id === lecture.id) {
+        cancelTapToPlace();
+        return true;
+    }
+
+    AppState.selectedLectureForPlacement = lecture;
+    AppState.selectedLectureIsBreak = !!isBreak;
+
+    // 선택 하이라이트
+    document.querySelectorAll('.lecture-item').forEach(el => el.classList.remove('tap-selected'));
+    const el = document.querySelector(\`.lecture-item[data-lecture-id="\${lecture.id}"]\`);
+    if (el) el.classList.add('tap-selected');
+
+    // 하단 토스트
+    _showPlacementToast(lecture.titleKo);
+
+    // 시간표 탭으로 자동 이동
+    setTimeout(() => {
+        if (typeof switchTab === 'function') switchTab('schedule');
+    }, 280);
+
+    return true;
+};
+
+/**
+ * 배치 취소 (강의 재탭 또는 토스트 ✕ 버튼)
+ */
+window.cancelTapToPlace = function() {
+    AppState.selectedLectureForPlacement = null;
+    AppState.selectedLectureIsBreak = false;
+    document.querySelectorAll('.lecture-item').forEach(el => el.classList.remove('tap-selected'));
+    _hidePlacementToast();
+};
+
+/**
+ * 셀 탭 → handleDrop 로직 재사용하여 실제 배치
+ */
+window.executeTapToPlace = function(cell) {
+    const lecture = AppState.selectedLectureForPlacement;
+    if (!lecture) return;
+
+    // handleDrop이 this.dataset.time/room을 읽고 AppState.draggedLecture를 사용
+    AppState.draggedLecture = lecture;
+    AppState.draggedIsBreak = AppState.selectedLectureIsBreak || false;
+    AppState.draggedScheduleKey = null;
+
+    const lectureName = lecture.titleKo;
+
+    // handleDrop 재사용 (call로 this = cell 전달)
+    handleDrop.call(cell, { preventDefault: () => {}, stopPropagation: () => {} });
+
+    cancelTapToPlace();
+    Toast.success(\`📌 "\${lectureName}" 배치 완료!\`);
+};
+
+// ── 배치 중 토스트 ──
+let _placementToastEl = null;
+
+function _showPlacementToast(title) {
+    _hidePlacementToast();
+    const el = document.createElement('div');
+    el.id = 'tapPlacementToast';
+    const short = title.length > 22 ? title.slice(0, 22) + '…' : title;
+    el.innerHTML = \`<span>📌 <b>\${short}</b> 배치 중… 시간표에서 셀을 탭하세요</span>
+        <button onclick="cancelTapToPlace()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:0.8rem;flex-shrink:0;line-height:1;">✕</button>\`;
+    el.style.cssText = [
+        'position:fixed',
+        'bottom:calc(var(--tabbar-h,64px) + 12px)',
+        'left:50%',
+        'transform:translateX(-50%)',
+        'background:#2E1A47',
+        'color:white',
+        'padding:0.6rem 1rem',
+        'border-radius:20px',
+        'font-size:0.82rem',
+        'z-index:9000',
+        'display:flex',
+        'align-items:center',
+        'gap:0.6rem',
+        'box-shadow:0 4px 20px rgba(46,26,71,0.45)',
+        'max-width:90vw',
+        'white-space:nowrap',
+        'overflow:hidden'
+    ].join(';');
+    document.body.appendChild(el);
+    _placementToastEl = el;
+}
+
+function _hidePlacementToast() {
+    if (_placementToastEl) { _placementToastEl.remove(); _placementToastEl = null; }
+    const ex = document.getElementById('tapPlacementToast');
+    if (ex) ex.remove();
+}
 
 console.log('✅ schedule.js 로드 완료');
