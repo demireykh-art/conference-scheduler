@@ -359,24 +359,28 @@ function createLectureItem(lecture, lectureId, isScheduled, isBreak) {
         if (typeof window.handleDragEnd === 'function') window.handleDragEnd(e);
     });
 
-    // 모바일 탭-투-플레이스: 강의 탭 → 선택 모드 진입 (드래그와 구분)
-    let _touchStartX = 0, _touchStartY = 0;
-    item.addEventListener('touchstart', function(e) {
-        _touchStartX = e.touches[0].clientX;
-        _touchStartY = e.touches[0].clientY;
-    }, { passive: true });
-    item.addEventListener('touchend', function(e) {
-        const isMob = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-        if (!isMob) return;
-        // 드래그로 인식되면 무시 (10px 이상 이동)
-        const dx = Math.abs(e.changedTouches[0].clientX - _touchStartX);
-        const dy = Math.abs(e.changedTouches[0].clientY - _touchStartY);
-        if (dx > 10 || dy > 10) return;
-        e.preventDefault();
-        if (typeof window.selectLectureForPlacement === 'function') {
-            window.selectLectureForPlacement(lecture, isBreak);
-        }
-    }, { passive: false });
+    // 모바일 탭-투-플레이스
+    (function() {
+        let _sx = 0, _sy = 0, _moved = false;
+        item.addEventListener('touchstart', function(e) {
+            _sx = e.touches[0].clientX;
+            _sy = e.touches[0].clientY;
+            _moved = false;
+        }, { passive: true });
+        item.addEventListener('touchmove', function(e) {
+            const dx = Math.abs(e.touches[0].clientX - _sx);
+            const dy = Math.abs(e.touches[0].clientY - _sy);
+            if (dx > 8 || dy > 8) _moved = true;
+            // 스크롤 방해하지 않음 (passive)
+        }, { passive: true });
+        item.addEventListener('touchend', function(e) {
+            if (_moved) return; // 스크롤이면 무시
+            // preventDefault 제거 → 스크롤 정상 동작
+            if (typeof window.selectLectureForPlacement === 'function') {
+                window.selectLectureForPlacement(lecture, isBreak);
+            }
+        }, { passive: true });
+    })();
     
     // Break 항목은 더블클릭 시 편집 불가 (기본 항목이므로)
     if (!isBreak) {

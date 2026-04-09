@@ -2075,3 +2075,10 @@ input[type="radio"]    { accent-color: var(--primary); cursor: pointer; }
     background: rgba(255, 107, 157, 0.08) !important;
     box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.2);
 }
+
+/* 시간표 배치 강의 - 롱프레스 텍스트선택 방지 */
+.scheduled-lecture {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}

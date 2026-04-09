@@ -670,21 +670,29 @@ window.updateScheduleDisplay = function() {
         });
 
         // 모바일 롱프레스 → 수정/삭제 액션시트
+        lectureDiv.style.webkitUserSelect = 'none';
+        lectureDiv.style.userSelect = 'none';
+        lectureDiv.style.webkitTouchCallout = 'none';
+        lectureDiv.addEventListener('contextmenu', e => e.preventDefault());
         (function() {
             let _lpTimer = null;
             let _lpMoved = false;
+            let _lpStartX = 0, _lpStartY = 0;
             lectureDiv.addEventListener('touchstart', function(e) {
                 _lpMoved = false;
+                _lpStartX = e.touches[0].clientX;
+                _lpStartY = e.touches[0].clientY;
                 _lpTimer = setTimeout(() => {
                     if (!_lpMoved) {
-                        e.preventDefault();
+                        if (navigator.vibrate) navigator.vibrate(30);
                         _showScheduledLectureActions(key, lecture, isBreak);
                     }
                 }, 500);
             }, { passive: true });
-            lectureDiv.addEventListener('touchmove', function() {
-                _lpMoved = true;
-                clearTimeout(_lpTimer);
+            lectureDiv.addEventListener('touchmove', function(e) {
+                const dx = Math.abs(e.touches[0].clientX - _lpStartX);
+                const dy = Math.abs(e.touches[0].clientY - _lpStartY);
+                if (dx > 8 || dy > 8) { _lpMoved = true; clearTimeout(_lpTimer); }
             }, { passive: true });
             lectureDiv.addEventListener('touchend', function() {
                 clearTimeout(_lpTimer);
@@ -1732,15 +1740,16 @@ window.updateRoomManagerDropdowns = function() {
 // 모바일 탭-투-플레이스 (tap-to-place)
 // ====================================================
 
-const _isMobileDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+function _isMobileDevice() { return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || window.innerWidth <= 768; }
 
 /**
  * 강의목록에서 강의를 탭 → 1단계: 룸 선택 토스트 표시
  * lectures.js의 touchend에서 호출
  */
 window.selectLectureForPlacement = function(lecture, isBreak) {
-    if (!_isMobileDevice) return false;
+    console.log('[TTP] selectLectureForPlacement called', lecture && lecture.titleKo, 'isMobile:', _isMobileDevice());
 
+    // 모바일 체크 제거 - 항상 동작하도록
     // 동일 강의 재탭 → 취소
     if (AppState.selectedLectureForPlacement &&
         AppState.selectedLectureForPlacement.id === lecture.id) {
@@ -1757,7 +1766,8 @@ window.selectLectureForPlacement = function(lecture, isBreak) {
     const el = document.querySelector(`.lecture-item[data-lecture-id="${lecture.id}"]`);
     if (el) el.classList.add('tap-selected');
 
-    // 1단계: 룸 선택 토스트 표시 (자동 탭전환 제거)
+    console.log('[TTP] rooms:', AppState.rooms);
+    // 1단계: 룸 선택 토스트 표시
     _showRoomSelectToast(lecture);
 
     return true;
