@@ -172,7 +172,7 @@
                             <div class="category-filters" id="categoryFilters" style="display:flex;flex-wrap:wrap;gap:0.25rem;"></div>
                         </div>
                     </div>
-                    <div class="lecture-sidebar-body">
+                    <div class="lecture-sidebar-body" id="pcLectureSidebarBody">
                         <!-- JS(lectures.js)가 document.getElementById('lectureList')로 직접 렌더링 -->
                         <div class="lecture-list" id="lectureList"></div>
                     </div>
@@ -212,7 +212,7 @@
                     <div class="category-filters-wrapper" id="categoryFiltersWrapperMobile">
                         <div class="category-filters" id="categoryFiltersMobile"></div>
                     </div>
-                    <div class="lecture-list" id="lectureListTabMobile"></div>
+                    <div id="lectureListMobileSlot"></div>
                 </div>
             </section>
 
@@ -1249,21 +1249,11 @@
             window.updateSpeakerList();
         }
         if (tabName === 'lectures') {
-            // 모바일 탭에서 강의목록 표시: lectureListTabMobile에 동기화
-            const sidebar = document.getElementById('lectureList');
-            const mobile  = document.getElementById('lectureListTabMobile');
-            if (sidebar && mobile) {
-                mobile.innerHTML = sidebar.innerHTML;
-                // 드래그 이벤트 재연결
-                mobile.querySelectorAll('.lecture-item[draggable]').forEach(item => {
-                    item.addEventListener('dragstart', e => { if(window.handleDragStart) window.handleDragStart(e); });
-                    item.addEventListener('dragend',   e => { if(window.handleDragEnd)   window.handleDragEnd(e);   });
-                    item.addEventListener('dblclick', function() {
-                        const id = this.dataset.lectureId;
-                        if (id && window.openEditModal) window.openEditModal(id);
-                    });
-                });
-            } else if (typeof window.updateLectureList === 'function') {
+            // 모바일: lectureList DOM을 모바일 슬롯으로 이동 (이벤트 보존)
+            if (typeof window._moveLectureList === 'function') {
+                window._moveLectureList('lectureListMobileSlot');
+            }
+            if (typeof window.updateLectureList === 'function') {
                 window.updateLectureList();
             }
         }
@@ -1582,6 +1572,30 @@
             };
         }
     });
+    </script>    <script>
+    // lectureList DOM 이동 방식 (이벤트 완전 보존)
+    // PC: lectureList는 #pcLectureSidebar 안에
+    // 모바일: lectureList를 #lectureListMobileSlot으로 이동
+    function _moveLectureList(targetId) {
+        const list = document.getElementById('lectureList');
+        const target = document.getElementById(targetId);
+        if (!list || !target) return;
+        if (list.parentElement === target) return; // 이미 있음
+        target.appendChild(list);
+    }
+
+    // updateLectureList 후 강의수 업데이트
+    document.addEventListener('DOMContentLoaded', function() {
+        const orig = window.updateLectureList;
+        if (!orig) return;
+        window.updateLectureList = function() {
+            orig.apply(this, arguments);
+            const list = document.getElementById('lectureList');
+            const cnt  = document.getElementById('pcLectureCount');
+            if (list && cnt) cnt.textContent = list.querySelectorAll('.lecture-item').length + '개';
+        };
+    });
+    window._moveLectureList = _moveLectureList;
     </script>
 </body>
 </html>
