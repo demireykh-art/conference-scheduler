@@ -1248,6 +1248,9 @@
         if (tabName === 'speaker' && typeof window.updateSpeakerList === 'function') {
             window.updateSpeakerList();
         }
+        if (tabName === 'schedule' && typeof window._moveLectureList === 'function') {
+            window._moveLectureList('pcLectureSidebarBody');
+        }
         if (tabName === 'lectures') {
             // 모바일: lectureList DOM을 모바일 슬롯으로 이동 (이벤트 보존)
             if (typeof window._moveLectureList === 'function') {
