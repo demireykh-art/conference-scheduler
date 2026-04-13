@@ -265,7 +265,7 @@ body {
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    padding: 0.18rem 0.5rem;
+    padding: 0.18rem 0.4rem;
     background: rgba(255,255,255,0.09);
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: var(--radius-pill);
@@ -2115,3 +2115,83 @@ input[type="radio"]    { accent-color: var(--primary); cursor: pointer; }
 .mob-menu-btn:active { background: #f5f3fa; }
 .mob-menu-danger { color: #e74c3c !important; }
 .mob-menu-cancel { color: #888 !important; }
+
+/* ── 로그인 상태 UI ── */
+.auth-user-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.35rem;
+    border-radius: 20px;
+    transition: background 0.15s;
+    position: relative;
+}
+.auth-user-wrap:hover {
+    background: rgba(255,255,255,0.15);
+}
+/* hover 툴팁 */
+.auth-user-wrap:hover::after {
+    content: attr(title);
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: rgba(20,10,40,0.95);
+    color: white;
+    font-size: 0.75rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 8px;
+    white-space: pre;
+    z-index: 9999;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    min-width: 100px;
+}
+.auth-role-badge {
+    font-size: 0.85rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.auth-signout-icon {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.5);
+    flex-shrink: 0;
+    transition: color 0.15s;
+}
+.auth-user-wrap:hover .auth-signout-icon {
+    color: #FF6B9D;
+}
+/* 로그인 버튼 (비로그인 상태) */
+.login-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    border-radius: 20px;
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.15s;
+    position: relative;
+}
+.login-btn:hover {
+    background: rgba(255,255,255,0.2);
+}
+.login-btn:hover::after {
+    content: attr(title);
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: rgba(20,10,40,0.95);
+    color: white;
+    font-size: 0.75rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 8px;
+    white-space: nowrap;
+    z-index: 9999;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+/* 모바일: 툴팁 비활성 (터치에서 hover 작동 안 함) */
+@media (max-width: 767px) {
+    .auth-user-wrap:hover::after,
+    .login-btn:hover::after { display: none; }
+}
