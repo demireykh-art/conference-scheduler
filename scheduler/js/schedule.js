@@ -529,7 +529,7 @@ window.updateScheduleDisplay = function() {
         const cellHeight = 27; // CSS height 26px + border-spacing 1px
         const totalHeight = slotsSpan * cellHeight;
         // 세션 헤더가 있으면 강의를 아래로 내리고 높이 조정
-        lectureDiv.style.height = `${totalHeight - sessionHeaderHeight - 2}px`; // 2px 여백
+        lectureDiv.style.height = `${totalHeight - sessionHeaderHeight}px`; // 여백 없음 - 시각적 틈 제거
         lectureDiv.style.top = `${sessionHeaderHeight}px`;
 
         const title = AppState.currentLanguage === 'en' && lecture.titleEn ? lecture.titleEn : lecture.titleKo;
