@@ -172,16 +172,19 @@ window.updateAuthUI = function(user) {
                 if (addLectureCard) addLectureCard.style.display = 'none';
         }
 
+        const displayName = user.displayName || user.email || '';
+        const shortName = displayName.length > 6 ? displayName.slice(0, 6) + '…' : displayName;
         authStatus.innerHTML = `
-            <img class="user-photo" src="${user.photoURL || 'https://via.placeholder.com/28'}" alt="">
-            <span class="user-name">${user.displayName || user.email}</span>
-            <span style="color:${roleColor}; font-size:0.7rem;">${roleText}</span>
-            <button class="logout-btn" onclick="signOut()">로그아웃</button>
+            <div class="auth-user-wrap" title="${displayName}&#10;${roleText}&#10;클릭하여 로그아웃" onclick="signOut()" style="cursor:pointer;">
+                <img class="user-photo" src="${user.photoURL || 'https://via.placeholder.com/28'}" alt="${displayName}">
+                <span class="auth-role-badge" style="color:${roleColor};">${roleText.split(' ')[0]}</span>
+                <span class="auth-signout-icon" title="로그아웃">↪</span>
+            </div>
         `;
     } else {
         authStatus.innerHTML = `
-            <button class="login-btn" onclick="signInWithGoogle()">
-                🔐 로그인
+            <button class="login-btn" onclick="signInWithGoogle()" title="Google 계정으로 로그인">
+                🔐
             </button>
         `;
         adminOnlyBtns.forEach(btn => btn.style.display = 'none');
