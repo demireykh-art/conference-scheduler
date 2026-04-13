@@ -1927,6 +1927,7 @@ input[type="radio"]    { accent-color: var(--primary); cursor: pointer; }
 .scheduled-lecture {
     overflow: hidden !important;
     box-sizing: border-box;
+    margin-bottom: -1px; /* 셀 border와 겹쳐서 시각적 틈 제거 */
 }
 /* X 버튼: 우측 정렬, 작고 깔끔하게 */
 .remove-btn {
