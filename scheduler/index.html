@@ -488,6 +488,55 @@
          모달들 (모든 ID 보존)
          ============================================ -->
 
+    <!-- 강의 배치 모달 (모바일 전용) -->
+    <div class="modal" id="placementModal">
+        <div class="modal-content" style="max-width:420px;max-height:90vh;">
+            <div class="modal-header">
+                <h2>📌 시간표에 배치</h2>
+                <button class="modal-close" onclick="closePlacementModal()">×</button>
+            </div>
+            <div style="padding:1rem 1.2rem 1.4rem;overflow-y:auto;max-height:calc(90vh - 70px);">
+
+                <!-- 강의 정보 -->
+                <div id="placementLectureInfo" style="
+                    background:var(--bg2);border-radius:10px;
+                    padding:0.7rem 1rem;margin-bottom:1.2rem;
+                    border-left:4px solid var(--accent);font-size:0.88rem;">
+                </div>
+
+                <!-- 날짜 선택 -->
+                <div class="pm-field" id="pmDateField">
+                    <label class="pm-label">📅 날짜</label>
+                    <div class="pm-options" id="pmDateOptions"></div>
+                </div>
+
+                <!-- 룸 선택 -->
+                <div class="pm-field">
+                    <label class="pm-label">🏠 룸</label>
+                    <div class="pm-options" id="pmRoomOptions"></div>
+                </div>
+
+                <!-- 시간 선택 -->
+                <div class="pm-field">
+                    <label class="pm-label">⏰ 시간</label>
+                    <div class="pm-time-scroll" id="pmTimeScroll">
+                        <!-- 시간 슬롯 동적 생성 -->
+                    </div>
+                </div>
+
+                <!-- 배치 버튼 -->
+                <button id="pmConfirmBtn" onclick="confirmPlacement()"
+                    style="width:100%;padding:0.85rem;margin-top:0.5rem;
+                           background:var(--primary);color:white;border:none;
+                           border-radius:12px;font-size:1rem;font-weight:700;
+                           cursor:pointer;opacity:0.4;transition:opacity 0.2s;"
+                    disabled>
+                    ✅ 배치하기
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- 배너 관리 모달 -->
     <div class="modal" id="bannerManageModal">
         <div class="modal-content" style="max-width:500px;max-height:90vh;">
