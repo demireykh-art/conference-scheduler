@@ -2171,3 +2171,101 @@ input[type="radio"]    { accent-color: var(--primary); cursor: pointer; }
     color: white;
     border-color: var(--primary);
 }
+
+/* ============================================
+   강의 배치 모달 (모바일)
+   ============================================ */
+
+.pm-field {
+    margin-bottom: 1.1rem;
+}
+.pm-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-light);
+    margin-bottom: 0.45rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.pm-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+.pm-opt-btn {
+    padding: 0.45rem 0.9rem;
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    background: var(--white);
+    font-size: 0.82rem;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+    white-space: nowrap;
+}
+.pm-opt-btn.selected {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    font-weight: 700;
+}
+
+/* 시간 스크롤 휠 */
+.pm-time-scroll {
+    height: 220px;
+    overflow-y: auto;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
+    position: relative;
+    scroll-snap-type: y mandatory;
+    -webkit-overflow-scrolling: touch;
+}
+.pm-time-scroll::before,
+.pm-time-scroll::after {
+    content: '';
+    display: block;
+    height: calc(50% - 22px);
+    pointer-events: none;
+}
+.pm-time-item {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    scroll-snap-align: center;
+    transition: all 0.15s;
+    border-radius: 8px;
+    margin: 0 0.3rem;
+    position: relative;
+}
+.pm-time-item.selected {
+    background: var(--primary);
+    color: white;
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+.pm-time-item.occupied {
+    color: var(--border);
+    text-decoration: line-through;
+    cursor: not-allowed;
+}
+/* 중앙 선택 표시선 */
+.pm-time-scroll-center-line {
+    position: sticky;
+    top: calc(50% - 22px);
+    left: 0; right: 0;
+    height: 44px;
+    border-top: 2px solid var(--primary);
+    border-bottom: 2px solid var(--primary);
+    pointer-events: none;
+    z-index: 1;
+    margin: -44px 0.3rem 0;
+    border-radius: 8px;
+    background: rgba(46,26,71,0.06);
+}
