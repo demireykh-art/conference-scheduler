@@ -502,7 +502,7 @@ window.updateScheduleDisplay = function() {
         const isLunch = category === 'Lunch';
         
         lectureDiv.className = 'scheduled-lecture' + (isInSession ? ' in-session' : '') + (isBreak ? ' break-item' : '') + (isPanelDiscussion ? ' panel-discussion' : '') + (isLuncheon ? ' luncheon-lecture' : '') + (isLunch ? ' lunch-item' : '');
-        lectureDiv.draggable = true;
+        lectureDiv.draggable = !isBreak; // Break 항목은 드래그 불필요 → 스크롤 허용
         lectureDiv.dataset.scheduleKey = key;
         lectureDiv.tabIndex = 0;
         
@@ -673,6 +673,11 @@ window.updateScheduleDisplay = function() {
         lectureDiv.style.webkitUserSelect = 'none';
         lectureDiv.style.userSelect = 'none';
         lectureDiv.style.webkitTouchCallout = 'none';
+        // Break 항목: 스크롤 허용 (드래그 불필요)
+        if (isBreak) {
+            lectureDiv.style.touchAction = 'pan-y';
+            lectureDiv.style.cursor = 'default';
+        }
         lectureDiv.addEventListener('contextmenu', e => e.preventDefault());
         if (('ontouchstart' in window) || navigator.maxTouchPoints > 0) {
             let tStart = 0, tY = 0, tMoved = false, tTimer = null;
@@ -691,8 +696,11 @@ window.updateScheduleDisplay = function() {
                 clearTimeout(tTimer);
                 if (tMoved) return;
                 if (Date.now() - tStart < 400) {
-                    e.preventDefault();
-                    e.stopPropagation();
+                    // Break 항목은 탭 시 스크롤 방해 안 함
+                    if (!isBreak) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
                     _showScheduledLectureMenu(key, lecture);
                 }
             }, { passive: false });
@@ -888,6 +896,12 @@ window.handleDragEnd = function(e) {
  * 시간표 내 드래그 시작
  */
 window.handleScheduleDragStart = function(e) {
+    // Break 항목은 드래그 비활성 (draggable=false이지만 혹시 모를 경우 방어)
+    const lecture = AppState.schedule[this.dataset.scheduleKey];
+    if (lecture && (lecture.isBreak || (AppConfig.BREAK_TYPES || []).includes(lecture.category))) {
+        e.preventDefault();
+        return;
+    }
     AppState.draggedScheduleKey = this.dataset.scheduleKey;
     AppState.draggedLecture = AppState.schedule[AppState.draggedScheduleKey];
     this.style.opacity = '0.5';
