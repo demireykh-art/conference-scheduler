@@ -66,8 +66,17 @@ window.getSpeakerLectureStats = function(speakerName) {
  * 강의 목록 업데이트
  */
 window.updateLectureList = function() {
-    const list = document.getElementById('lectureList');
-    list.innerHTML = '';
+    // 렌더링 대상: PC 사이드바 + 모바일 탭 (둘 다 직접 렌더링 → 이벤트 정상 동작)
+    const targets = [
+        document.getElementById('lectureList'),
+        document.getElementById('lectureListTabMobile')
+    ].filter(Boolean);
+
+    if (targets.length === 0) return;
+
+    // 아래 로직을 각 컨테이너에 동일하게 실행하는 헬퍼
+    function renderInto(list) {
+        list.innerHTML = '';
 
     // 시간표에 배치된 강의 ID 목록
     const scheduledLectureIds = Object.values(AppState.schedule).map(s => s.id);
@@ -269,6 +278,10 @@ window.updateLectureList = function() {
         const item = createLectureItem(lecture, lecture.id, isScheduled, false);
         list.appendChild(item);
     });
+    } // end renderInto
+
+    // PC 사이드바 + 모바일 탭 모두 직접 렌더링 (이벤트 리스너 정상 동작)
+    targets.forEach(renderInto);
 };
 
 /**
