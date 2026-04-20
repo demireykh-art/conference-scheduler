@@ -416,6 +416,9 @@ window.switchDate = function(date) {
     createScheduleTable();
     updateLectureList();
 
+    // 날짜 선택 → 배너 숨기고 시간표 표시
+    if (typeof showScheduleView === 'function') showScheduleView();
+
     console.log(`날짜 변경: ${date}, 시간: ${AppState.timeSlots[0]} ~ ${AppState.timeSlots[AppState.timeSlots.length - 1]}`);
 };
 
@@ -2101,3 +2104,226 @@ window.generateSpeakersFromLectures = function() {
     
     return newSpeakers;
 };
+
+// ============================================
+// 배너 슬라이더 (첫 화면)
+// ============================================
+
+AppState.banners = []; // [{id, title, subtitle, imageBase64}]
+let _bannerTimer = null;
+let _bannerCurrent = 0;
+
+/** Firebase에서 배너 로드 */
+window.loadBannersFromFirebase = function() {
+    database.ref('/settings/banners').on('value', (snapshot) => {
+        AppState.banners = snapshot.exists() ? snapshot.val() : [];
+        renderBannerSlider();
+    });
+};
+
+/** 배너 슬라이더 렌더링 */
+window.renderBannerSlider = function() {
+    const slider = document.getElementById('bannerSlider');
+    const dots   = document.getElementById('bannerDots');
+    if (!slider || !dots) return;
+
+    slider.innerHTML = '';
+    dots.innerHTML   = '';
+    clearInterval(_bannerTimer);
+
+    const banners = AppState.banners || [];
+
+    // 관리자 버튼 표시 여부
+    const editBtn = document.getElementById('bannerEditBtn');
+    if (editBtn) editBtn.style.display = (canEdit && canEdit()) ? 'inline-block' : 'none';
+
+    if (banners.length === 0) {
+        // 빈 상태: 안내 메시지
+        slider.innerHTML = `
+            <div class="banner-empty-state">
+                <div class="empty-icon">📅</div>
+                <div class="empty-title">학술대회 스케줄러</div>
+                <div class="empty-desc">위의 날짜 버튼을 탭하면<br>시간표가 표시됩니다</div>
+            </div>`;
+        return;
+    }
+
+    // 슬라이드 생성
+    banners.forEach((b, i) => {
+        const slide = document.createElement('div');
+        slide.className = 'banner-slide' + (i === 0 ? ' active' : '');
+
+        if (b.imageBase64) {
+            slide.innerHTML = `
+                <img class="banner-slide-img" src="${b.imageBase64}" alt="${b.title || '배너'}">
+                ${b.title    ? `<div class="banner-slide-title">${b.title}</div>` : ''}
+                ${b.subtitle ? `<div class="banner-slide-subtitle">${b.subtitle}</div>` : ''}`;
+        } else {
+            slide.innerHTML = `
+                <div class="banner-text-card">
+                    <h2>${b.title || '학술대회'}</h2>
+                    ${b.subtitle ? `<p>${b.subtitle}</p>` : ''}
+                </div>`;
+        }
+        slider.appendChild(slide);
+
+        // dot
+        const dot = document.createElement('div');
+        dot.className = 'banner-dot' + (i === 0 ? ' active' : '');
+        dot.onclick = () => goToBannerSlide(i);
+        dots.appendChild(dot);
+    });
+
+    _bannerCurrent = 0;
+
+    // 2개 이상이면 자동 전환 (4초)
+    if (banners.length > 1) {
+        _bannerTimer = setInterval(() => {
+            goToBannerSlide((_bannerCurrent + 1) % banners.length);
+        }, 4000);
+
+        // 터치 스와이프
+        let tx = 0;
+        slider.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+        slider.addEventListener('touchend', e => {
+            const dx = e.changedTouches[0].clientX - tx;
+            if (Math.abs(dx) > 40) goToBannerSlide(dx < 0
+                ? (_bannerCurrent + 1) % banners.length
+                : (_bannerCurrent - 1 + banners.length) % banners.length);
+        }, { passive: true });
+    }
+};
+
+function goToBannerSlide(idx) {
+    const slides = document.querySelectorAll('#bannerSlider .banner-slide');
+    const ddots  = document.querySelectorAll('#bannerDots .banner-dot');
+    slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+    ddots.forEach((d, i) => d.classList.toggle('active', i === idx));
+    _bannerCurrent = idx;
+}
+
+/** 날짜 선택 시 배너↔시간표 전환 */
+window.showScheduleView = function() {
+    const bs = document.getElementById('bannerScreen');
+    const sw = document.getElementById('scheduleTableWrapper');
+    if (bs) bs.style.display = 'none';
+    if (sw) sw.style.display = '';
+    clearInterval(_bannerTimer);
+};
+window.showBannerView = function() {
+    const bs = document.getElementById('bannerScreen');
+    const sw = document.getElementById('scheduleTableWrapper');
+    if (bs) bs.style.display = '';
+    if (sw) sw.style.display = 'none';
+    renderBannerSlider();
+};
+
+// ── 배너 관리 모달 ──
+
+window.openBannerManageModal = function() {
+    renderBannerListInModal();
+    document.getElementById('bannerManageModal').classList.add('active');
+};
+window.closeBannerManageModal = function() {
+    document.getElementById('bannerManageModal').classList.remove('active');
+    // 입력 초기화
+    document.getElementById('bannerTitleInput').value    = '';
+    document.getElementById('bannerSubtitleInput').value = '';
+    document.getElementById('bannerImageInput').value    = '';
+    const preview = document.getElementById('bannerImagePreview');
+    preview.innerHTML = '<span style="font-size:2rem;">📷</span><span style="font-size:0.8rem;color:var(--text-muted);">탭하여 사진 선택</span>';
+    preview._base64 = null;
+};
+
+window.previewBannerImage = function(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        // 이미지 리사이즈 (최대 1200px, 품질 0.82)
+        const img = new Image();
+        img.onload = function() {
+            const MAX = 1200;
+            let w = img.width, h = img.height;
+            if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            const b64 = canvas.toDataURL('image/jpeg', 0.82);
+            const preview = document.getElementById('bannerImagePreview');
+            preview.innerHTML = `<img src="${b64}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`;
+            preview._base64 = b64;
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+};
+
+window.addBannerItem = function() {
+    if (!canEdit()) return;
+    const title    = document.getElementById('bannerTitleInput').value.trim();
+    const subtitle = document.getElementById('bannerSubtitleInput').value.trim();
+    const preview  = document.getElementById('bannerImagePreview');
+    const b64      = preview._base64 || null;
+
+    if (!title && !b64) {
+        if (typeof Toast !== 'undefined') Toast.warning('제목 또는 이미지를 입력해주세요.');
+        return;
+    }
+    if ((AppState.banners || []).length >= 5) {
+        if (typeof Toast !== 'undefined') Toast.warning('배너는 최대 5개까지 추가할 수 있습니다.');
+        return;
+    }
+
+    const newBanner = { id: Date.now(), title, subtitle, imageBase64: b64 };
+    AppState.banners = [...(AppState.banners || []), newBanner];
+
+    database.ref('/settings/banners').set(AppState.banners)
+        .then(() => {
+            if (typeof Toast !== 'undefined') Toast.success('배너가 추가됐습니다.');
+            closeBannerManageModal();
+        })
+        .catch(() => {
+            if (typeof Toast !== 'undefined') Toast.error('저장 실패. 다시 시도해주세요.');
+        });
+};
+
+window.deleteBannerItem = function(id) {
+    if (!canEdit()) return;
+    AppState.banners = (AppState.banners || []).filter(b => b.id !== id);
+    database.ref('/settings/banners').set(AppState.banners)
+        .then(() => {
+            renderBannerListInModal();
+            renderBannerSlider();
+            if (typeof Toast !== 'undefined') Toast.success('배너가 삭제됐습니다.');
+        });
+};
+
+function renderBannerListInModal() {
+    const list = document.getElementById('bannerList');
+    if (!list) return;
+    const banners = AppState.banners || [];
+    if (banners.length === 0) {
+        list.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:0.82rem;padding:0.5rem;">등록된 배너가 없습니다</p>';
+        return;
+    }
+    list.innerHTML = banners.map(b => `
+        <div class="banner-list-item">
+            ${b.imageBase64
+                ? `<img class="banner-list-thumb" src="${b.imageBase64}" alt="">`
+                : `<div class="banner-list-thumb-placeholder">🖼️</div>`}
+            <div class="banner-list-info">
+                <div class="banner-list-title">${b.title || '(제목 없음)'}</div>
+                <div class="banner-list-sub">${b.subtitle || ''}</div>
+            </div>
+            <button class="banner-list-del" onclick="deleteBannerItem(${b.id})" title="삭제">🗑️</button>
+        </div>
+    `).join('');
+}
+
+// DOMContentLoaded 시 배너 로드 + 초기 상태는 배너 화면
+document.addEventListener('DOMContentLoaded', function() {
+    loadBannersFromFirebase();
+    // 초기엔 배너 화면 표시 (날짜 선택 전)
+    showBannerView();
+});
