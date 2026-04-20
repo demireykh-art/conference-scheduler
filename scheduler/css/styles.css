@@ -724,7 +724,9 @@ body {
     transition: all var(--transition);
     border-left: 3px solid var(--accent);
     box-shadow: var(--shadow-xs);
-    touch-action: pan-y; /* iOS: 세로 스크롤 허용, 드래그는 dragstart로 처리 */
+    user-select: none;          /* iOS 롱프레스 시 텍스트선택 차단 */
+    -webkit-user-select: none;
+    -webkit-touch-callout: none; /* iOS 컨텍스트메뉴 차단 */
 }
 .lecture-item:hover {
     border-color: var(--primary-light);
