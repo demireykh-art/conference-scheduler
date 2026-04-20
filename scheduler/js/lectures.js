@@ -362,38 +362,36 @@ function createLectureItem(lecture, lectureId, isScheduled, isBreak) {
     });
 
     // 모바일 터치 UX
-    // - 스크롤: 항상 자유 (preventDefault 없음)
-    // - 롱프레스(600ms): 메뉴 표시 (배치/수정/삭제)
-    // - 더블탭/더블클릭: 수정 모달
     (function() {
         let tStart = 0, tY = 0, tX = 0, tMoved = false, tTimer = null;
+        let longPressed = false; // 롱프레스 발동 여부 플래그
         let lastTap = 0;
 
         item.addEventListener('touchstart', function(e) {
-            tStart = Date.now();
-            tY = e.touches[0].clientY;
-            tX = e.touches[0].clientX;
-            tMoved = false;
+            tStart    = Date.now();
+            tY        = e.touches[0].clientY;
+            tX        = e.touches[0].clientX;
+            tMoved    = false;
+            longPressed = false;
 
-            // 롱프레스 600ms - 메뉴 표시
             tTimer = setTimeout(() => {
-                if (!tMoved) {
-                    if (navigator.vibrate) navigator.vibrate(50);
-                    if (!isBreak) {
-                        _showMobileLectureMenu(lecture, item);
-                    } else {
-                        if (typeof window.selectLectureForPlacement === 'function')
-                            window.selectLectureForPlacement(lecture, true);
-                    }
+                if (tMoved) return;
+                longPressed = true;
+                if (navigator.vibrate) navigator.vibrate(50);
+                // iOS 텍스트선택 컨텍스트메뉴 차단은 CSS로 처리
+                if (!isBreak) {
+                    _showMobileLectureMenu(lecture, item);
+                } else {
+                    if (typeof window.selectLectureForPlacement === 'function')
+                        window.selectLectureForPlacement(lecture, true);
                 }
             }, 600);
-        }, { passive: true }); // passive:true → 스크롤 완전 자유
+        }, { passive: true });
 
         item.addEventListener('touchmove', function(e) {
-            // 10px 이상 움직이면 스크롤로 판단 → 타이머 취소
             const dy = Math.abs(e.touches[0].clientY - tY);
             const dx = Math.abs(e.touches[0].clientX - tX);
-            if (dy > 10 || dx > 10) {
+            if (dy > 8 || dx > 8) {
                 tMoved = true;
                 clearTimeout(tTimer);
             }
@@ -401,15 +399,14 @@ function createLectureItem(lecture, lectureId, isScheduled, isBreak) {
 
         item.addEventListener('touchend', function(e) {
             clearTimeout(tTimer);
-            if (tMoved) return; // 스크롤이면 무시
+            // 스크롤 or 롱프레스 → touchend 동작 없음
+            if (tMoved || longPressed) return;
 
-            // 더블탭 감지 (300ms 내 2번 탭) → 수정 모달
+            // 더블탭 → 수정 모달
             if (!isBreak) {
                 const now = Date.now();
-                const elapsed = now - tStart;
-                if (elapsed < 600) { // 롱프레스 아닌 경우만
-                    if (now - lastTap < 300) {
-                        // 더블탭 → 수정
+                if (Date.now() - tStart < 600) {
+                    if (now - lastTap < 350) {
                         openEditModal(lecture.id);
                         lastTap = 0;
                     } else {
@@ -417,7 +414,7 @@ function createLectureItem(lecture, lectureId, isScheduled, isBreak) {
                     }
                 }
             }
-        }, { passive: true }); // passive:true → preventDefault 없음
+        }, { passive: true });
 
         // PC 더블클릭
         if (!isBreak) {
