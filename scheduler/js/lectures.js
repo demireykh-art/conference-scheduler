@@ -278,7 +278,7 @@ function createLectureItem(lecture, lectureId, isScheduled, isBreak) {
     const color = AppConfig.categoryColors[lecture.category] || '#9B59B6';
     const item = document.createElement('div');
     item.className = 'lecture-item' + (isScheduled && !isBreak ? ' scheduled' : '');
-    item.draggable = true;
+    item.draggable = !isBreak; // Break 항목은 드래그 비활성 → 스크롤 허용
     item.dataset.lectureId = lecture.id;
     
     const isLuncheon = lecture.isLuncheon;
@@ -286,6 +286,8 @@ function createLectureItem(lecture, lectureId, isScheduled, isBreak) {
     
     if (isBreak) {
         item.dataset.isBreak = 'true';
+        item.style.touchAction = 'pan-y'; // 세로 스크롤 허용
+        item.style.cursor = 'default';
         // Panel Discussion은 흰색 배경
         if (isPanelDiscussion) {
             item.style.background = 'white';
