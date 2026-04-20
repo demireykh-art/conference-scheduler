@@ -719,14 +719,61 @@ body {
     background: var(--white);
     border: 1.5px solid var(--border);
     border-radius: var(--radius-sm);
-    padding: 0.65rem 0.85rem;
-    cursor: pointer;
+    padding: 0.55rem 0.75rem;
+    cursor: default;
     transition: all var(--transition);
     border-left: 3px solid var(--accent);
     box-shadow: var(--shadow-xs);
-    user-select: none;          /* iOS 롱프레스 시 텍스트선택 차단 */
+    user-select: none;
     -webkit-user-select: none;
-    -webkit-touch-callout: none; /* iOS 컨텍스트메뉴 차단 */
+    -webkit-touch-callout: none;
+}
+
+/* 셀 내부: 정보(좌) + 버튼(우) */
+.lecture-item-body {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.lecture-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 우측 액션 버튼 영역 */
+.lecture-item-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    flex-shrink: 0;
+}
+.li-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    background: var(--bg);
+}
+.li-btn:active {
+    transform: scale(0.92);
+}
+.li-btn-place {
+    background: #EDE7F6;
+}
+.li-btn-place:active {
+    background: #D1C4E9;
+}
+.li-btn-edit {
+    background: #E3F2FD;
+}
+.li-btn-edit:active {
+    background: #BBDEFB;
 }
 .lecture-item:hover {
     border-color: var(--primary-light);
