@@ -340,87 +340,55 @@ function createLectureItem(lecture, lectureId, isScheduled, isBreak) {
         '<span class="tag" style="background: #FFF3E0; color: #E65100;">중복가능</span>' : '';
 
     item.innerHTML = `
-        <div class="lecture-title">
-            <span class="category-color" style="background: ${color}"></span>
-            ${titleDisplay}
-        </div>
-        <div class="lecture-meta">
-            ${speakerTag}
-            ${sponsorTag}
-            ${luncheonTag}
-            <span class="tag" style="background: #E3F2FD; color: #1976D2;">⏱️ ${duration}분</span>
-            ${scheduledTag}
-            ${breakTag}
+        <div class="lecture-item-body">
+            <div class="lecture-item-info">
+                <div class="lecture-title">
+                    <span class="category-color" style="background: ${color}"></span>
+                    ${titleDisplay}
+                </div>
+                <div class="lecture-meta">
+                    ${speakerTag}
+                    ${sponsorTag}
+                    ${luncheonTag}
+                    <span class="tag" style="background: #E3F2FD; color: #1976D2;">⏱️ ${duration}분</span>
+                    ${scheduledTag}
+                    ${breakTag}
+                </div>
+            </div>
+            <div class="lecture-item-actions">
+                ${isBreak
+                    ? `<button class="li-btn li-btn-place" title="시간표에 배치">📌</button>`
+                    : `<button class="li-btn li-btn-place" title="시간표에 배치">📌</button>
+                       <button class="li-btn li-btn-edit"  title="수정">✏️</button>`
+                }
+            </div>
         </div>
     `;
 
+    // 버튼 이벤트 (stopPropagation으로 셀 클릭과 분리)
+    const placeBtn = item.querySelector('.li-btn-place');
+    if (placeBtn) {
+        placeBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (typeof window.selectLectureForPlacement === 'function')
+                window.selectLectureForPlacement(lecture, !!isBreak);
+        });
+    }
+    const editBtn = item.querySelector('.li-btn-edit');
+    if (editBtn) {
+        editBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (typeof openEditModal === 'function') openEditModal(lecture.id);
+        });
+    }
+
+    // 드래그 (PC)
     item.addEventListener('dragstart', function(e) {
         if (typeof window.handleDragStart === 'function') window.handleDragStart(e);
     });
     item.addEventListener('dragend', function(e) {
         if (typeof window.handleDragEnd === 'function') window.handleDragEnd(e);
     });
-
-    // 모바일 터치 UX
-    (function() {
-        let tStart = 0, tY = 0, tX = 0, tMoved = false, tTimer = null;
-        let longPressed = false; // 롱프레스 발동 여부 플래그
-        let lastTap = 0;
-
-        item.addEventListener('touchstart', function(e) {
-            tStart    = Date.now();
-            tY        = e.touches[0].clientY;
-            tX        = e.touches[0].clientX;
-            tMoved    = false;
-            longPressed = false;
-
-            tTimer = setTimeout(() => {
-                if (tMoved) return;
-                longPressed = true;
-                if (navigator.vibrate) navigator.vibrate(50);
-                // iOS 텍스트선택 컨텍스트메뉴 차단은 CSS로 처리
-                if (!isBreak) {
-                    _showMobileLectureMenu(lecture, item);
-                } else {
-                    if (typeof window.selectLectureForPlacement === 'function')
-                        window.selectLectureForPlacement(lecture, true);
-                }
-            }, 600);
-        }, { passive: true });
-
-        item.addEventListener('touchmove', function(e) {
-            const dy = Math.abs(e.touches[0].clientY - tY);
-            const dx = Math.abs(e.touches[0].clientX - tX);
-            if (dy > 8 || dx > 8) {
-                tMoved = true;
-                clearTimeout(tTimer);
-            }
-        }, { passive: true });
-
-        item.addEventListener('touchend', function(e) {
-            clearTimeout(tTimer);
-            // 스크롤 or 롱프레스 → touchend 동작 없음
-            if (tMoved || longPressed) return;
-
-            // 더블탭 → 수정 모달
-            if (!isBreak) {
-                const now = Date.now();
-                if (Date.now() - tStart < 600) {
-                    if (now - lastTap < 350) {
-                        openEditModal(lecture.id);
-                        lastTap = 0;
-                    } else {
-                        lastTap = now;
-                    }
-                }
-            }
-        }, { passive: true });
-
-        // PC 더블클릭
-        if (!isBreak) {
-            item.addEventListener('dblclick', () => openEditModal(lecture.id));
-        }
-    })();
 
     return item;
 }
@@ -1090,93 +1058,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 console.log('✅ lectures.js 로드 완료 (수정본 - ID 타입 문제 해결 + 연자 자동완성 추가 + 모바일 터치 UX 재설계)');
 
-// ── 모바일 액션 메뉴 (강의목록) ──────────────────────────────────────────────
-// 현재 메뉴 대상 강의를 전역 변수로 보관 (onclick 인라인 따옴표 충돌 방지)
-window._mobileMenuLecture = null;
 
-function _showMobileLectureMenu(lecture, anchorEl) {
-    document.getElementById('mobileLectureMenu')?.remove();
-    document.getElementById('mobileLectureMenuOverlay')?.remove();
-
-    // 강의 객체를 전역에 보관
-    window._mobileMenuLecture = lecture;
-
-    const short = (lecture.titleKo || '').length > 24
-        ? lecture.titleKo.slice(0, 24) + '…' : (lecture.titleKo || '');
-
-    const menu = document.createElement('div');
-    menu.id = 'mobileLectureMenu';
-    menu.innerHTML = `
-        <div class="mob-menu-title">${short}</div>
-        <button class="mob-menu-btn" id="mobBtnPlace">📌 시간표에 배치</button>
-        <button class="mob-menu-btn" id="mobBtnEdit">✏️ 수정</button>
-        <button class="mob-menu-btn mob-menu-danger" id="mobBtnDelete">🗑️ 삭제</button>
-        <button class="mob-menu-btn mob-menu-cancel" id="mobBtnCancel">취소</button>
-    `;
-    menu.style.cssText = [
-        'position:fixed',
-        'bottom:calc(var(--tabbar-h,64px) + 8px)',
-        'left:12px', 'right:12px',
-        'background:white',
-        'border-radius:16px',
-        'padding:1rem',
-        'z-index:9500',
-        'box-shadow:0 -4px 30px rgba(0,0,0,0.2)',
-        'display:flex',
-        'flex-direction:column',
-        'gap:0.25rem'
-    ].join(';');
-
-    document.body.appendChild(menu);
-
-    function closeMenu() {
-        document.getElementById('mobileLectureMenu')?.remove();
-        document.getElementById('mobileLectureMenuOverlay')?.remove();
-        window._mobileMenuLecture = null;
-    }
-
-    // 배치 버튼
-    document.getElementById('mobBtnPlace').addEventListener('click', function() {
-        const lec = window._mobileMenuLecture;
-        closeMenu();
-        if (lec && typeof window.selectLectureForPlacement === 'function') {
-            window.selectLectureForPlacement(lec, false);
-        }
-    });
-
-    // 수정 버튼
-    document.getElementById('mobBtnEdit').addEventListener('click', function() {
-        const lec = window._mobileMenuLecture;
-        closeMenu();
-        if (lec && typeof openEditModal === 'function') {
-            openEditModal(lec.id);
-        }
-    });
-
-    // 삭제 버튼
-    document.getElementById('mobBtnDelete').addEventListener('click', function() {
-        const lec = window._mobileMenuLecture;
-        closeMenu();
-        if (lec && typeof window._confirmDeleteLecture === 'function') {
-            window._confirmDeleteLecture(lec.id, lec.titleKo || '');
-        }
-    });
-
-    // 취소 버튼
-    document.getElementById('mobBtnCancel').addEventListener('click', closeMenu);
-
-    // 배경 오버레이
-    const overlay = document.createElement('div');
-    overlay.id = 'mobileLectureMenuOverlay';
-    overlay.style.cssText = [
-        'position:fixed', 'inset:0',
-        'z-index:9499',
-        'background:rgba(0,0,0,0.3)'
-    ].join(';');
-    overlay.addEventListener('click', closeMenu);
-    document.body.insertBefore(overlay, menu);
-}
-
+// _confirmDeleteLecture: 수정 모달 내 삭제로 대체됨 (하위 호환 유지)
 window._confirmDeleteLecture = function(lectureId, title) {
     if (confirm(`"${title}" 강의를 삭제하시겠습니까?`)) {
         AppState.lectures = AppState.lectures.filter(l => l.id != lectureId);
