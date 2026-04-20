@@ -1,9 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <!-- 모바일 디버거 Eruda (확인 후 제거) -->
-    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-    <script>eruda.init();</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <style>html,body{overscroll-behavior:none;overscroll-behavior-y:none;}</style>
@@ -172,7 +169,7 @@
                             <div class="category-filters" id="categoryFilters" style="display:flex;flex-wrap:wrap;gap:0.25rem;"></div>
                         </div>
                     </div>
-                    <div class="lecture-sidebar-body" id="pcLectureSidebarBody">
+                    <div class="lecture-sidebar-body">
                         <!-- JS(lectures.js)가 document.getElementById('lectureList')로 직접 렌더링 -->
                         <div class="lecture-list" id="lectureList"></div>
                     </div>
@@ -189,7 +186,24 @@
                             <button class="tool-btn" onclick="openFullScheduleModal()" title="크게 보기">🔍크게보기</button>
                         </div>
                     </div>
-                    <div class="schedule-table-wrapper">
+
+                    <!-- ★ 배너 슬라이더 (날짜 미선택 시 표시) -->
+                    <div class="banner-screen" id="bannerScreen">
+                        <div class="banner-slider" id="bannerSlider">
+                            <!-- JS로 동적 생성 -->
+                        </div>
+                        <div class="banner-dots" id="bannerDots"></div>
+                        <div class="banner-cta">
+                            <p class="banner-cta-text">위의 날짜를 선택하면 시간표가 표시됩니다</p>
+                            <!-- 관리자만 표시 -->
+                            <button class="banner-edit-btn admin-only-banner-btn" id="bannerEditBtn"
+                                onclick="openBannerManageModal()" style="display:none;">
+                                🖼️ 배너 관리
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="schedule-table-wrapper" id="scheduleTableWrapper" style="display:none;">
                         <table class="schedule-table" id="scheduleTable"></table>
                     </div>
                 </div>
@@ -212,7 +226,7 @@
                     <div class="category-filters-wrapper" id="categoryFiltersWrapperMobile">
                         <div class="category-filters" id="categoryFiltersMobile"></div>
                     </div>
-                    <div id="lectureListMobileSlot"></div>
+                    <div class="lecture-list" id="lectureListTabMobile"></div>
                 </div>
             </section>
 
@@ -473,6 +487,63 @@
     <!-- ============================================
          모달들 (모든 ID 보존)
          ============================================ -->
+
+    <!-- 배너 관리 모달 -->
+    <div class="modal" id="bannerManageModal">
+        <div class="modal-content" style="max-width:500px;max-height:90vh;">
+            <div class="modal-header">
+                <h2>🖼️ 배너 관리</h2>
+                <button class="modal-close" onclick="closeBannerManageModal()">×</button>
+            </div>
+            <div style="padding:1rem;overflow-y:auto;max-height:calc(90vh - 80px);">
+
+                <!-- 배너 목록 -->
+                <div id="bannerList" style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:1rem;"></div>
+
+                <!-- 새 배너 추가 -->
+                <div style="border:2px dashed var(--border);border-radius:12px;padding:1rem;background:var(--bg);">
+                    <div style="font-weight:700;font-size:0.9rem;color:var(--primary);margin-bottom:0.75rem;">➕ 새 배너 추가</div>
+
+                    <!-- 이미지 업로드 (모바일 친화) -->
+                    <div style="margin-bottom:0.75rem;">
+                        <label style="font-size:0.82rem;color:var(--text-light);display:block;margin-bottom:0.4rem;">📷 이미지</label>
+                        <label class="banner-upload-label" for="bannerImageInput">
+                            <div id="bannerImagePreview" class="banner-upload-preview">
+                                <span style="font-size:2rem;">📷</span>
+                                <span style="font-size:0.8rem;color:var(--text-muted);">탭하여 사진 선택</span>
+                            </div>
+                        </label>
+                        <input type="file" id="bannerImageInput" accept="image/*"
+                            style="display:none;" onchange="previewBannerImage(this)">
+                    </div>
+
+                    <!-- 제목 -->
+                    <div style="margin-bottom:0.5rem;">
+                        <label style="font-size:0.82rem;color:var(--text-light);display:block;margin-bottom:0.3rem;">📝 제목 (선택)</label>
+                        <input type="text" id="bannerTitleInput"
+                            placeholder="예: ASLS 2025 추계학술대회"
+                            style="width:100%;padding:0.5rem 0.7rem;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;box-sizing:border-box;">
+                    </div>
+
+                    <!-- 부제목 -->
+                    <div style="margin-bottom:0.75rem;">
+                        <label style="font-size:0.82rem;color:var(--text-light);display:block;margin-bottom:0.3rem;">📋 부제목 (선택)</label>
+                        <input type="text" id="bannerSubtitleInput"
+                            placeholder="예: 2025.11.15 ~ 16 | 그랜드 인터컨티넨탈"
+                            style="width:100%;padding:0.5rem 0.7rem;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;box-sizing:border-box;">
+                    </div>
+
+                    <button class="btn btn-primary" onclick="addBannerItem()" style="width:100%;">
+                        ➕ 배너 추가
+                    </button>
+                </div>
+
+                <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.75rem;text-align:center;">
+                    💡 이미지 없이 텍스트만도 가능 · 최대 5개
+                </p>
+            </div>
+        </div>
+    </div>
 
     <!-- 전체 시간표 크게 보기 -->
     <div class="modal" id="fullScheduleModal">
@@ -1248,15 +1319,22 @@
         if (tabName === 'speaker' && typeof window.updateSpeakerList === 'function') {
             window.updateSpeakerList();
         }
-        if (tabName === 'schedule' && typeof window._moveLectureList === 'function') {
-            window._moveLectureList('pcLectureSidebarBody');
-        }
         if (tabName === 'lectures') {
-            // 모바일: lectureList DOM을 모바일 슬롯으로 이동 (이벤트 보존)
-            if (typeof window._moveLectureList === 'function') {
-                window._moveLectureList('lectureListMobileSlot');
-            }
-            if (typeof window.updateLectureList === 'function') {
+            // 모바일 탭에서 강의목록 표시: lectureListTabMobile에 동기화
+            const sidebar = document.getElementById('lectureList');
+            const mobile  = document.getElementById('lectureListTabMobile');
+            if (sidebar && mobile) {
+                mobile.innerHTML = sidebar.innerHTML;
+                // 드래그 이벤트 재연결
+                mobile.querySelectorAll('.lecture-item[draggable]').forEach(item => {
+                    item.addEventListener('dragstart', e => { if(window.handleDragStart) window.handleDragStart(e); });
+                    item.addEventListener('dragend',   e => { if(window.handleDragEnd)   window.handleDragEnd(e);   });
+                    item.addEventListener('dblclick', function() {
+                        const id = this.dataset.lectureId;
+                        if (id && window.openEditModal) window.openEditModal(id);
+                    });
+                });
+            } else if (typeof window.updateLectureList === 'function') {
                 window.updateLectureList();
             }
         }
@@ -1575,30 +1653,6 @@
             };
         }
     });
-    </script>    <script>
-    // lectureList DOM 이동 방식 (이벤트 완전 보존)
-    // PC: lectureList는 #pcLectureSidebar 안에
-    // 모바일: lectureList를 #lectureListMobileSlot으로 이동
-    function _moveLectureList(targetId) {
-        const list = document.getElementById('lectureList');
-        const target = document.getElementById(targetId);
-        if (!list || !target) return;
-        if (list.parentElement === target) return; // 이미 있음
-        target.appendChild(list);
-    }
-
-    // updateLectureList 후 강의수 업데이트
-    document.addEventListener('DOMContentLoaded', function() {
-        const orig = window.updateLectureList;
-        if (!orig) return;
-        window.updateLectureList = function() {
-            orig.apply(this, arguments);
-            const list = document.getElementById('lectureList');
-            const cnt  = document.getElementById('pcLectureCount');
-            if (list && cnt) cnt.textContent = list.querySelectorAll('.lecture-item').length + '개';
-        };
-    });
-    window._moveLectureList = _moveLectureList;
     </script>
 </body>
 </html>
