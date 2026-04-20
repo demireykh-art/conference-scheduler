@@ -1320,23 +1320,8 @@
             window.updateSpeakerList();
         }
         if (tabName === 'lectures') {
-            // 모바일 탭에서 강의목록 표시: lectureListTabMobile에 동기화
-            const sidebar = document.getElementById('lectureList');
-            const mobile  = document.getElementById('lectureListTabMobile');
-            if (sidebar && mobile) {
-                mobile.innerHTML = sidebar.innerHTML;
-                // 드래그 이벤트 재연결
-                mobile.querySelectorAll('.lecture-item[draggable]').forEach(item => {
-                    item.addEventListener('dragstart', e => { if(window.handleDragStart) window.handleDragStart(e); });
-                    item.addEventListener('dragend',   e => { if(window.handleDragEnd)   window.handleDragEnd(e);   });
-                    item.addEventListener('dblclick', function() {
-                        const id = this.dataset.lectureId;
-                        if (id && window.openEditModal) window.openEditModal(id);
-                    });
-                });
-            } else if (typeof window.updateLectureList === 'function') {
-                window.updateLectureList();
-            }
+            // updateLectureList가 lectureList + lectureListTabMobile 모두 직접 렌더링
+            if (typeof window.updateLectureList === 'function') window.updateLectureList();
         }
     }
 
@@ -1569,34 +1554,13 @@
         });
     }
 
-    // lectureList → lectureListTabMobile 미러링
-    function mirrorToMobile() {
-        const sidebar = document.getElementById('lectureList');
-        const mobile  = document.getElementById('lectureListTabMobile');
-        if (!sidebar || !mobile) return;
-        mobile.innerHTML = sidebar.innerHTML;
-        // 이벤트 재연결 (드래그, 더블클릭)
-        mobile.querySelectorAll('.lecture-item').forEach(item => {
-            item.addEventListener('dragstart', function(e) {
-                if (typeof window.handleDragStart === 'function') window.handleDragStart(e);
-            });
-            item.addEventListener('dragend', function(e) {
-                if (typeof window.handleDragEnd === 'function') window.handleDragEnd(e);
-            });
-            item.addEventListener('dblclick', function() {
-                const id = this.dataset.lectureId;
-                if (id && typeof window.openEditModal === 'function') window.openEditModal(id);
-            });
-        });
-    }
-
+    // lectureList 미러링 불필요 (updateLectureList가 두 컨테이너 직접 렌더링)
     // categoryFilters → categoryFiltersMobile 미러링
     function mirrorCategoryFilters() {
         const src  = document.getElementById('categoryFilters');
         const dest = document.getElementById('categoryFiltersMobile');
         if (!src || !dest) return;
         dest.innerHTML = src.innerHTML;
-        // onclick 이벤트는 인라인 onclick="..." 그대로 복사되므로 별도 연결 불필요
     }
 
     // 강의수 표시 업데이트
@@ -1608,42 +1572,25 @@
         countEl.textContent = count + '개';
     }
 
-    // updateLectureList 후킹 (lectures.js 수정 없이)
+    // updateLectureList 후킹: 카테고리필터 미러링 + 강의수 갱신
     document.addEventListener('DOMContentLoaded', function() {
         const origUpdate = window.updateLectureList;
         if (typeof origUpdate === 'function') {
             window.updateLectureList = function() {
                 origUpdate.apply(this, arguments);
-                mirrorToMobile();
                 mirrorCategoryFilters();
                 updatePcLectureCount();
                 syncMobileFilterBtns();
             };
-        } else {
-            // lectures.js 보다 늦게 로드된 경우를 대비한 폴백
-            const _origDesc = Object.getOwnPropertyDescriptor(window, 'updateLectureList');
-            Object.defineProperty(window, 'updateLectureList', {
-                configurable: true,
-                set: function(fn) {
-                    const wrapped = function() {
-                        fn.apply(this, arguments);
-                        mirrorToMobile();
-                        mirrorCategoryFilters();
-                        updatePcLectureCount();
-                    };
-                    Object.defineProperty(window, 'updateLectureList', { value: wrapped, writable: true, configurable: true });
-                },
-                get: function() { return undefined; }
-            });
         }
 
-        // switchTab 'lectures' 진입 시 항상 최신 동기화
+        // switchTab 'lectures' 진입 시 최신 렌더링
         const _origSwitch2 = window.switchTab;
         if (typeof _origSwitch2 === 'function') {
             window.switchTab = function(tabName) {
                 _origSwitch2.apply(this, arguments);
                 if (tabName === 'lectures') {
-                    mirrorToMobile();
+                    if (typeof window.updateLectureList === 'function') window.updateLectureList();
                     mirrorCategoryFilters();
                     // 검색어 동기화
                     const sb  = document.getElementById('lectureSearchInput');
