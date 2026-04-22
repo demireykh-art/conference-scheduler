@@ -2121,6 +2121,20 @@ window.loadBannersFromFirebase = function() {
     });
 };
 
+/** 배너 Firebase 저장 */
+window.saveBannersToFirebase = function() {
+    if (!AppState.currentUser) return;
+    const banners = AppState.banners || [];
+    database.ref('/settings/banners').set(banners)
+        .then(() => {
+            console.log('배너 저장 완료:', banners.length, '개');
+        })
+        .catch(err => {
+            console.error('배너 저장 실패:', err);
+            if (typeof Toast !== 'undefined') Toast.error('배너 저장에 실패했습니다.');
+        });
+};
+
 /** 배너 슬라이더 렌더링 */
 window.renderBannerSlider = function() {
     const slider = document.getElementById('bannerSlider');
