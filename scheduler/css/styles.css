@@ -2388,3 +2388,33 @@ input[type="radio"]    { accent-color: var(--primary); cursor: pointer; }
         transform: translateX(-50%) !important;
     }
 }
+
+/* ── 강의 입력/수정 폼 textarea ── */
+.form-textarea {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    font-family: inherit;
+    color: var(--text);
+    background: white;
+    box-sizing: border-box;
+    line-height: 1.55;
+    resize: vertical;
+    min-height: 70px;
+    max-height: 200px;
+    transition: border-color 0.15s;
+}
+.form-textarea:focus {
+    outline: none;
+    border-color: var(--primary-light, #7c5cbf);
+    box-shadow: 0 0 0 2px rgba(74,46,108,0.1);
+}
+/* 라벨 서브텍스트 */
+.form-label-sub {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-left: 0.2rem;
+}
