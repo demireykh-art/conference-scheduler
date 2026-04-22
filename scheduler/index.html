@@ -246,13 +246,15 @@
                         </div>
 
                         <div class="form-group">
-                            <label>제목 (한글)</label>
-                            <input type="text" id="titleKo">
+                            <label>제목</label>
+                            <textarea id="titleKo" rows="3" class="form-textarea"
+                                placeholder="한국어 / 해당 언어&#10;부제목도 함께 입력 가능"></textarea>
                         </div>
 
                         <div class="form-group">
-                            <label>제목 (영문)</label>
-                            <input type="text" id="titleEn" placeholder="English title">
+                            <label>제목(영어) <span class="form-label-sub">English</span></label>
+                            <textarea id="titleEn" rows="3" class="form-textarea"
+                                placeholder="English title&#10;(subtitle can be included)"></textarea>
                             <div class="translation-help">
                                 💡 번역:
                                 <a href="https://translate.google.com/?sl=ko&tl=en" target="_blank">Google</a> |
@@ -261,23 +263,22 @@
                             </div>
                         </div>
 
-                        <div class="form-row">
-                            <div class="form-group autocomplete-container">
-                                <label>연자 <span style="font-size:0.75rem;color:var(--text-muted);">한국어 / 해당 언어</span></label>
-                                <!-- speakerKo: required 속성 없어야 함 -->
-                                <input type="text" id="speakerKo" autocomplete="off">
-                                <div class="autocomplete-list" id="autocompleteList"></div>
-                            </div>
-                            <div class="form-group">
-                                <label>연자 (영문)</label>
-                                <input type="text" id="speakerEn" placeholder="Speaker name">
-                            </div>
+                        <div class="form-group autocomplete-container">
+                            <label>연자</label>
+                            <input type="text" id="speakerKo" autocomplete="off"
+                                placeholder="한국어 / 해당 언어">
+                            <div class="autocomplete-list" id="autocompleteList"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>연자(영어) <span class="form-label-sub">English</span></label>
+                            <input type="text" id="speakerEn" placeholder="Speaker name (English)">
                         </div>
 
                         <div class="form-row">
                             <div class="form-group">
                                 <label>소속</label>
-                                <input type="text" id="affiliation">
+                                <input type="text" id="affiliation" placeholder="한국어 / 해당 언어">
                             </div>
                             <div class="form-group">
                                 <label>강의 시간</label>
