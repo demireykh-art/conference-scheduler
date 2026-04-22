@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스케줄러 정보</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans KR', -apple-system, sans-serif;
+            background: #F5F3FA;
+            color: #18152A;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            max-width: 480px;
+            width: 100%;
+            box-shadow: 0 8px 40px rgba(46,26,71,0.13);
+        }
+        .logo {
+            font-size: 3rem;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+        h1 {
+            text-align: center;
+            font-size: 1.4rem;
+            color: #2E1A47;
+            margin-bottom: 0.3rem;
+        }
+        .version {
+            text-align: center;
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 1.5rem;
+        }
+        .section {
+            margin-bottom: 1.25rem;
+        }
+        .section h2 {
+            font-size: 0.85rem;
+            color: #2E1A47;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 2px solid #EDE9F5;
+        }
+        .feature-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+        .feature-list li {
+            font-size: 0.88rem;
+            color: #444;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+        .feature-list li::before {
+            content: '✓';
+            color: #FF6B9D;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .tip-box {
+            background: #F5F3FA;
+            border-left: 3px solid #2E1A47;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            font-size: 0.83rem;
+            color: #444;
+            line-height: 1.6;
+        }
+        .tip-box b { color: #2E1A47; }
+        .back-btn {
+            display: block;
+            width: 100%;
+            margin-top: 1.5rem;
+            padding: 0.75rem;
+            background: #2E1A47;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+        }
+        .back-btn:hover { background: #4A2E6C; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="logo">📅</div>
+        <h1>학술대회 스케줄러</h1>
+        <p class="version">ASLS Conference Scheduler</p>
+
+        <div class="section">
+            <h2>주요 기능</h2>
+            <ul class="feature-list">
+                <li>강의 추가 · 수정 · 삭제</li>
+                <li>드래그앤드롭으로 시간표 배치 (PC)</li>
+                <li>롱프레스 메뉴로 시간표 배치 (모바일)</li>
+                <li>세션 · 좌장 관리</li>
+                <li>연자 관리 및 사진 등록</li>
+                <li>실시간 다중 사용자 동기화</li>
+                <li>엑셀 강의목록 업로드</li>
+                <li>인쇄 / PDF / 엑셀 내보내기</li>
+                <li>자동 백업 (매시간)</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>모바일 사용법</h2>
+            <div class="tip-box">
+                <b>강의 배치:</b> 강의목록에서 강의를 <b>길게 누르면</b> (0.6초) 메뉴가 나타납니다.<br>
+                "시간표에 배치"를 선택 후 시간표 탭에서 원하는 시간대를 탭하세요.<br><br>
+                <b>강의 수정:</b> 강의를 <b>두 번 빠르게 탭</b>하면 수정 화면이 열립니다.
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>권한 안내</h2>
+            <ul class="feature-list">
+                <li>👑 관리자: 모든 기능 + 사용자 관리</li>
+                <li>✏️ 편집자: 강의/시간표 편집 가능</li>
+                <li>⏳ 승인대기: 보기만 가능 (관리자 승인 필요)</li>
+            </ul>
+        </div>
+
+        <a href="javascript:history.back()" class="back-btn">← 돌아가기</a>
+    </div>
+</body>
+</html>
