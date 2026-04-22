@@ -1017,45 +1017,58 @@ window.updateCategoryDropdowns = function() {
 
 // 강의 추가 버튼 이벤트
 document.addEventListener('DOMContentLoaded', function() {
+    // 학회강의 체크박스: 체크 시 파트너사 섹션 숨기기
+    const academicCb = document.getElementById('isAcademicLecture');
+    const partnerSection = document.querySelector('#lectureForm .form-row:has(#companyName)')
+        || document.getElementById('companyName')?.closest('.form-row');
+
+    if (academicCb) {
+        function toggleAcademicMode() {
+            const isAcademic = academicCb.checked;
+            // 파트너사/제품 관련 필드 토글
+            ['companyName','productName','productDescription'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    const group = el.closest('.form-group') || el.closest('.form-row');
+                    if (group) group.style.display = isAcademic ? 'none' : '';
+                }
+            });
+        }
+        academicCb.addEventListener('change', toggleAcademicMode);
+    }
+
     const addBtn = document.getElementById('addLectureBtn');
     if (addBtn) {
-        addBtn.addEventListener('click', async function() {
-            // HTML form.checkValidity() 대신 직접 검증 (숨겨진 탭 패널 오작동 방지)
+        addBtn.addEventListener('click', function() {
             const category = document.getElementById('category').value;
-            const titleKo = document.getElementById('titleKo').value.trim().replace(/\n+/g, ' ');
+            const titleKo  = (document.getElementById('titleKo').value || '').trim().replace(/\n+/g, ' ');
 
             if (!category) {
-                if (typeof Toast !== 'undefined') Toast.warning('분류를 선택해주세요.');
-                else alert('분류를 선택해주세요.');
+                Toast.warning('분류를 선택해주세요.');
                 return;
             }
             if (!titleKo) {
-                if (typeof Toast !== 'undefined') Toast.warning('제목(한글)을 입력해주세요.');
-                else alert('제목(한글)을 입력해주세요.');
+                Toast.warning('제목을 입력해주세요.');
                 return;
             }
 
-            const speakerKoValue = document.getElementById('speakerKo').value.trim();
-
-            if (!speakerKoValue) {
-                addLectureToList();
-                return;
-            }
-
-            const speakerExists = AppState.speakers.find(s => s.name.toLowerCase() === speakerKoValue.toLowerCase());
-
-            if (!speakerExists) {
-                AppState.pendingSpeakerInfo = {
-                    name: speakerKoValue,
-                    nameEn: document.getElementById('speakerEn').value.trim() || '',
-                    affiliation: document.getElementById('affiliation').value.trim() || '',
-                    affiliationEn: ''
-                };
-
-                document.getElementById('confirmMessage').textContent =
-                    `"${speakerKoValue}" 연자가 목록에 없습니다. 연자 목록에 추가하시겠습니까?`;
-                document.getElementById('confirmAddSpeakerModal').classList.add('active');
-                return;
+            // 새 연자 자동 등록 (모달 없이)
+            const speakerKoValue = (document.getElementById('speakerKo').value || '').trim();
+            if (speakerKoValue) {
+                const exists = AppState.speakers.find(
+                    s => s.name.toLowerCase() === speakerKoValue.toLowerCase()
+                );
+                if (!exists) {
+                    AppState.speakers.push({
+                        name: speakerKoValue,
+                        nameEn: (document.getElementById('speakerEn').value || '').trim(),
+                        affiliation: (document.getElementById('affiliation').value || '').trim(),
+                        affiliationEn: ''
+                    });
+                    if (typeof saveAndSync === 'function') saveAndSync();
+                    if (typeof updateSpeakerList === 'function') updateSpeakerList();
+                    Toast.info(`"${speakerKoValue}" 연자가 자동 등록되었습니다.`);
+                }
             }
 
             addLectureToList();
