@@ -1022,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', function() {
         addBtn.addEventListener('click', async function() {
             // HTML form.checkValidity() 대신 직접 검증 (숨겨진 탭 패널 오작동 방지)
             const category = document.getElementById('category').value;
-            const titleKo = document.getElementById('titleKo').value.trim();
+            const titleKo = document.getElementById('titleKo').value.trim().replace(/\n+/g, ' ');
 
             if (!category) {
                 if (typeof Toast !== 'undefined') Toast.warning('분류를 선택해주세요.');
