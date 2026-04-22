@@ -12,7 +12,7 @@ window.Toast = {
         if (!this._container) {
             this._container = document.createElement('div');
             this._container.id = 'toast-container';
-            this._container.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;';
+            this._container.style.cssText = 'position:fixed;bottom:calc(var(--tabbar-h,64px) + 16px);left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;width:max-content;max-width:90vw;';
             document.body.appendChild(this._container);
         }
         return this._container;
@@ -22,13 +22,13 @@ window.Toast = {
         const toast = document.createElement('div');
         const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
         const colors = { success: '#10b981', error: '#ef4444', warning: '#f59e0b', info: '#3b82f6' };
-        toast.style.cssText = `pointer-events:auto;background:#fff;border-left:4px solid ${colors[type]};padding:12px 16px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-width:400px;font-size:0.9rem;display:flex;align-items:flex-start;gap:8px;opacity:0;transform:translateX(100%);transition:all 0.3s ease;`;
+        toast.style.cssText = `pointer-events:auto;background:#fff;border-left:4px solid ${colors[type]};padding:12px 16px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-width:400px;font-size:0.9rem;display:flex;align-items:flex-start;gap:8px;opacity:0;transform:translateY(16px);transition:all 0.3s ease;`;
         toast.innerHTML = `<span style="flex-shrink:0">${icons[type]}</span><span style="flex:1;word-break:break-word">${message}</span><button onclick="this.parentElement.remove()" style="flex-shrink:0;background:none;border:none;cursor:pointer;font-size:1.1rem;color:#999;padding:0 0 0 8px;">×</button>`;
         container.appendChild(toast);
-        requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateX(0)'; });
+        requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; });
         if (duration > 0) {
             setTimeout(() => {
-                toast.style.opacity = '0'; toast.style.transform = 'translateX(100%)';
+                toast.style.opacity = '0'; toast.style.transform = 'translateY(16px)';
                 setTimeout(() => toast.remove(), 300);
             }, duration);
         }
