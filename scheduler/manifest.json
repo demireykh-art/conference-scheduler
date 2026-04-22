@@ -20,28 +20,41 @@
       "src": "favicon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "favicon-192.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ],
-  "categories": ["productivity", "utilities"],
+  "categories": [
+    "productivity",
+    "utilities"
+  ],
   "shortcuts": [
     {
       "name": "시간표 보기",
       "short_name": "시간표",
       "url": "/conference-scheduler/scheduler/#schedule",
-      "icons": [{ "src": "favicon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "favicon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "강의 추가",
       "short_name": "강의추가",
       "url": "/conference-scheduler/scheduler/#add",
-      "icons": [{ "src": "favicon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "favicon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }
