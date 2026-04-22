@@ -2269,3 +2269,82 @@ input[type="radio"]    { accent-color: var(--primary); cursor: pointer; }
     border-radius: 8px;
     background: rgba(46,26,71,0.06);
 }
+
+/* ── 배너 관리 모달 개선 ── */
+.banner-list-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+.banner-list-thumb-wrap {
+    width: 64px;
+    height: 64px;
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.banner-list-thumb {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 6px;
+    display: block;
+}
+.banner-list-thumb-placeholder {
+    width: 64px;
+    height: 64px;
+    background: var(--bg2);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+/* 수정 가능한 입력 */
+.banner-edit-input {
+    width: 100%;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.83rem;
+    font-family: inherit;
+    background: white;
+    color: var(--text);
+    box-sizing: border-box;
+}
+.banner-edit-input:focus {
+    outline: none;
+    border-color: var(--primary-light);
+}
+/* 순서/삭제 버튼 */
+.banner-list-btn {
+    width: 28px;
+    height: 24px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.65rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.banner-list-btn:hover { background: var(--primary); color: white; }
+.banner-list-del {
+    width: 28px;
+    height: 28px;
+    background: none;
+    border: 1px solid #fca5a5;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    color: #ef4444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.banner-list-del:hover { background: #fee2e2; }
