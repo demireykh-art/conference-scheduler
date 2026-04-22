@@ -2307,19 +2307,105 @@ function renderBannerListInModal() {
         list.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:0.82rem;padding:0.5rem;">등록된 배너가 없습니다</p>';
         return;
     }
-    list.innerHTML = banners.map(b => `
-        <div class="banner-list-item">
-            ${b.imageBase64
-                ? `<img class="banner-list-thumb" src="${b.imageBase64}" alt="">`
-                : `<div class="banner-list-thumb-placeholder">🖼️</div>`}
-            <div class="banner-list-info">
-                <div class="banner-list-title">${b.title || '(제목 없음)'}</div>
-                <div class="banner-list-sub">${b.subtitle || ''}</div>
+    list.innerHTML = banners.map((b, idx) => `
+        <div class="banner-list-item" id="bannerItem_${b.id}">
+            <div class="banner-list-thumb-wrap" onclick="triggerBannerImageEdit(${b.id})" title="이미지 교체" style="cursor:pointer;position:relative;flex-shrink:0;">
+                ${b.imageBase64
+                    ? `<img class="banner-list-thumb" src="${b.imageBase64}" alt="">`
+                    : `<div class="banner-list-thumb-placeholder">🖼️</div>`}
+                <div style="position:absolute;inset:0;background:rgba(0,0,0,0.35);border-radius:6px;
+                            display:flex;align-items:center;justify-content:center;
+                            opacity:0;transition:opacity 0.2s;"
+                     class="banner-thumb-overlay">
+                    <span style="color:white;font-size:1.1rem;">📷</span>
+                </div>
             </div>
-            <button class="banner-list-del" onclick="deleteBannerItem(${b.id})" title="삭제">🗑️</button>
+            <div class="banner-list-info" style="flex:1;min-width:0;">
+                <input class="banner-edit-input" value="${(b.title || '').replace(/"/g, '&quot;')}"
+                    placeholder="제목" onchange="updateBannerField(${b.id},'title',this.value)"
+                    style="width:100%;margin-bottom:0.25rem;">
+                <input class="banner-edit-input" value="${(b.subtitle || '').replace(/"/g, '&quot;')}"
+                    placeholder="부제목" onchange="updateBannerField(${b.id},'subtitle',this.value)"
+                    style="width:100%;font-size:0.78rem;color:var(--text-light);">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.3rem;flex-shrink:0;">
+                ${idx > 0 ? `<button class="banner-list-btn" onclick="moveBannerItem(${b.id},-1)" title="위로">▲</button>` : '<div style="width:28px;"></div>'}
+                ${idx < banners.length-1 ? `<button class="banner-list-btn" onclick="moveBannerItem(${b.id},1)" title="아래로">▼</button>` : '<div style="width:28px;"></div>'}
+                <button class="banner-list-del" onclick="deleteBannerItem(${b.id})" title="삭제">🗑️</button>
+            </div>
+            <input type="file" id="bannerEditFile_${b.id}" accept="image/*"
+                style="display:none;" onchange="replaceBannerImage(${b.id}, this)">
         </div>
     `).join('');
+
+    // hover 효과
+    list.querySelectorAll('.banner-thumb-overlay').forEach(ov => {
+        const wrap = ov.parentElement;
+        wrap.addEventListener('mouseenter', () => ov.style.opacity = '1');
+        wrap.addEventListener('mouseleave', () => ov.style.opacity = '0');
+    });
 }
+
+// 배너 이미지 교체 트리거
+window.triggerBannerImageEdit = function(id) {
+    const input = document.getElementById('bannerEditFile_' + id);
+    if (input) input.click();
+};
+
+// 배너 이미지 교체
+window.replaceBannerImage = function(id, input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        // 이미지 압축 (Canvas)
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const MAX = 1200;
+            let w = img.width, h = img.height;
+            if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            const b64 = canvas.toDataURL('image/jpeg', 0.82);
+            const banner = (AppState.banners || []).find(b => b.id === id);
+            if (banner) {
+                banner.imageBase64 = b64;
+                saveBannersToFirebase();
+                renderBannerListInModal();
+                renderBannerSlider();
+                if (typeof Toast !== 'undefined') Toast.success('이미지가 교체되었습니다.');
+            }
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+};
+
+// 배너 필드 업데이트 (제목/부제목)
+window.updateBannerField = function(id, field, value) {
+    const banner = (AppState.banners || []).find(b => b.id === id);
+    if (!banner) return;
+    banner[field] = value;
+    saveBannersToFirebase();
+    renderBannerSlider();
+};
+
+// 배너 순서 이동
+window.moveBannerItem = function(id, dir) {
+    const banners = AppState.banners || [];
+    const idx = banners.findIndex(b => b.id === id);
+    if (idx < 0) return;
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= banners.length) return;
+    const tmp = banners[idx];
+    banners[idx] = banners[newIdx];
+    banners[newIdx] = tmp;
+    AppState.banners = banners;
+    saveBannersToFirebase();
+    renderBannerListInModal();
+    renderBannerSlider();
+};
 
 // DOMContentLoaded 시 배너 로드 + 초기 상태는 배너 화면
 document.addEventListener('DOMContentLoaded', function() {
