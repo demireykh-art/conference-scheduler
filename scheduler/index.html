@@ -1568,10 +1568,11 @@
     };
     function outsideClickHandler(e) {
         const menu = document.getElementById('hamburgerMenu');
-        const btn = document.querySelector('.hamburger-btn');
-        if (!menu.contains(e.target) && !btn.contains(e.target)) {
-            closeHamburgerMenu();
-        }
+        const btn  = document.querySelector('.hamburger-btn');
+        // 메뉴 내부 클릭이면 닫지 않음
+        if (menu && menu.contains(e.target)) return;
+        if (btn  && btn.contains(e.target))  return;
+        closeHamburgerMenu();
     }
     </script>
 
