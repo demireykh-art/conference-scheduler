@@ -413,6 +413,11 @@ window.switchDate = function(date) {
         btn.classList.toggle('active', btn.dataset.date === date);
     });
 
+    // 강의 추가 폼 "포함할 일정" 기본 선택을 현재 일정으로 갱신
+    if (typeof renderLectureDateChecks === 'function') {
+        renderLectureDateChecks('lectureDateChecks', [date]);
+    }
+
     createScheduleTable();
     updateLectureList();
 
@@ -1964,6 +1969,11 @@ window.updateDateSelectorButtons = function() {
             </button>
         `;
     }).join('');
+
+    // 강의 추가 폼의 "포함할 일정" 체크박스도 갱신 (기본: 현재 일정 선택)
+    if (typeof renderLectureDateChecks === 'function') {
+        renderLectureDateChecks('lectureDateChecks', [AppState.currentDate]);
+    }
 };
 
 /**
