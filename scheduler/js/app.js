@@ -343,7 +343,8 @@ window.loadConferenceDatesFromFirebase = function() {
         if (!AppState.currentDate) {
             AppState.currentDate = AppConfig.CONFERENCE_DATES[0].date;
         }
-        updateDateButtons();
+        // 날짜 선택 버튼 렌더링 (updateDateButtons → updateDateSelectorButtons 로 이름 변경됨)
+        if (typeof updateDateSelectorButtons === 'function') updateDateSelectorButtons();
         loadDateData(AppState.currentDate);
         console.log('날짜 설정 로드:', AppConfig.CONFERENCE_DATES);
     });
