@@ -6,6 +6,87 @@
  * 3. schedule에서 직접 강의를 찾는 로직 추가
  */
 
+// ============================================
+// 일정(날짜)별 강의 배정 헬퍼
+// 강의를 여러 일정에 동시 추가/수정할 수 있도록 지원
+// ============================================
+
+/**
+ * 등록된 모든 행사 일정 반환 ([{date,label,featured?}, ...])
+ */
+window.getAllEventDates = function() {
+    const e = AppState.eventDates;
+    if (Array.isArray(e) && e.length) return e;
+    return AppConfig.CONFERENCE_DATES || [];
+};
+
+/**
+ * 특정 날짜의 강의/스케줄 버킷 반환
+ * 현재 날짜는 라이브 참조(AppState.lectures/schedule)를 사용해 UI와 동기화 유지
+ */
+window.getDateBucket = function(date) {
+    if (date === AppState.currentDate) {
+        return { lectures: AppState.lectures, schedule: AppState.schedule };
+    }
+    if (!AppState.dataByDate[date]) {
+        AppState.dataByDate[date] = { lectures: [], schedule: {}, sessions: [] };
+    }
+    if (!Array.isArray(AppState.dataByDate[date].lectures)) AppState.dataByDate[date].lectures = [];
+    if (!AppState.dataByDate[date].schedule) AppState.dataByDate[date].schedule = {};
+    return {
+        lectures: AppState.dataByDate[date].lectures,
+        schedule: AppState.dataByDate[date].schedule
+    };
+};
+
+/**
+ * 일정 체크박스 렌더링
+ * @param {string} containerId 컨테이너 element id
+ * @param {string[]} selectedDates 체크할 날짜 배열
+ */
+window.renderLectureDateChecks = function(containerId, selectedDates) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const dates = getAllEventDates();
+    selectedDates = selectedDates || [];
+    if (!dates.length) {
+        container.innerHTML = '<small style="color:#999;">등록된 일정이 없습니다. 먼저 📅+ 에서 일정을 추가하세요.</small>';
+        return;
+    }
+    container.innerHTML = dates.map(d => {
+        const checked = selectedDates.includes(d.date) ? 'checked' : '';
+        return `<label class="date-check-label" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:0.85rem;background:#fafafa;">
+            <input type="checkbox" class="lecture-date-check" value="${d.date}" ${checked} style="width:15px;height:15px;accent-color:#2E1A47;">
+            ${d.featured ? '⭐ ' : ''}${d.label || d.date}
+        </label>`;
+    }).join('');
+};
+
+/**
+ * 체크된 일정 날짜 목록 반환
+ */
+window.getSelectedLectureDates = function(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return [];
+    return Array.from(container.querySelectorAll('.lecture-date-check:checked')).map(c => c.value);
+};
+
+/**
+ * 특정 강의 id가 포함된 일정 날짜 목록 반환
+ */
+window.getLectureDates = function(lectureId) {
+    const result = [];
+    getAllEventDates().forEach(d => {
+        const bucket = (d.date === AppState.currentDate)
+            ? { lectures: AppState.lectures }
+            : AppState.dataByDate[d.date];
+        if (bucket && Array.isArray(bucket.lectures) && bucket.lectures.some(l => l.id == lectureId)) {
+            result.push(d.date);
+        }
+    });
+    return result;
+};
+
 /**
  * 연자별 일자별 강의 통계 계산
  */
@@ -484,9 +565,27 @@ window.addLectureToList = function() {
         AppState.companies.sort((a, b) => a.localeCompare(b, 'ko'));
     }
 
-    AppState.lectures.push(lecture);
+    // 선택된 일정(날짜)들에 강의 추가 (각 일정마다 독립 복사본, id는 공유)
+    let targetDates = getSelectedLectureDates('lectureDateChecks');
+    if (!targetDates || targetDates.length === 0) {
+        targetDates = [AppState.currentDate];  // 선택 없으면 현재 일정에만
+    }
+    targetDates.forEach(date => {
+        const bucket = getDateBucket(date);
+        const clone = JSON.parse(JSON.stringify(lecture));
+        bucket.lectures.push(clone);
+    });
+
     saveAndSync();
     updateLectureList();
+
+    const addedLabels = targetDates.map(dt => {
+        const ev = getAllEventDates().find(e => e.date === dt);
+        return ev ? (ev.label || dt) : dt;
+    });
+    if (typeof Toast !== 'undefined') {
+        Toast.success(`강의가 ${addedLabels.length}개 일정에 추가되었습니다: ${addedLabels.join(', ')}`);
+    }
 
     // 폼 초기화
     document.getElementById('category').value = '';
@@ -505,6 +604,9 @@ window.addLectureToList = function() {
     const autocompleteList = document.getElementById('autocompleteList');
     autocompleteList.classList.remove('active');
     autocompleteList.innerHTML = '';
+
+    // 일정 체크박스 기본값(현재 일정)으로 리셋
+    renderLectureDateChecks('lectureDateChecks', [AppState.currentDate]);
 
     console.log('강의가 추가되었습니다.');
 };
@@ -567,6 +669,11 @@ window.openEditModal = function(lectureId) {
 
     // 연자 자동완성 설정
     setupEditSpeakerAutocomplete();
+
+    // 이 강의가 포함된 일정 체크박스 렌더링 (어디에도 없으면 현재 일정 기본 선택)
+    let lectureDates = getLectureDates(lecture.id);
+    if (lectureDates.length === 0) lectureDates = [AppState.currentDate];
+    renderLectureDateChecks('editLectureDateChecks', lectureDates);
 
     document.getElementById('editModal').classList.add('active');
 };
@@ -722,7 +829,6 @@ window.deleteLectureFromModal = function() {
  */
 window.saveEditedLecture = function() {
     const lectureId = document.getElementById('editLectureId').value;
-    const lectureIndex = AppState.lectures.findIndex(l => l.id == lectureId);
     const category = document.getElementById('editCategory').value;
     const editIsLuncheonCheckbox = document.getElementById('editIsLuncheon');
     const isLuncheon = editIsLuncheonCheckbox ? editIsLuncheonCheckbox.checked : false;
@@ -761,19 +867,40 @@ window.saveEditedLecture = function() {
         AppState.companies.sort((a, b) => a.localeCompare(b, 'ko'));
     }
 
-    // lectures 배열에 있으면 업데이트
-    if (lectureIndex !== -1) {
-        AppState.lectures[lectureIndex] = updatedLecture;
-    } else {
-        // lectures에 없으면 추가 (schedule에만 있던 강의)
-        AppState.lectures.push(updatedLecture);
-        console.log('강의 목록에 추가됨:', updatedLecture.titleKo);
+    // 선택된 일정 목록 (없으면 현재 일정 유지)
+    let selectedDates = getSelectedLectureDates('editLectureDateChecks');
+    if (!selectedDates || selectedDates.length === 0) {
+        selectedDates = [AppState.currentDate];
     }
 
-    // 시간표의 강의도 업데이트
-    Object.keys(AppState.schedule).forEach(key => {
-        if (AppState.schedule[key].id == lectureId) {
-            AppState.schedule[key] = { ...updatedLecture };
+    // 모든 행사 일정을 순회하며 적용/제거
+    getAllEventDates().forEach(d => {
+        const date = d.date;
+        const bucket = getDateBucket(date);
+        const idx = bucket.lectures.findIndex(l => l.id == lectureId);
+
+        if (selectedDates.includes(date)) {
+            // 이 일정에 포함: 강의 정보 업데이트(없으면 추가)
+            const clone = JSON.parse(JSON.stringify(updatedLecture));
+            if (idx !== -1) {
+                bucket.lectures[idx] = clone;
+            } else {
+                bucket.lectures.push(clone);
+            }
+            // 시간표에 배치된 동일 강의도 업데이트
+            Object.keys(bucket.schedule).forEach(key => {
+                if (bucket.schedule[key].id == lectureId) {
+                    bucket.schedule[key] = { ...clone };
+                }
+            });
+        } else {
+            // 이 일정에서 제거 (강의 목록 + 배치된 시간표)
+            if (idx !== -1) bucket.lectures.splice(idx, 1);
+            Object.keys(bucket.schedule).forEach(key => {
+                if (bucket.schedule[key].id == lectureId) {
+                    delete bucket.schedule[key];
+                }
+            });
         }
     });
 
@@ -781,8 +908,8 @@ window.saveEditedLecture = function() {
     updateLectureList();
     updateScheduleDisplay();
     closeEditModal();
-    
-    console.log('강의 수정 완료:', updatedLecture.titleKo);
+
+    console.log('강의 수정 완료:', updatedLecture.titleKo, '→ 일정:', selectedDates.join(', '));
 };
 
 /**

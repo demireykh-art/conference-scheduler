@@ -329,6 +329,12 @@
                             <small style="color:#666;margin-left:1.5rem;">런치 시간 내 파트너사 강의인 경우 체크</small>
                         </div>
 
+                        <!-- 포함할 일정 선택 (여러 일정에 동시 추가 가능) -->
+                        <div class="form-group">
+                            <label>📅 포함할 일정 <span class="form-label-sub">선택한 모든 일정에 강의가 추가됩니다</span></label>
+                            <div id="lectureDateChecks" class="lecture-date-checks" style="display:flex;flex-wrap:wrap;gap:0.4rem;"></div>
+                        </div>
+
                         <!-- addLectureBtn: lectures.js가 직접 검증 — form.checkValidity() 사용 금지 -->
                         <button type="button" class="btn btn-primary btn-full" id="addLectureBtn">강의 추가</button>
                         <div class="form-row" style="margin-top:0.5rem;">
@@ -881,6 +887,10 @@
                             <input type="text" id="editProductName" placeholder="예: 올리지오키스">
                         </div>
                     </div>
+                </div>
+                <div class="form-group">
+                    <label>📅 포함할 일정 <span class="form-label-sub">체크를 해제하면 해당 일정에서 제거됩니다</span></label>
+                    <div id="editLectureDateChecks" class="lecture-date-checks" style="display:flex;flex-wrap:wrap;gap:0.4rem;"></div>
                 </div>
                 <div style="display:flex;gap:0.5rem;">
                     <button type="button" class="btn btn-primary" id="saveEditBtn" style="flex:1;">수정 완료</button>

@@ -343,7 +343,8 @@ window.loadConferenceDatesFromFirebase = function() {
         if (!AppState.currentDate) {
             AppState.currentDate = AppConfig.CONFERENCE_DATES[0].date;
         }
-        updateDateButtons();
+        // 날짜 선택 버튼 렌더링 (updateDateButtons → updateDateSelectorButtons 로 이름 변경됨)
+        if (typeof updateDateSelectorButtons === 'function') updateDateSelectorButtons();
         loadDateData(AppState.currentDate);
         console.log('날짜 설정 로드:', AppConfig.CONFERENCE_DATES);
     });
@@ -412,6 +413,11 @@ window.switchDate = function(date) {
     document.querySelectorAll('.date-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.date === date);
     });
+
+    // 강의 추가 폼 "포함할 일정" 기본 선택을 현재 일정으로 갱신
+    if (typeof renderLectureDateChecks === 'function') {
+        renderLectureDateChecks('lectureDateChecks', [date]);
+    }
 
     createScheduleTable();
     updateLectureList();
@@ -1964,6 +1970,11 @@ window.updateDateSelectorButtons = function() {
             </button>
         `;
     }).join('');
+
+    // 강의 추가 폼의 "포함할 일정" 체크박스도 갱신 (기본: 현재 일정 선택)
+    if (typeof renderLectureDateChecks === 'function') {
+        renderLectureDateChecks('lectureDateChecks', [AppState.currentDate]);
+    }
 };
 
 /**
