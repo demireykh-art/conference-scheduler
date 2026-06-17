@@ -1493,7 +1493,7 @@ window.createBackup = function(type = 'manual') {
 };
 
 /**
- * 오래된 백업 정리 (최대 10개 유지)
+ * 오래된 백업 정리 (최대 MAX_BACKUPS개 유지)
  */
 window.cleanupOldBackups = function() {
     database.ref('/backups').orderByChild('timestamp').once('value', (snapshot) => {
@@ -1505,7 +1505,7 @@ window.cleanupOldBackups = function() {
         // 오래된 순으로 정렬
         backups.sort((a, b) => a.timestamp - b.timestamp);
         
-        // MAX_BACKUPS(10개) 초과 시 오래된 것 삭제
+        // MAX_BACKUPS 초과 시 오래된 것 삭제
         while (backups.length > MAX_BACKUPS) {
             const oldBackup = backups.shift();
             database.ref(`/backups/${oldBackup.key}`).remove();
@@ -1622,15 +1622,24 @@ window.uploadAndRestoreBackup = function() {
                 if (restoreData.categories) AppState.categories = restoreData.categories;
                 if (restoreData.timeSettingsByDate) AppState.timeSettingsByDate = restoreData.timeSettingsByDate;
                 if (restoreData.eventDates) AppState.eventDates = restoreData.eventDates;
-                
+                if (restoreData.timeSettingsByDate) AppState.timeSettingsByDate = restoreData.timeSettingsByDate;
+
                 loadDateData(AppState.currentDate);
                 generateTimeSlots();
                 saveToFirebase();
-                
+                if (restoreData.timeSettingsByDate && typeof saveTimeSettingsToFirebase === 'function') {
+                    saveTimeSettingsToFirebase();
+                }
+                // 일정(날짜) 설정 복원 → /settings 반영 + 날짜 버튼 갱신
+                if (restoreData.eventDates) {
+                    if (typeof saveEventDatesToFirebase === 'function') saveEventDatesToFirebase();
+                    if (typeof updateDateSelectorButtons === 'function') updateDateSelectorButtons();
+                }
+
                 createScheduleTable();
                 updateLectureList();
                 updateCategoryDropdowns();
-                
+
                 closeBackupModal();
                 Toast.success(' 백업 파일에서 복원되었습니다.');
                 
@@ -1723,17 +1732,23 @@ window.restoreBackup = function(backupKey) {
         if (data.companies) AppState.companies = data.companies;
         if (data.categories) AppState.categories = data.categories;
         if (data.timeSettingsByDate) AppState.timeSettingsByDate = data.timeSettingsByDate;
-        
+        if (data.eventDates) AppState.eventDates = data.eventDates;
+
         // 현재 날짜 데이터 로드
         loadDateData(AppState.currentDate);
         generateTimeSlots();
-        
+
         // Firebase에 복원된 데이터 저장
         saveToFirebase();
         if (data.timeSettingsByDate) {
             saveTimeSettingsToFirebase();
         }
-        
+        // 일정(날짜) 설정 복원 → /settings 에 반영 + 날짜 버튼 갱신
+        if (data.eventDates) {
+            if (typeof saveEventDatesToFirebase === 'function') saveEventDatesToFirebase();
+            if (typeof updateDateSelectorButtons === 'function') updateDateSelectorButtons();
+        }
+
         // UI 업데이트
         createScheduleTable();
         updateLectureList();
