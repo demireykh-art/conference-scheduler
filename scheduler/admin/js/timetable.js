@@ -14,6 +14,7 @@ let movingLecture = null;     // { roomId, sessionId, lecId }
 let placingTarget = null;     // { roomId, sessionId } (배치 대상 세션)
 let editingDuration = null;   // { roomId, sessionId, lecId }
 let POOL = [];                // 이 행사의 강의 풀
+let newRoomDate = '';         // 룸 추가 모달에서 선택한 날짜
 
 const SPEAKER_TRAVEL_MIN = 10; // 다른 룸 이동 시간(분)
 
@@ -76,7 +77,7 @@ function renderRoomTabs(rooms) {
             onclick="selectRoom('${r.id}')">
             <span class="grip" title="드래그하여 순서 변경">⋮⋮</span>${escapeHtml(r.name || '(이름 없음)')}
         </button>`).join('');
-    box.innerHTML = tabs + `<button class="room-tab add-tab" onclick="addRoom()">+ 룸 추가</button>`;
+    box.innerHTML = tabs + `<button class="room-tab add-tab" onclick="openRoomModal()">+ 룸 추가</button>`;
 
     enableSort(box, '.room-tab[data-room]', 'data-room', ids => persistRoomOrder(ids), 'room');
 }
@@ -167,18 +168,34 @@ window.setRoomDate = function (d) {
     updateRoom('date', newVal);
 };
 
-window.addRoom = function () {
+// 룸 추가 모달 — 날짜 필수
+window.openRoomModal = function () {
     if (!AdminAuth.requireEdit()) return;
-    const rooms = orderedRooms();
+    const days = enumerateDates(CONF.startDate, CONF.endDate);
+    if (!days.length) { Toast.warning('먼저 행사설정에서 행사 기간(시작일·종료일)을 입력하세요.'); return; }
+    newRoomDate = days.length === 1 ? days[0] : '';   // 하루 행사면 자동 선택
+    document.getElementById('newRoomName').value = `룸 ${orderedRooms().length + 1}`;
+    renderNewRoomDayButtons();
+    document.getElementById('roomModal').classList.add('open');
+    setTimeout(() => document.getElementById('newRoomName').focus(), 50);
+};
+window.closeRoomModal = function () { document.getElementById('roomModal').classList.remove('open'); };
+function renderNewRoomDayButtons() {
+    const days = enumerateDates(CONF.startDate, CONF.endDate);
+    document.getElementById('newRoomDayBtns').innerHTML = days.map(d =>
+        `<button type="button" class="day-btn ${newRoomDate === d ? 'active' : ''}" onclick="selectNewRoomDate('${d}')">${dayLabel(d)}</button>`
+    ).join('');
+}
+window.selectNewRoomDate = function (d) { newRoomDate = d; renderNewRoomDayButtons(); };
+window.saveNewRoom = function () {
+    if (!AdminAuth.requireEdit()) return;
+    if (!newRoomDate) { Toast.warning('날짜를 선택하세요. (필수)'); return; }
+    const name = document.getElementById('newRoomName').value.trim() || `룸 ${orderedRooms().length + 1}`;
     const id = uuid();
     confRef().child('rooms/' + id).set({
-        name: `룸 ${rooms.length + 1}`,
-        topic: '',
-        startTime: '09:00',
-        defaultDuration: 10,
-        visible: true,
-        order: rooms.length
-    }).then(() => { CURRENT_ROOM = id; }).catch(e => Toast.error(e.message));
+        name, topic: '', date: newRoomDate, startTime: '09:00', defaultDuration: 10, visible: true, order: orderedRooms().length
+    }).then(() => { CURRENT_ROOM = id; closeRoomModal(); Toast.success('룸이 추가되었습니다.'); })
+        .catch(e => Toast.error(e.message));
 };
 
 window.deleteRoom = async function (id) {
