@@ -315,6 +315,78 @@ a { color: inherit; }
 .poster-dl-btn:hover { background: rgba(20, 24, 33, 0.9); }
 
 /* ============================================================
+   관리 테이블 (연자/파트너사)
+   ============================================================ */
+.toolbar-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.table-card { overflow-x: auto; }
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    min-width: 560px;
+}
+.data-table th, .data-table td {
+    text-align: left;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.86rem;
+    vertical-align: middle;
+}
+.data-table th {
+    background: #fafbfc;
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: 0.76rem;
+    white-space: nowrap;
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table td.en, .data-table td.dim { color: var(--text-dim); }
+.data-table .row-actions { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
+.count-pill {
+    display: inline-block; min-width: 22px; text-align: center;
+    background: #eef4ff; color: var(--primary);
+    border-radius: 999px; padding: 1px 8px; font-size: 0.75rem; font-weight: 600;
+}
+
+/* 파트너 제품 입력 행 */
+.product-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+}
+.product-row input { width: 100%; }
+.product-row .del {
+    background: none; border: none; color: var(--danger);
+    font-size: 1rem; cursor: pointer; padding: 4px 8px;
+}
+
+/* 강의 모달: 마스터에서 선택하는 셀렉트 + 힌트 */
+.master-empty-hint {
+    font-size: 0.78rem; color: var(--danger);
+    background: var(--danger-soft); padding: 8px 10px; border-radius: 6px;
+    margin-top: 4px; line-height: 1.5;
+}
+.master-empty-hint a { color: var(--primary); font-weight: 600; }
+.select-add-row { display: flex; gap: 6px; }
+.select-add-row select {
+    flex: 1; padding: 8px 10px; border: 1px solid var(--border);
+    border-radius: 7px; font-size: 0.86rem; background: #fff;
+}
+.modal-field select {
+    padding: 8px 10px; border: 1px solid var(--border);
+    border-radius: 7px; font-size: 0.86rem; background: #fff; width: 100%;
+}
+.lec-product { font-size: 0.8rem; color: var(--text-dim); margin-top: 2px; }
+
+/* ============================================================
    시간표 페이지
    ============================================================ */
 .room-tabs {

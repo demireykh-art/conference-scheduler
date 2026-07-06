@@ -55,31 +55,43 @@
 
     <!-- ================= 강의 추가/수정 모달 ================= -->
     <div class="modal-overlay" id="lectureModal">
-        <div class="modal">
+        <div class="modal wide">
             <h3 id="lecModalTitle">강의 추가</h3>
             <div class="modal-field">
-                <label>강의 제목</label>
-                <textarea id="lecTitle" placeholder="강의 제목을 입력하세요" rows="2"></textarea>
+                <label>강의 제목 (국문) *</label>
+                <textarea id="lecTitleKo" placeholder="강의 제목 (국문)" rows="2"></textarea>
             </div>
             <div class="modal-field">
-                <label>강의 부제</label>
-                <input type="text" id="lecSubtitle" placeholder="(선택) 부제를 입력하세요">
+                <label>강의 제목 (영문)</label>
+                <textarea id="lecTitleEn" placeholder="Lecture title (English)" rows="2"></textarea>
             </div>
+            <div class="modal-field">
+                <label>강의 시간 (분)</label>
+                <input type="number" id="lecDuration" min="0" step="5" value="10" style="max-width:140px">
+            </div>
+
+            <div class="modal-field">
+                <label>연자 (등록된 연자에서 선택)</label>
+                <div class="select-add-row">
+                    <select id="lecSpeakerSelect"></select>
+                    <button type="button" class="btn btn-sm" onclick="addSelectedSpeaker()">+ 추가</button>
+                </div>
+                <div class="chips" id="lecSpeakerChips"></div>
+                <div id="lecSpeakerHint"></div>
+            </div>
+
             <div class="modal-grid2">
                 <div class="modal-field">
-                    <label>강의 시간 (분)</label>
-                    <input type="number" id="lecDuration" min="0" step="5" value="10">
+                    <label>파트너사 (등록된 파트너사에서 선택)</label>
+                    <select id="lecPartnerSelect" onchange="onPartnerChange()"></select>
+                    <div id="lecPartnerHint"></div>
                 </div>
                 <div class="modal-field">
-                    <label>연자 (Speaker)</label>
-                    <input type="text" id="lecSpeakerInput" placeholder="이름 입력 후 Enter">
-                    <div class="chips" id="lecSpeakerChips"></div>
+                    <label>제품 (선택)</label>
+                    <select id="lecProductSelect"></select>
                 </div>
             </div>
-            <div class="modal-field">
-                <label>파트너사 (Partner)</label>
-                <input type="text" id="lecPartner" placeholder="업체명 입력">
-            </div>
+
             <div class="modal-actions">
                 <button class="btn" onclick="closeLectureModal()">취소</button>
                 <button class="btn btn-primary" onclick="saveLecture()">저장</button>
@@ -120,6 +132,7 @@
     <script src="../js/config.js"></script>
     <script src="js/admin-common.js"></script>
     <script src="js/admin-auth.js"></script>
+    <script src="js/masters.js"></script>
     <script src="js/timetable.js"></script>
 </body>
 </html>
