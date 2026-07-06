@@ -211,6 +211,26 @@ window.renderSidebar = function (activeKey) {
         </aside>`;
 };
 
+/* ------------------------------------------------------------
+   제품 분류 (하드코딩) — 파트너사 제품 등록/강의에서 공용
+   ------------------------------------------------------------ */
+window.PRODUCT_CATEGORIES = [
+    'Energy-Based & Aesthetic Devices',
+    'Injectables & Threads',
+    'Regeneratives & Bio',
+    'Cosmeceuticals & Consumables',
+    'Digital, AI & Management',
+    'Clinical & Academic',
+    'Others'
+];
+
+window.productCategoryOptions = function (selected) {
+    return '<option value="">-- 제품분류 선택 --</option>' +
+        PRODUCT_CATEGORIES.map(c =>
+            `<option value="${escapeHtml(c)}"${c === selected ? ' selected' : ''}>${escapeHtml(c)}</option>`
+        ).join('');
+};
+
 // 아직 구현 안 된 메뉴 클릭 시 안내
 document.addEventListener('click', function (e) {
     const soon = e.target.closest('[data-soon="1"]');

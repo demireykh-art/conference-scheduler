@@ -354,19 +354,25 @@ a { color: inherit; }
     border-radius: 999px; padding: 1px 8px; font-size: 0.75rem; font-weight: 600;
 }
 
-/* 파트너 제품 입력 행 */
-.product-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr auto;
-    gap: 8px;
+/* 파트너 제품 입력 카드 */
+.product-item {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: #fafbfc;
+}
+.product-item-head {
+    display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 8px;
-    align-items: center;
 }
-.product-row input { width: 100%; }
-.product-row .del {
+.product-item-title { font-size: 0.8rem; font-weight: 600; color: var(--text-dim); }
+.product-item input, .product-item select { width: 100%; }
+.product-item .del {
     background: none; border: none; color: var(--danger);
-    font-size: 1rem; cursor: pointer; padding: 4px 8px;
+    font-size: 0.8rem; cursor: pointer; padding: 2px 6px; border-radius: 5px;
 }
+.product-item .del:hover { background: var(--danger-soft); }
 
 /* 강의 모달: 마스터에서 선택하는 셀렉트 + 힌트 */
 .master-empty-hint {
