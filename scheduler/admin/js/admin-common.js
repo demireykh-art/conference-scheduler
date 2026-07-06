@@ -1,6 +1,6 @@
 /**
  * admin-common.js — 공통 유틸 (Toast / UUID / 시간계산 / 사이드바 / 이스케이프)
- * KAFC 리스트형 컨퍼런스 관리 모듈
+ * ASLS 리스트형 컨퍼런스 관리 모듈
  */
 
 /* ------------------------------------------------------------
@@ -201,7 +201,7 @@ window.renderSidebar = function (activeKey) {
     return `
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <span>KAFC 행사 관리</span>
+                <span>ASLS 행사 관리</span>
                 <span class="collapse-icon" onclick="document.getElementById('sidebar').classList.remove('open')">‹</span>
             </div>
             <a class="sidebar-home" href="../index.html">🏠 메인 화면</a>

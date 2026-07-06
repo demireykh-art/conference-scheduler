@@ -83,7 +83,7 @@ window.openLoginGate = function () {
         gate.innerHTML = `
             <div class="login-card">
                 <div style="font-size:2.2rem">📅</div>
-                <h2>KAFC 행사 관리</h2>
+                <h2>ASLS 행사 관리</h2>
                 <p>편집하려면 Google 계정으로 로그인하세요.<br>승인된 사용자만 수정할 수 있습니다.</p>
                 <button class="google-btn" onclick="signInWithGoogle()">
                     <img src="https://www.google.com/favicon.ico" alt="G">Google 계정으로 로그인
