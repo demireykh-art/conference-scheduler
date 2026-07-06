@@ -59,19 +59,32 @@ function renderPartners() {
 
 /* ---------- 제품 입력 행 ---------- */
 function productRowHtml(pr = {}) {
-    return `<div class="product-row">
-        <input type="text" class="prod-ko" placeholder="제품명 (국문)" value="${escapeHtml(pr.nameKo || '')}">
-        <input type="text" class="prod-en" placeholder="제품명 (영문)" value="${escapeHtml(pr.nameEn || '')}">
-        <button type="button" class="del" onclick="this.parentElement.remove()" title="삭제">✕</button>
+    return `<div class="product-item">
+        <div class="product-item-head">
+            <span class="product-item-title">제품</span>
+            <button type="button" class="del" onclick="this.closest('.product-item').remove()" title="삭제">✕ 삭제</button>
+        </div>
+        <div class="modal-grid2">
+            <input type="text" class="prod-ko" placeholder="제품명 (국문)" value="${escapeHtml(pr.nameKo || '')}">
+            <input type="text" class="prod-en" placeholder="제품명 (영문)" value="${escapeHtml(pr.nameEn || '')}">
+        </div>
+        <div style="margin-top:8px">
+            <select class="prod-cat">${productCategoryOptions(pr.category || '')}</select>
+        </div>
+        <div style="margin-top:8px">
+            <input type="text" class="prod-desc" placeholder="제품 설명 (수동 입력)" value="${escapeHtml(pr.description || '')}">
+        </div>
     </div>`;
 }
 window.addProductRow = function (pr) {
     document.getElementById('ptnProducts').insertAdjacentHTML('beforeend', productRowHtml(pr));
 };
 function collectProducts() {
-    return [...document.querySelectorAll('#ptnProducts .product-row')].map(row => ({
+    return [...document.querySelectorAll('#ptnProducts .product-item')].map(row => ({
         nameKo: row.querySelector('.prod-ko').value.trim(),
-        nameEn: row.querySelector('.prod-en').value.trim()
+        nameEn: row.querySelector('.prod-en').value.trim(),
+        category: row.querySelector('.prod-cat').value,
+        description: row.querySelector('.prod-desc').value.trim()
     })).filter(pr => pr.nameKo || pr.nameEn);
 }
 

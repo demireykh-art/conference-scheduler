@@ -206,8 +206,12 @@ function renderLectureRow(roomId, sessionId, lec) {
             return s.affiliationKo ? `${nm} (${s.affiliationKo})` : nm;
         }).join(', ')
         : '미정';
-    const product = (n.productKo || n.productEn)
-        ? `<div class="lec-product">제품: ${escapeHtml(n.productKo || n.productEn)}</div>` : '';
+    let product = '';
+    if (n.productKo || n.productEn) {
+        const cat = n.productCategory ? ` · ${escapeHtml(n.productCategory)}` : '';
+        product = `<div class="lec-product">제품: ${escapeHtml(n.productKo || n.productEn)}${cat}</div>`;
+        if (n.productDesc) product += `<div class="lec-product" style="opacity:.85">└ ${escapeHtml(n.productDesc)}</div>`;
+    }
     return `
     <div class="lecture-row" data-lec="${lec.id}">
         <span class="grip" title="드래그하여 순서 변경">⋮⋮</span>
@@ -255,7 +259,9 @@ function normalizeLecture(lec) {
         partnerKo: lec.partnerKo != null ? lec.partnerKo : (lec.partner || ''),
         partnerEn: lec.partnerEn || '',
         productKo: lec.productKo || '',
-        productEn: lec.productEn || ''
+        productEn: lec.productEn || '',
+        productCategory: lec.productCategory || '',
+        productDesc: lec.productDesc || ''
     };
 }
 
@@ -406,13 +412,16 @@ window.saveLecture = function () {
     // 파트너사 + 제품 (마스터에서 해석)
     const pid = document.getElementById('lecPartnerSelect').value;
     const partner = Masters.partner(pid);
-    let productKo = '', productEn = '';
+    let productKo = '', productEn = '', productCategory = '', productDesc = '';
     if (partner) {
         const pIdx = document.getElementById('lecProductSelect').value;
         const products = Array.isArray(partner.products) ? partner.products : [];
         if (pIdx !== '' && products[Number(pIdx)]) {
-            productKo = products[Number(pIdx)].nameKo || '';
-            productEn = products[Number(pIdx)].nameEn || '';
+            const pr = products[Number(pIdx)];
+            productKo = pr.nameKo || '';
+            productEn = pr.nameEn || '';
+            productCategory = pr.category || '';
+            productDesc = pr.description || '';
         }
     }
 
@@ -427,7 +436,7 @@ window.saveLecture = function () {
         partnerId: pid || '',
         partnerKo: partner ? (partner.nameKo || '') : '',
         partnerEn: partner ? (partner.nameEn || '') : '',
-        productKo, productEn,
+        productKo, productEn, productCategory, productDesc,
         // 구 포맷 필드 제거
         title: null, subtitle: null, partner: null
     };
@@ -543,7 +552,7 @@ window.exportExcel = function () {
     if (!CONF) return;
     const rows = [['룸', '세션', '시작', '종료', '시간(분)',
         '제목(국문)', '제목(영문)', '연자(국문)', '연자(영문)', '소속(국문)', '소속(영문)',
-        '파트너사(국문)', '파트너사(영문)', '제품(국문)', '제품(영문)']];
+        '파트너사(국문)', '파트너사(영문)', '제품(국문)', '제품(영문)', '제품분류', '제품설명']];
     const join = arr => arr.filter(Boolean).join('; ');
     orderedRooms().forEach(r => {
         computeRoom(r).forEach(s => {
@@ -554,7 +563,7 @@ window.exportExcel = function () {
                     n.titleKo, n.titleEn,
                     join(n.speakers.map(x => x.nameKo)), join(n.speakers.map(x => x.nameEn)),
                     join(n.speakers.map(x => x.affiliationKo)), join(n.speakers.map(x => x.affiliationEn)),
-                    n.partnerKo, n.partnerEn, n.productKo, n.productEn
+                    n.partnerKo, n.partnerEn, n.productKo, n.productEn, n.productCategory, n.productDesc
                 ]);
             });
         });
@@ -562,7 +571,7 @@ window.exportExcel = function () {
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = [{ wch: 18 }, { wch: 8 }, { wch: 7 }, { wch: 7 }, { wch: 8 },
         { wch: 40 }, { wch: 40 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 18 },
-        { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 16 }];
+        { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 40 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '시간표');
     const safe = (CONF.title || '시간표').replace(/[\\/:*?"<>|]/g, '_');
