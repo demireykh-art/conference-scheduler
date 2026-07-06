@@ -553,8 +553,9 @@ a { color: inherit; }
     display: none;
     align-items: flex-start;
     justify-content: center;
-    padding: 8vh 16px;
+    padding: 5vh 16px;
     z-index: 1000;
+    overflow-y: auto;               /* 모달이 화면보다 커도 스크롤 가능 */
 }
 .modal-overlay.open { display: flex; }
 .modal {
@@ -565,6 +566,9 @@ a { color: inherit; }
     max-width: 420px;
     padding: 24px;
     animation: pop 0.14s ease;
+    max-height: 90vh;               /* 화면 높이 초과 시 */
+    overflow-y: auto;               /* 내부 스크롤 → 하단 저장 버튼 항상 접근 가능 */
+    margin: auto 0;
 }
 .modal.wide { max-width: 520px; }
 @keyframes pop { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
