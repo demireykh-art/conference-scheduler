@@ -193,16 +193,35 @@ setupAutocomplete(
             .catch(e => Toast.error('연자 등록 실패: ' + e.message));
     }
 );
+function setPartner(p) {
+    partnerDraft = { id: p.id, nameKo: p.nameKo || '', nameEn: p.nameEn || '' };
+    renderPartnerChosen();
+    loadProducts(Masters.partner(p.id));
+}
 setupAutocomplete(
     document.getElementById('lecPartnerInput'),
     document.getElementById('lecPartnerAc'),
     q => {
         const ql = q.toLowerCase();
-        return Masters.partners
+        const items = Masters.partners
             .filter(p => [p.nameKo, p.nameEn].join(' ').toLowerCase().includes(ql))
-            .map(p => ({ label: `${escapeHtml(p.nameKo || '')} <span class="sub">${escapeHtml(p.nameEn || '')}</span>`, value: p }));
+            .map(p => ({ label: `${escapeHtml(p.nameKo || '')} <span class="sub">${escapeHtml(p.nameEn || '')}</span>`, value: { type: 'existing', p } }));
+        const exact = Masters.partners.some(p => (p.nameKo || '').toLowerCase() === ql || (p.nameEn || '').toLowerCase() === ql);
+        if (q && !exact) items.push({ label: `➕ "<b>${escapeHtml(q)}</b>" 새 파트너사로 등록`, value: { type: 'new', name: q } });
+        return items;
     },
-    p => { partnerDraft = { id: p.id, nameKo: p.nameKo || '', nameEn: p.nameEn || '' }; renderPartnerChosen(); loadProducts(Masters.partner(p.id)); }
+    async val => {
+        if (val.type === 'existing') { setPartner(val.p); return; }
+        const name = (val.name || '').trim();
+        if (!name) return;
+        const ok = await confirmDialog(`"${name}" 파트너사가 목록에 없습니다.\n새 파트너사로 등록할까요? (파트너사 관리 목록에도 추가되며, 제품은 거기서 추가)`, { okText: '등록' });
+        if (!ok) return;
+        const id = uuid();
+        const pdata = { nameKo: name, nameEn: '', products: [], order: Masters.partners.length, createdAt: firebase.database.ServerValue.TIMESTAMP };
+        database.ref('/adminPartners/' + id).set(pdata)
+            .then(() => { setPartner({ id, ...pdata }); Toast.success(`"${name}" 파트너사를 등록했습니다. (파트너사 관리에서 제품 추가 가능)`); })
+            .catch(e => Toast.error('파트너사 등록 실패: ' + e.message));
+    }
 );
 
 function loadProducts(partner) {
