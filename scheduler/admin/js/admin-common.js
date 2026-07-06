@@ -163,6 +163,7 @@ const SIDE_MENU = [
     {
         group: '학술대회 · 행사', items: [
             { key: 'events', label: '행사 개설/관리', href: 'index.html' },
+            { key: 'lectures', label: '강의 관리', href: 'lectures.html' },
             { key: 'speakers', label: '연자 관리', href: 'speakers.html' },
             { key: 'partners', label: '파트너사 관리', href: 'partners.html' },
             { key: 'registrants', label: '등록자 관리' },
