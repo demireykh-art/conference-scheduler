@@ -53,48 +53,36 @@
         </main>
     </div>
 
-    <!-- ================= 강의 추가/수정 모달 ================= -->
-    <div class="modal-overlay" id="lectureModal">
+    <!-- ================= 강의 배치 모달 (풀에서 검색·선택) ================= -->
+    <div class="modal-overlay" id="placeModal">
         <div class="modal wide">
-            <h3 id="lecModalTitle">강의 추가</h3>
-            <div class="modal-field">
-                <label>강의 제목 (국문) *</label>
-                <textarea id="lecTitleKo" placeholder="강의 제목 (국문)" rows="2"></textarea>
+            <h3 id="placeModalTitle">강의 배치</h3>
+            <div class="filter-bar" style="margin-bottom:8px">
+                <input type="text" id="placeSearch" placeholder="🔍 제목·연자·태그 검색" style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.86rem;flex:1;min-width:160px">
+                <select id="placeCatFilter" style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:0.86rem"></select>
+                <label class="check-inline" style="font-size:0.82rem"><input type="checkbox" id="placeHidePlaced" checked> 미배치만</label>
             </div>
-            <div class="modal-field">
-                <label>강의 제목 (영문)</label>
-                <textarea id="lecTitleEn" placeholder="Lecture title (English)" rows="2"></textarea>
+            <div class="place-list" id="placeList"></div>
+            <div class="modal-actions">
+                <a href="lectures.html" target="_blank" id="placeManageLink" class="btn btn-sm" style="margin-right:auto">＋ 강의 관리에서 등록</a>
+                <button class="btn" onclick="closePlaceModal()">닫기</button>
             </div>
+        </div>
+    </div>
+
+    <!-- ================= 강의 시간 수정 모달 ================= -->
+    <div class="modal-overlay" id="durModal">
+        <div class="modal" style="max-width:340px">
+            <h3>강의 시간 수정</h3>
+            <div id="durLecTitle" style="font-size:0.9rem;color:var(--text-dim);margin-bottom:12px"></div>
             <div class="modal-field">
                 <label>강의 시간 (분)</label>
-                <input type="number" id="lecDuration" min="0" step="5" value="10" style="max-width:140px">
+                <input type="number" id="durInput" min="0" step="5" style="max-width:140px">
             </div>
-
-            <div class="modal-field">
-                <label>연자 (등록된 연자에서 선택)</label>
-                <div class="select-add-row">
-                    <select id="lecSpeakerSelect"></select>
-                    <button type="button" class="btn btn-sm" onclick="addSelectedSpeaker()">+ 추가</button>
-                </div>
-                <div class="chips" id="lecSpeakerChips"></div>
-                <div id="lecSpeakerHint"></div>
-            </div>
-
-            <div class="modal-grid2">
-                <div class="modal-field">
-                    <label>파트너사 (등록된 파트너사에서 선택)</label>
-                    <select id="lecPartnerSelect" onchange="onPartnerChange()"></select>
-                    <div id="lecPartnerHint"></div>
-                </div>
-                <div class="modal-field">
-                    <label>제품 (선택)</label>
-                    <select id="lecProductSelect"></select>
-                </div>
-            </div>
-
+            <div style="font-size:0.78rem;color:var(--text-dim)">강의 내용(제목·연자 등)은 <b>강의 관리</b>에서 수정합니다.</div>
             <div class="modal-actions">
-                <button class="btn" onclick="closeLectureModal()">취소</button>
-                <button class="btn btn-primary" onclick="saveLecture()">저장</button>
+                <button class="btn" onclick="closeDurModal()">취소</button>
+                <button class="btn btn-primary" onclick="saveDuration()">저장</button>
             </div>
         </div>
     </div>

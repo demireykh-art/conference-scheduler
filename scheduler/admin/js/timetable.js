@@ -9,25 +9,24 @@ const confRef = () => database.ref('/adminConferences/' + CONF_ID);
 
 let CONF = null;              // 전체 행사 객체
 let CURRENT_ROOM = null;      // 현재 선택된 룸 id
-let editingLecture = null;    // { roomId, sessionId, lecId } | { roomId, sessionId }(신규)
 let editingSession = null;    // { roomId, sessionId } | { roomId }(신규)
 let movingLecture = null;     // { roomId, sessionId, lecId }
-let speakerDraft = [];        // 강의 모달 연자 칩 배열
+let placingTarget = null;     // { roomId, sessionId } (배치 대상 세션)
+let editingDuration = null;   // { roomId, sessionId, lecId }
+let POOL = [];                // 이 행사의 강의 풀
+
+const SPEAKER_TRAVEL_MIN = 10; // 다른 룸 이동 시간(분)
 
 /* ---------- 초기화 ---------- */
 document.getElementById('sidebarMount').innerHTML = renderSidebar('events');
-Masters.init();
+Masters.init();   // 연자 이름 표시(중복 알림)용
 
-// 마스터(연자/파트너사) 로드/변경 시, 강의 모달이 열려 있으면 셀렉트 갱신
-document.addEventListener('masters-change', () => {
-    const modal = document.getElementById('lectureModal');
-    if (modal && modal.classList.contains('open')) {
-        const pv = document.getElementById('lecPartnerSelect').value;
-        populateMasterSelects();
-        document.getElementById('lecPartnerSelect').value = pv;
-        onPartnerChange();
-    }
-});
+// 배치 모달 분류 필터 + 검색 이벤트
+document.getElementById('placeCatFilter').innerHTML =
+    '<option value="">전체 분류</option>' + PRODUCT_CATEGORIES.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+document.getElementById('placeSearch').addEventListener('input', renderPlaceList);
+document.getElementById('placeCatFilter').addEventListener('change', renderPlaceList);
+document.getElementById('placeHidePlaced').addEventListener('change', renderPlaceList);
 
 if (!CONF_ID) {
     document.getElementById('sessions').innerHTML =
@@ -41,6 +40,11 @@ if (!CONF_ID) {
             return;
         }
         renderAll();
+        if (document.getElementById('placeModal').classList.contains('open')) renderPlaceList();
+    });
+    confRef().child('lecturePool').on('value', snap => {
+        POOL = toOrderedArray(snap.val());
+        if (document.getElementById('placeModal').classList.contains('open')) renderPlaceList();
     });
 }
 
@@ -96,6 +100,10 @@ function renderRoomSettings() {
         <div class="field grow">
             <label>주제</label>
             <input type="text" value="${escapeHtml(room.topic || '')}" onchange="updateRoom('topic', this.value)">
+        </div>
+        <div class="field">
+            <label>날짜 (연자 중복 체크 기준)</label>
+            <input type="date" value="${escapeHtml(room.date || '')}" onchange="updateRoom('date', this.value)">
         </div>
         <div class="field">
             <label>시작시간</label>
@@ -186,7 +194,7 @@ function renderSessionBlock(roomId, s) {
                 <div class="session-sub">${range} · ${s._count}건 · 총 ${s._total}분</div>
             </div>
             <div class="spacer"></div>
-            <button class="btn btn-primary btn-sm" onclick="openLectureModal('${roomId}','${s.id}')">+ 강의 추가</button>
+            <button class="btn btn-primary btn-sm" onclick="openPlaceModal('${roomId}','${s.id}')">+ 강의 배치</button>
             <button class="txt-btn" onclick="editSession('${roomId}','${s.id}')">수정</button>
             <button class="txt-btn danger" onclick="deleteSession('${roomId}','${s.id}')">삭제</button>
         </div>
@@ -228,7 +236,7 @@ function renderLectureRow(roomId, sessionId, lec) {
         </div>
         <div class="lec-actions">
             <button class="txt-btn" onclick="openMoveModal('${roomId}','${sessionId}','${lec.id}')">이동</button>
-            <button class="txt-btn" onclick="openLectureModal('${roomId}','${sessionId}','${lec.id}')">수정</button>
+            <button class="txt-btn" onclick="openDurModal('${roomId}','${sessionId}','${lec.id}')">시간</button>
             <button class="txt-btn danger" onclick="deleteLecture('${roomId}','${sessionId}','${lec.id}')">삭제</button>
         </div>
     </div>`;
@@ -314,151 +322,173 @@ function persistSessionOrder(roomId, ids) {
 }
 
 /* ============================================================
-   강의 모달
+   강의 배치 (강의 관리 풀에서 검색·선택 → 세션에 배치)
    ============================================================ */
-// 등록된 연자/파트너사로 셀렉트 채우기
-function populateMasterSelects() {
-    const spkSel = document.getElementById('lecSpeakerSelect');
-    spkSel.innerHTML = '<option value="">-- 연자 선택 --</option>' +
-        Masters.speakers.map(s =>
-            `<option value="${s.id}">${escapeHtml(s.nameKo || s.nameEn)}${s.affiliationKo ? ' (' + escapeHtml(s.affiliationKo) + ')' : ''}</option>`
-        ).join('');
-
-    const ptnSel = document.getElementById('lecPartnerSelect');
-    ptnSel.innerHTML = '<option value="">-- 파트너사 선택 --</option>' +
-        Masters.partners.map(p => `<option value="${p.id}">${escapeHtml(p.nameKo || p.nameEn)}</option>`).join('');
-
-    document.getElementById('lecSpeakerHint').innerHTML = Masters.speakers.length ? '' :
-        `<div class="master-empty-hint">등록된 연자가 없습니다. <a href="speakers.html" target="_blank">연자 관리</a>에서 먼저 등록하세요.</div>`;
-    document.getElementById('lecPartnerHint').innerHTML = Masters.partners.length ? '' :
-        `<div class="master-empty-hint">등록된 파트너사가 없습니다. <a href="partners.html" target="_blank">파트너사 관리</a>에서 먼저 등록하세요.</div>`;
-}
-
-// 선택한 파트너사의 제품 목록으로 제품 셀렉트 채우기
-window.onPartnerChange = function () {
-    const pid = document.getElementById('lecPartnerSelect').value;
-    const prodSel = document.getElementById('lecProductSelect');
-    const p = Masters.partner(pid);
-    const products = (p && Array.isArray(p.products)) ? p.products : [];
-    prodSel.innerHTML = '<option value="">-- 제품 선택 --</option>' +
-        products.map((pr, i) => `<option value="${i}">${escapeHtml(pr.nameKo || pr.nameEn || '')}</option>`).join('');
-    prodSel.disabled = !products.length;
-};
-
-// 연자 추가 (칩)
-window.addSelectedSpeaker = function () {
-    const sel = document.getElementById('lecSpeakerSelect');
-    const id = sel.value;
-    if (!id) { Toast.info('추가할 연자를 선택하세요.'); return; }
-    if (speakerDraft.find(s => s.id === id)) { Toast.info('이미 추가된 연자입니다.'); return; }
-    const s = Masters.speaker(id);
-    if (!s) return;
-    speakerDraft.push({
-        id: s.id, nameKo: s.nameKo || '', nameEn: s.nameEn || '',
-        affiliationKo: s.affiliationKo || '', affiliationEn: s.affiliationEn || ''
+function placedLectureIdSet() {
+    const ids = new Set();
+    orderedRooms().forEach(r => {
+        toOrderedArray(r.sessions).forEach(s => {
+            toOrderedArray(s.lectures).forEach(l => { if (l.lectureId) ids.add(l.lectureId); });
+        });
     });
-    sel.value = '';
-    renderSpeakerChips();
-};
-
-window.openLectureModal = function (roomId, sessionId, lecId) {
-    if (!AdminAuth.requireEdit()) return;
-    editingLecture = lecId ? { roomId, sessionId, lecId } : { roomId, sessionId };
-    const room = CONF.rooms[roomId];
-    const isEdit = !!lecId;
-    document.getElementById('lecModalTitle').textContent = isEdit ? '강의 수정' : '강의 추가';
-
-    populateMasterSelects();
-
-    const n = isEdit
-        ? normalizeLecture(room.sessions[sessionId].lectures[lecId])
-        : normalizeLecture({ duration: Number(room.defaultDuration) || 10 });
-
-    document.getElementById('lecTitleKo').value = n.titleKo || '';
-    document.getElementById('lecTitleEn').value = n.titleEn || '';
-    document.getElementById('lecDuration').value = (isEdit ? n.duration : (Number(room.defaultDuration) || 10)) ?? 10;
-
-    speakerDraft = n.speakers.map(s => ({ ...s }));
-    renderSpeakerChips();
-
-    // 파트너사 + 제품
-    document.getElementById('lecPartnerSelect').value = n.partnerId || '';
-    onPartnerChange();
-    if (n.partnerId) {
-        const p = Masters.partner(n.partnerId);
-        if (p && Array.isArray(p.products) && (n.productKo || n.productEn)) {
-            const idx = p.products.findIndex(pr =>
-                (pr.nameKo || '') === (n.productKo || '') && (pr.nameEn || '') === (n.productEn || ''));
-            if (idx >= 0) document.getElementById('lecProductSelect').value = String(idx);
-        }
-    }
-
-    document.getElementById('lectureModal').classList.add('open');
-    setTimeout(() => document.getElementById('lecTitleKo').focus(), 50);
-};
-window.closeLectureModal = function () { document.getElementById('lectureModal').classList.remove('open'); };
-
-function renderSpeakerChips() {
-    document.getElementById('lecSpeakerChips').innerHTML = speakerDraft.map((s, i) =>
-        `<span class="chip">${escapeHtml(s.nameKo || s.nameEn || '')}<span class="x" onclick="removeSpeaker(${i})">×</span></span>`).join('');
+    return ids;
 }
-window.removeSpeaker = function (i) { speakerDraft.splice(i, 1); renderSpeakerChips(); };
 
-window.saveLecture = function () {
+window.openPlaceModal = function (roomId, sessionId) {
     if (!AdminAuth.requireEdit()) return;
-    const titleKo = document.getElementById('lecTitleKo').value.trim();
-    if (!titleKo) { Toast.warning('강의 제목(국문)을 입력하세요.'); return; }
+    placingTarget = { roomId, sessionId };
+    const room = getRoom(roomId);
+    const sName = (room && room.sessions && room.sessions[sessionId]) ? room.sessions[sessionId].name : '';
+    document.getElementById('placeModalTitle').textContent = `강의 배치 — ${room ? room.name : ''} › ${sName}`;
+    document.getElementById('placeSearch').value = '';
+    document.getElementById('placeCatFilter').value = '';
+    document.getElementById('placeHidePlaced').checked = true;
+    document.getElementById('placeManageLink').href = 'lectures.html?id=' + CONF_ID;
+    renderPlaceList();
+    document.getElementById('placeModal').classList.add('open');
+};
+window.closePlaceModal = function () { document.getElementById('placeModal').classList.remove('open'); };
 
-    // 파트너사 + 제품 (마스터에서 해석)
-    const pid = document.getElementById('lecPartnerSelect').value;
-    const partner = Masters.partner(pid);
-    let productKo = '', productEn = '', productCategory = '', productDesc = '';
-    if (partner) {
-        const pIdx = document.getElementById('lecProductSelect').value;
-        const products = Array.isArray(partner.products) ? partner.products : [];
-        if (pIdx !== '' && products[Number(pIdx)]) {
-            const pr = products[Number(pIdx)];
-            productKo = pr.nameKo || '';
-            productEn = pr.nameEn || '';
-            productCategory = pr.category || '';
-            productDesc = pr.description || '';
-        }
+function renderPlaceList() {
+    const q = document.getElementById('placeSearch').value.trim().toLowerCase();
+    const cat = document.getElementById('placeCatFilter').value;
+    const hidePlaced = document.getElementById('placeHidePlaced').checked;
+    const placed = placedLectureIdSet();
+
+    let list = POOL.slice().sort((a, b) => (a.titleKo || '').localeCompare(b.titleKo || '', 'ko'));
+    if (cat) list = list.filter(l => (l.categories || []).includes(cat));
+    if (hidePlaced) list = list.filter(l => !placed.has(l.id));
+    if (q) list = list.filter(l => {
+        const hay = [l.titleKo, l.titleEn, ...(l.tags || []), ...(l.categories || []),
+        ...((l.speakers || []).map(s => s.nameKo + ' ' + s.nameEn)), l.partnerKo, l.productKo].join(' ').toLowerCase();
+        return hay.includes(q);
+    });
+
+    const box = document.getElementById('placeList');
+    if (!POOL.length) {
+        box.innerHTML = `<div class="empty-state" style="padding:30px">이 행사에 등록된 강의가 없습니다.<br><a href="lectures.html" target="_blank">강의 관리</a>에서 먼저 강의를 등록하세요.</div>`;
+        return;
     }
+    if (!list.length) { box.innerHTML = `<div class="empty-state" style="padding:30px">조건에 맞는 강의가 없습니다.</div>`; return; }
+
+    box.innerHTML = list.map(l => {
+        const isPlaced = placed.has(l.id);
+        const cats = (l.categories || []).map(c => `<span class="chip cat">${escapeHtml(c)}</span>`).join('');
+        const tags = (l.tags || []).map(t => `<span class="chip tag">${escapeHtml(t)}</span>`).join('');
+        const spk = (l.speakers || []).map(s => escapeHtml(s.nameKo || s.nameEn)).join(', ') || '미정';
+        return `
+        <div class="place-row ${isPlaced ? 'is-placed' : ''}">
+            <div class="p-main">
+                <div class="p-title">${escapeHtml(l.titleKo || '(제목 없음)')} <span style="color:var(--text-dim);font-weight:400">· ${l.duration || 0}분</span></div>
+                <div class="chips" style="margin:4px 0">${cats}${tags}</div>
+                <div class="p-meta">연자: ${spk}${l.partnerKo ? ' · ' + escapeHtml(l.partnerKo) : ''}${isPlaced ? ' · <b>이미 배치됨</b>' : ''}</div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="placeLecture('${l.id}')">배치</button>
+        </div>`;
+    }).join('');
+}
+
+window.placeLecture = function (poolId) {
+    if (!AdminAuth.requireEdit()) return;
+    const { roomId, sessionId } = placingTarget;
+    const pool = POOL.find(l => l.id === poolId);
+    if (!pool) { Toast.error('강의를 찾을 수 없습니다.'); return; }
+
+    // 배치될 시각 = 대상 세션의 현재 종료 시각
+    const room = getRoom(roomId);
+    const sessions = computeRoom(room);
+    const targetSession = sessions.find(s => s.id === sessionId);
+    const startMin = targetSession ? targetSession._end : parseTime(room.startTime || '09:00');
+    const endMin = startMin + (Number(pool.duration) || 0);
+
+    // 연자 중복(동선) 체크
+    const conflict = findSpeakerConflict(roomId, room.date || '', startMin, endMin, pool.speakers || [], null);
+    if (conflict) { Toast.error(conflictMessage(conflict), 7000); return; }
 
     const data = {
-        titleKo,
-        titleEn: document.getElementById('lecTitleEn').value.trim(),
-        duration: Number(document.getElementById('lecDuration').value) || 0,
-        speakers: speakerDraft.map(s => ({
-            id: s.id || '', nameKo: s.nameKo || '', nameEn: s.nameEn || '',
-            affiliationKo: s.affiliationKo || '', affiliationEn: s.affiliationEn || ''
-        })),
-        partnerId: pid || '',
-        partnerKo: partner ? (partner.nameKo || '') : '',
-        partnerEn: partner ? (partner.nameEn || '') : '',
-        productKo, productEn, productCategory, productDesc,
-        // 구 포맷 필드 제거
-        title: null, subtitle: null, partner: null
+        lectureId: pool.id,
+        titleKo: pool.titleKo || '', titleEn: pool.titleEn || '',
+        duration: Number(pool.duration) || 0,
+        categories: pool.categories || [], tags: pool.tags || [],
+        speakers: (pool.speakers || []).map(s => ({ ...s })),
+        partnerId: pool.partnerId || '', partnerKo: pool.partnerKo || '', partnerEn: pool.partnerEn || '',
+        productKo: pool.productKo || '', productEn: pool.productEn || '',
+        productCategory: pool.productCategory || '', productDesc: pool.productDesc || '',
+        order: toOrderedArray(CONF.rooms[roomId].sessions[sessionId].lectures).length
     };
-    const { roomId, sessionId, lecId } = editingLecture;
-    const base = `rooms/${roomId}/sessions/${sessionId}/lectures`;
-    if (lecId) {
-        confRef().child(`${base}/${lecId}`).update(data)
-            .then(() => { Toast.success('저장되었습니다.'); closeLectureModal(); })
-            .catch(e => Toast.error('저장 실패: ' + e.message));
-    } else {
-        const lectures = toOrderedArray(CONF.rooms[roomId].sessions[sessionId].lectures);
-        data.order = lectures.length;
-        confRef().child(`${base}/${uuid()}`).set(data)
-            .then(() => { Toast.success('강의가 추가되었습니다.'); closeLectureModal(); })
-            .catch(e => Toast.error('추가 실패: ' + e.message));
+    confRef().child(`rooms/${roomId}/sessions/${sessionId}/lectures/${uuid()}`).set(data)
+        .then(() => { Toast.success(`"${data.titleKo}" 배치됨`); renderPlaceList(); })
+        .catch(e => Toast.error('배치 실패: ' + e.message));
+};
+
+/* ---------- 연자 중복(동선) 체크 ---------- */
+function speakerKeysOf(speakers) {
+    return (speakers || []).map(s => (typeof s === 'string' ? s : (s.id || s.nameKo || '')).trim()).filter(Boolean);
+}
+// 현재 배치된 모든 강의를 절대 시각으로 수집
+function collectPlaced() {
+    const out = [];
+    orderedRooms().forEach(room => {
+        computeRoom(room).forEach(session => {
+            session.lectures.forEach(lec => {
+                out.push({
+                    roomId: room.id, roomName: room.name, date: room.date || '',
+                    lecId: lec.id, titleKo: normalizeLecture(lec).titleKo,
+                    start: lec._start, end: lec._end, speakerKeys: speakerKeysOf(lec.speakers)
+                });
+            });
+        });
+    });
+    return out;
+}
+// 후보 강의가 기존 배치와 연자·시간 충돌하는지 (같은 날짜만, 다른 룸은 이동 10분 버퍼)
+function findSpeakerConflict(targetRoomId, targetDate, candStart, candEnd, candSpeakers, ignoreLecId) {
+    const candKeys = speakerKeysOf(candSpeakers);
+    if (!candKeys.length) return null;
+    for (const p of collectPlaced()) {
+        if (p.lecId === ignoreLecId) continue;
+        if ((p.date || '') !== (targetDate || '')) continue;         // 다른 날짜면 충돌 아님
+        const shared = p.speakerKeys.find(k => candKeys.includes(k));
+        if (!shared) continue;
+        const buffer = (p.roomId === targetRoomId) ? 0 : SPEAKER_TRAVEL_MIN; // 같은 룸은 이동 불필요
+        if (candStart < p.end + buffer && p.start < candEnd + buffer) {
+            return { key: shared, other: p, buffer, candStart, candEnd };
+        }
     }
+    return null;
+}
+function speakerLabel(key) {
+    const sp = (Masters.speakers || []).find(s => s.id === key || s.nameKo === key);
+    return sp ? sp.nameKo : key;
+}
+function conflictMessage(c) {
+    const travel = c.buffer ? `(다른 룸 이동 ${c.buffer}분 필요) ` : '';
+    return `⛔ 연자 중복: "${speakerLabel(c.key)}" 님이 같은 날 ${c.other.roomName} ${formatTime(c.other.start)}~${formatTime(c.other.end)} "${c.other.titleKo}" 와 겹칩니다 ${travel}— 배치할 수 없습니다.`;
+}
+
+/* ---------- 강의 시간 수정 ---------- */
+window.openDurModal = function (roomId, sessionId, lecId) {
+    if (!AdminAuth.requireEdit()) return;
+    editingDuration = { roomId, sessionId, lecId };
+    const lec = CONF.rooms[roomId].sessions[sessionId].lectures[lecId];
+    document.getElementById('durLecTitle').textContent = normalizeLecture(lec).titleKo || '';
+    document.getElementById('durInput').value = lec.duration ?? 0;
+    document.getElementById('durModal').classList.add('open');
+};
+window.closeDurModal = function () { document.getElementById('durModal').classList.remove('open'); };
+window.saveDuration = function () {
+    if (!AdminAuth.requireEdit()) return;
+    const { roomId, sessionId, lecId } = editingDuration;
+    const dur = Number(document.getElementById('durInput').value) || 0;
+    confRef().child(`rooms/${roomId}/sessions/${sessionId}/lectures/${lecId}/duration`).set(dur)
+        .then(() => { Toast.success('시간이 수정되었습니다.'); closeDurModal(); })
+        .catch(e => Toast.error('저장 실패: ' + e.message));
 };
 
 window.deleteLecture = async function (roomId, sessionId, lecId) {
     if (!AdminAuth.requireEdit()) return;
     const lec = CONF.rooms[roomId].sessions[sessionId].lectures[lecId];
-    const ok = await confirmDialog(`"${lec ? lec.title : ''}" 강의를 삭제할까요?`, { danger: true, okText: '삭제' });
+    const ok = await confirmDialog(`"${lec ? normalizeLecture(lec).titleKo : ''}" 강의를 삭제할까요?`, { danger: true, okText: '삭제' });
     if (!ok) return;
     confRef().child(`rooms/${roomId}/sessions/${sessionId}/lectures/${lecId}`).remove()
         .then(() => Toast.success('삭제되었습니다.'));
@@ -497,6 +527,15 @@ window.confirmMove = function () {
     const { roomId, sessionId, lecId } = movingLecture;
     const lec = CONF.rooms[roomId].sessions[sessionId].lectures[lecId];
     if (!lec) return;
+    // 이동 대상에서의 시각으로 연자 중복 체크 (자기 자신 제외)
+    const toRoomObj = getRoom(toRoom);
+    const toSessions = computeRoom(toRoomObj);
+    const tSession = toSessions.find(s => s.id === toSession);
+    const startMin = tSession ? tSession._end : parseTime(toRoomObj.startTime || '09:00');
+    const endMin = startMin + (Number(lec.duration) || 0);
+    const conflict = findSpeakerConflict(toRoom, toRoomObj.date || '', startMin, endMin, lec.speakers || [], lecId);
+    if (conflict) { Toast.error(conflictMessage(conflict), 7000); return; }
+
     const targetLectures = toOrderedArray(CONF.rooms[toRoom].sessions[toSession].lectures);
     const moved = { ...lec, order: targetLectures.length };
     const updates = {};
