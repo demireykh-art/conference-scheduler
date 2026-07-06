@@ -138,7 +138,7 @@ function setupAutocomplete(input, listEl, getItems, onPick) {
     const close = () => { listEl.classList.remove('open'); listEl.innerHTML = ''; active = -1; items = []; };
     const highlight = () => [...listEl.children].forEach((c, i) => c.classList.toggle('active', i === active));
     const render = () => {
-        items = getItems(input.value.trim().toLowerCase()).slice(0, 8);
+        items = getItems(input.value.trim()).slice(0, 8);
         if (!items.length) { listEl.innerHTML = '<div class="ac-empty">일치하는 항목이 없습니다.</div>'; listEl.classList.add('open'); active = -1; return; }
         active = 0;
         listEl.innerHTML = items.map((it, i) => `<div class="ac-item ${i === 0 ? 'active' : ''}" data-i="${i}">${it.label}</div>`).join('');
@@ -161,24 +161,47 @@ function setupAutocomplete(input, listEl, getItems, onPick) {
     input.addEventListener('blur', () => setTimeout(close, 150));
 }
 
+function addSpeakerToDraft(s) {
+    if (spkDraft.find(x => x.id === s.id && s.id)) { Toast.info('이미 추가된 연자입니다.'); return; }
+    if (spkDraft.find(x => (x.nameKo || '') === (s.nameKo || '') && x.nameKo)) { Toast.info('이미 추가된 연자입니다.'); return; }
+    spkDraft.push({ id: s.id || '', nameKo: s.nameKo || '', nameEn: s.nameEn || '', affiliationKo: s.affiliationKo || '', affiliationEn: s.affiliationEn || '' });
+    renderSpeakerChips();
+}
+
 setupAutocomplete(
     document.getElementById('lecSpeakerInput'),
     document.getElementById('lecSpeakerAc'),
-    q => Masters.speakers
-        .filter(s => [s.nameKo, s.nameEn, s.affiliationKo, s.affiliationEn].join(' ').toLowerCase().includes(q))
-        .map(s => ({ label: `${escapeHtml(s.nameKo || '')} <span class="sub">${escapeHtml(s.nameEn || '')}${s.affiliationKo ? ' · ' + escapeHtml(s.affiliationKo) : ''}</span>`, value: s })),
-    s => {
-        if (spkDraft.find(x => x.id === s.id)) { Toast.info('이미 추가된 연자입니다.'); return; }
-        spkDraft.push({ id: s.id, nameKo: s.nameKo || '', nameEn: s.nameEn || '', affiliationKo: s.affiliationKo || '', affiliationEn: s.affiliationEn || '' });
-        renderSpeakerChips();
+    q => {
+        const ql = q.toLowerCase();
+        const items = Masters.speakers
+            .filter(s => [s.nameKo, s.nameEn, s.affiliationKo, s.affiliationEn].join(' ').toLowerCase().includes(ql))
+            .map(s => ({ label: `${escapeHtml(s.nameKo || '')} <span class="sub">${escapeHtml(s.nameEn || '')}${s.affiliationKo ? ' · ' + escapeHtml(s.affiliationKo) : ''}</span>`, value: { type: 'existing', s } }));
+        const exact = Masters.speakers.some(s => (s.nameKo || '').toLowerCase() === ql || (s.nameEn || '').toLowerCase() === ql);
+        if (q && !exact) items.push({ label: `➕ "<b>${escapeHtml(q)}</b>" 새 연자로 등록`, value: { type: 'new', name: q } });
+        return items;
+    },
+    async val => {
+        if (val.type === 'existing') { addSpeakerToDraft(val.s); return; }
+        const name = (val.name || '').trim();
+        if (!name) return;
+        const ok = await confirmDialog(`"${name}" 연자가 목록에 없습니다.\n새 연자로 등록할까요? (연자 관리 목록에도 추가됩니다)`, { okText: '등록' });
+        if (!ok) return;
+        const id = uuid();
+        const sdata = { nameKo: name, nameEn: '', affiliationKo: '', affiliationEn: '', order: Masters.speakers.length, createdAt: firebase.database.ServerValue.TIMESTAMP };
+        database.ref('/adminSpeakers/' + id).set(sdata)
+            .then(() => { addSpeakerToDraft({ id, ...sdata }); Toast.success(`"${name}" 연자를 등록했습니다. (연자 관리에서 소속·영문명 보완 가능)`); })
+            .catch(e => Toast.error('연자 등록 실패: ' + e.message));
     }
 );
 setupAutocomplete(
     document.getElementById('lecPartnerInput'),
     document.getElementById('lecPartnerAc'),
-    q => Masters.partners
-        .filter(p => [p.nameKo, p.nameEn].join(' ').toLowerCase().includes(q))
-        .map(p => ({ label: `${escapeHtml(p.nameKo || '')} <span class="sub">${escapeHtml(p.nameEn || '')}</span>`, value: p })),
+    q => {
+        const ql = q.toLowerCase();
+        return Masters.partners
+            .filter(p => [p.nameKo, p.nameEn].join(' ').toLowerCase().includes(ql))
+            .map(p => ({ label: `${escapeHtml(p.nameKo || '')} <span class="sub">${escapeHtml(p.nameEn || '')}</span>`, value: p }));
+    },
     p => { partnerDraft = { id: p.id, nameKo: p.nameKo || '', nameEn: p.nameEn || '' }; renderPartnerChosen(); loadProducts(Masters.partner(p.id)); }
 );
 
