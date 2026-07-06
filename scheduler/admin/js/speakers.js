@@ -116,6 +116,4 @@ window.deleteSpeaker = async function (id) {
         .catch(e => Toast.error('삭제 실패: ' + e.message));
 };
 
-document.getElementById('spkModal').addEventListener('click', e => {
-    if (e.target.id === 'spkModal') closeSpeakerModal();
-});
+// 배경 클릭으로는 닫지 않음 — 닫기/취소 버튼으로만 닫힘 (입력 보호)

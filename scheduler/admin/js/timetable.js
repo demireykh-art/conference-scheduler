@@ -579,9 +579,4 @@ window.exportExcel = function () {
     Toast.success('엑셀 파일을 내려받았습니다.');
 };
 
-/* ---------- 모달 배경 클릭 닫기 ---------- */
-['lectureModal', 'sessionModal', 'moveModal'].forEach(id => {
-    document.getElementById(id).addEventListener('click', e => {
-        if (e.target.id === id) document.getElementById(id).classList.remove('open');
-    });
-});
+/* 배경 클릭으로는 닫지 않음 — 닫기/취소 버튼으로만 닫힘 (입력 보호) */

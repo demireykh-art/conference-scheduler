@@ -158,10 +158,7 @@ window.deleteConference = async function (id) {
         .catch(e => Toast.error('삭제 실패: ' + e.message));
 };
 
-// 모달 배경 클릭 닫기
-document.getElementById('confModal').addEventListener('click', e => {
-    if (e.target.id === 'confModal') closeConferenceModal();
-});
+// 배경 클릭으로는 닫지 않음 — 닫기/취소 버튼으로만 닫힘 (입력 보호)
 
 /* ============================================================
    포스터 이미지 업로드 / 미리보기 / 다운로드
