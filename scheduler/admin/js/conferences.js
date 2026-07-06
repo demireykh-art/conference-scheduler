@@ -8,6 +8,7 @@ const CONF_ROOT = database.ref('/adminConferences');
 let CONFS = [];          // [{id, ...}]
 let CURRENT_TAB = 'public';
 let EDIT_ID = null;      // 수정 중인 행사 id (null=신규)
+let posterData = '';     // 업로드한 포스터 data URL (파일 업로드 시에만 채워짐)
 
 /* ---------- 초기화 ---------- */
 document.getElementById('sidebarMount').innerHTML = renderSidebar('events');
@@ -48,7 +49,10 @@ function renderList() {
     box.innerHTML = list.map(c => {
         const st = confStatus(c);
         const poster = c.posterUrl
-            ? `<img class="conf-poster" src="${escapeHtml(c.posterUrl)}" alt="poster" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'conf-poster',textContent:'포스터 없음'}))">`
+            ? `<div class="conf-poster-wrap">
+                    <img class="conf-poster" src="${escapeHtml(c.posterUrl)}" alt="poster" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'conf-poster',textContent:'포스터 없음'}))">
+                    <button class="poster-dl-btn" onclick="downloadPoster('${c.id}')" title="포스터 다운로드">⬇ 저장</button>
+               </div>`
             : `<div class="conf-poster">포스터<br>없음</div>`;
         return `
         <div class="card conf-card">
@@ -87,7 +91,7 @@ window.openConferenceModal = function () {
     document.getElementById('cfStart').value = '';
     document.getElementById('cfEnd').value = '';
     document.getElementById('cfLocation').value = '';
-    document.getElementById('cfPoster').value = '';
+    setPosterFromValue('');
     document.getElementById('cfPublic').checked = true;
     document.getElementById('confModal').classList.add('open');
 };
@@ -103,7 +107,7 @@ window.editConference = function (id) {
     document.getElementById('cfStart').value = c.startDate || '';
     document.getElementById('cfEnd').value = c.endDate || '';
     document.getElementById('cfLocation').value = c.location || '';
-    document.getElementById('cfPoster').value = c.posterUrl || '';
+    setPosterFromValue(c.posterUrl || '');
     document.getElementById('cfPublic').checked = c.visibility !== 'private';
     document.getElementById('confModal').classList.add('open');
 };
@@ -125,7 +129,7 @@ window.saveConference = function () {
         startDate,
         endDate: document.getElementById('cfEnd').value || startDate,
         location: document.getElementById('cfLocation').value.trim(),
-        posterUrl: document.getElementById('cfPoster').value.trim(),
+        posterUrl: getPosterValue(),
         visibility: document.getElementById('cfPublic').checked ? 'public' : 'private',
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     };
@@ -158,3 +162,141 @@ window.deleteConference = async function (id) {
 document.getElementById('confModal').addEventListener('click', e => {
     if (e.target.id === 'confModal') closeConferenceModal();
 });
+
+/* ============================================================
+   포스터 이미지 업로드 / 미리보기 / 다운로드
+   ============================================================ */
+
+// 현재 모달의 포스터 값 (업로드 data URL 우선, 없으면 URL 입력값)
+function getPosterValue() {
+    if (posterData && posterData.startsWith('data:')) return posterData;
+    return document.getElementById('cfPoster').value.trim();
+}
+
+// 값으로 포스터 필드 초기 설정 (수정/신규 열 때)
+function setPosterFromValue(v) {
+    const fileInput = document.getElementById('cfPosterFile');
+    if (fileInput) fileInput.value = '';
+    if (v && v.startsWith('data:')) {
+        posterData = v;
+        document.getElementById('cfPoster').value = '';
+    } else {
+        posterData = '';
+        document.getElementById('cfPoster').value = v || '';
+    }
+    refreshPosterPreview();
+}
+
+function refreshPosterPreview() {
+    const v = getPosterValue();
+    const img = document.getElementById('cfPosterPreview');
+    const empty = document.getElementById('cfPosterEmpty');
+    const dl = document.getElementById('cfPosterDownload');
+    const clr = document.getElementById('cfPosterClear');
+    if (v) {
+        img.src = v;
+        img.style.display = '';
+        empty.style.display = 'none';
+        dl.style.display = '';
+        clr.style.display = '';
+    } else {
+        img.removeAttribute('src');
+        img.style.display = 'none';
+        empty.style.display = '';
+        dl.style.display = 'none';
+        clr.style.display = 'none';
+    }
+}
+
+window.clearPoster = function () {
+    posterData = '';
+    document.getElementById('cfPoster').value = '';
+    document.getElementById('cfPosterFile').value = '';
+    refreshPosterPreview();
+};
+
+// 이미지 파일 → 가로 maxW로 축소한 JPEG data URL
+function compressImage(file, maxW = 1000, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                let w = img.naturalWidth, h = img.naturalHeight;
+                if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';           // PNG 투명 배경 → 흰색
+                ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = () => reject(new Error('이미지를 읽을 수 없습니다.'));
+            img.src = reader.result;
+        };
+        reader.onerror = () => reject(new Error('파일을 읽을 수 없습니다.'));
+        reader.readAsDataURL(file);
+    });
+}
+
+// 파일 선택 시
+document.getElementById('cfPosterFile').addEventListener('change', async e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+        Toast.warning('이미지 파일만 업로드할 수 있습니다.');
+        e.target.value = '';
+        return;
+    }
+    try {
+        const dataUrl = await compressImage(file, 1000, 0.82);
+        posterData = dataUrl;
+        document.getElementById('cfPoster').value = '';
+        refreshPosterPreview();
+        const kb = Math.round((dataUrl.length * 3 / 4) / 1024);
+        Toast.success(`포스터 이미지가 추가되었습니다 (약 ${kb}KB).`);
+    } catch (err) {
+        Toast.error('이미지 처리 실패: ' + err.message);
+    }
+    e.target.value = '';
+});
+
+// URL 직접 입력 시 업로드 이미지 해제
+document.getElementById('cfPoster').addEventListener('input', () => {
+    posterData = '';
+    refreshPosterPreview();
+});
+
+// 포스터 값 다운로드 (data URL 또는 외부 URL)
+function downloadPosterValue(v, title) {
+    if (!v) { Toast.warning('저장할 포스터 이미지가 없습니다.'); return; }
+    const safe = (title || '포스터').replace(/[\\/:*?"<>|]/g, '_');
+    const a = document.createElement('a');
+    a.href = v;
+    if (v.startsWith('data:')) {
+        const mime = (v.match(/^data:(image\/[\w.+-]+)/) || [])[1] || 'image/jpeg';
+        let ext = (mime.split('/')[1] || 'jpg').toLowerCase();
+        if (ext === 'jpeg') ext = 'jpg';
+        a.download = `${safe}_포스터.${ext}`;
+    } else {
+        // 외부 URL은 교차출처라 download 속성이 무시될 수 있어 새 탭으로도 열어둠
+        a.download = `${safe}_포스터`;
+        a.target = '_blank';
+        a.rel = 'noopener';
+    }
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+// 모달 안에서 현재 포스터 다운로드
+window.downloadCurrentPoster = function () {
+    downloadPosterValue(getPosterValue(), document.getElementById('cfTitle').value.trim());
+};
+
+// 목록 카드에서 포스터 다운로드
+window.downloadPoster = function (id) {
+    const c = CONFS.find(x => x.id === id);
+    if (c) downloadPosterValue(c.posterUrl, c.title);
+};

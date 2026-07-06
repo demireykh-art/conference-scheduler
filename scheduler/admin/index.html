@@ -77,8 +77,19 @@
                 <input type="text" id="cfLocation" placeholder="코엑스 (서울 강남구 삼성동)">
             </div>
             <div class="modal-field">
-                <label>포스터 이미지 URL (선택)</label>
-                <input type="text" id="cfPoster" placeholder="https://...">
+                <label>포스터 이미지 (선택)</label>
+                <div style="display:flex;gap:12px;align-items:flex-start">
+                    <img id="cfPosterPreview" class="poster-preview" style="display:none" alt="포스터 미리보기">
+                    <div id="cfPosterEmpty" class="poster-preview poster-empty">미리보기</div>
+                    <div style="display:flex;flex-direction:column;gap:6px;flex:1">
+                        <input type="file" id="cfPosterFile" accept="image/*" style="display:none">
+                        <button type="button" class="btn btn-sm" onclick="document.getElementById('cfPosterFile').click()">🖼️ 이미지 파일 선택</button>
+                        <button type="button" class="btn btn-sm" id="cfPosterDownload" onclick="downloadCurrentPoster()" style="display:none">⬇ 다운로드</button>
+                        <button type="button" class="btn btn-sm btn-danger-ghost" id="cfPosterClear" onclick="clearPoster()" style="display:none">✕ 제거</button>
+                        <div style="font-size:0.72rem;color:var(--text-dim);line-height:1.4">JPG·PNG 업로드 시 가로 1000px로 자동 축소 저장됩니다.</div>
+                    </div>
+                </div>
+                <input type="text" id="cfPoster" placeholder="또는 이미지 URL 직접 입력 (https://...)" style="margin-top:8px">
             </div>
             <div class="modal-field">
                 <label class="check-inline">
