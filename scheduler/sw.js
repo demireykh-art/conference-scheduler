@@ -1,7 +1,7 @@
 // 학술대회 스케줄러 — Service Worker
 // 앱 껍데기(shell)만 캐시, 데이터는 항상 Firebase에서 실시간 수신
 
-const CACHE_NAME = 'scheduler-v1';
+const CACHE_NAME = 'scheduler-v2';
 const SHELL = [
   '/conference-scheduler/scheduler/',
   '/conference-scheduler/scheduler/index.html',
@@ -45,6 +45,21 @@ self.addEventListener('fetch', e => {
     url.hostname.includes('accounts.google')
   ) {
     return; // 기본 fetch 동작
+  }
+
+  // admin 모듈 → Network-first (항상 최신, 오프라인 시 캐시 폴백)
+  // cache-first로 인해 배포 후에도 옛 파일이 서빙되는 문제 방지
+  if (url.pathname.includes('/scheduler/admin/')) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (e.request.method === 'GET' && res && res.status === 200) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
   }
 
   // 셸 파일 → Cache-first, 실패 시 네트워크
