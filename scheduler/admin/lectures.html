@@ -93,10 +93,10 @@
             </div>
 
             <div class="modal-field">
-                <label>연자 (등록된 연자에서 선택)</label>
-                <div class="select-add-row">
-                    <select id="lecSpeakerSelect"></select>
-                    <button type="button" class="btn btn-sm" onclick="addSelectedSpeaker()">+ 추가</button>
+                <label>연자 (이름 검색 후 Enter로 추가)</label>
+                <div class="ac-wrap">
+                    <input type="text" id="lecSpeakerInput" placeholder="연자 이름 검색…" autocomplete="off">
+                    <div class="ac-list" id="lecSpeakerAc"></div>
                 </div>
                 <div class="chips" id="lecSpeakerChips"></div>
                 <div id="lecSpeakerHint"></div>
@@ -104,8 +104,12 @@
 
             <div class="modal-grid2">
                 <div class="modal-field">
-                    <label>파트너사 (선택)</label>
-                    <select id="lecPartnerSelect" onchange="onPartnerChange()"></select>
+                    <label>파트너사 (검색 후 Enter로 선택)</label>
+                    <div class="ac-wrap">
+                        <input type="text" id="lecPartnerInput" placeholder="파트너사 검색…" autocomplete="off">
+                        <div class="ac-list" id="lecPartnerAc"></div>
+                    </div>
+                    <div class="chips" id="lecPartnerChosen"></div>
                     <div id="lecPartnerHint"></div>
                 </div>
                 <div class="modal-field">
