@@ -78,7 +78,7 @@ function renderRoomTabs(rooms) {
         </button>`).join('');
     box.innerHTML = tabs + `<button class="room-tab add-tab" onclick="addRoom()">+ 룸 추가</button>`;
 
-    enableSort(box, '.room-tab[data-room]', 'data-room', ids => persistRoomOrder(ids));
+    enableSort(box, '.room-tab[data-room]', 'data-room', ids => persistRoomOrder(ids), 'room');
 }
 
 window.selectRoom = function (id) { CURRENT_ROOM = id; renderRoomTabs(orderedRooms()); renderRoomSettings(); renderSessions(); };
@@ -212,11 +212,11 @@ function renderSessions() {
     box.innerHTML = sessions.map(s => renderSessionBlock(room.id, s)).join('');
 
     // 세션 순서 드래그
-    enableSort(box, '.session-block', 'data-session', ids => persistSessionOrder(room.id, ids));
+    enableSort(box, '.session-block', 'data-session', ids => persistSessionOrder(room.id, ids), 'session');
     // 각 세션 내 강의 순서 드래그
     sessions.forEach(s => {
         const listEl = box.querySelector(`.lecture-list[data-session="${s.id}"]`);
-        if (listEl) enableSort(listEl, '.lecture-row', 'data-lec', ids => persistLectureOrder(room.id, s.id, ids));
+        if (listEl) enableSort(listEl, '.lecture-row', 'data-lec', ids => persistLectureOrder(room.id, s.id, ids), 'lecture');
     });
 }
 
@@ -583,11 +583,13 @@ window.confirmMove = function () {
 };
 
 /* ============================================================
-   드래그 정렬 (공통)
+   드래그 정렬 (공통) — 종류(type)+컨테이너별로 격리
+   강의를 드래그해도 상위 세션이 함께 이동하지 않도록 함
    ============================================================ */
-function enableSort(container, itemSelector, idAttr, onReorder) {
+let activeDrag = null; // { type, el, container }
+
+function enableSort(container, itemSelector, idAttr, onReorder, type) {
     if (!container) return;
-    let dragEl = null;
     container.querySelectorAll(itemSelector).forEach(item => {
         const grip = item.querySelector('.grip');
         if (grip) {
@@ -595,25 +597,33 @@ function enableSort(container, itemSelector, idAttr, onReorder) {
             grip.addEventListener('touchstart', () => item.setAttribute('draggable', 'true'), { passive: true });
         }
         item.addEventListener('dragstart', e => {
-            dragEl = item; item.classList.add('dragging');
+            if (e.target !== item) return;   // 자식(강의)에서 버블링된 이벤트 무시 → 세션이 끌려가지 않음
+            activeDrag = { type, el: item, container };
+            item.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', '');  // Firefox 대응
         });
         item.addEventListener('dragend', () => {
             item.classList.remove('dragging'); item.removeAttribute('draggable');
             container.querySelectorAll('.dragover').forEach(x => x.classList.remove('dragover'));
-            dragEl = null;
+            activeDrag = null;
         });
+        const sameCtx = () => activeDrag && activeDrag.type === type && activeDrag.container === container;
         item.addEventListener('dragover', e => {
+            if (!sameCtx()) return;          // 다른 종류/다른 세션의 드래그는 무시
             e.preventDefault();
-            if (dragEl && dragEl !== item) item.classList.add('dragover');
+            if (activeDrag.el !== item) item.classList.add('dragover');
         });
         item.addEventListener('dragleave', () => item.classList.remove('dragover'));
         item.addEventListener('drop', e => {
+            if (!sameCtx()) return;
             e.preventDefault();
             item.classList.remove('dragover');
+            const dragEl = activeDrag.el;
             if (!dragEl || dragEl === item) return;
             const items = [...container.querySelectorAll(itemSelector)];
             const from = items.indexOf(dragEl), to = items.indexOf(item);
+            if (from < 0 || to < 0) return;
             if (from < to) item.after(dragEl); else item.before(dragEl);
             const ids = [...container.querySelectorAll(itemSelector)].map(el => el.getAttribute(idAttr));
             onReorder(ids);
