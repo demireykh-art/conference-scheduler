@@ -118,36 +118,84 @@ function renderPool() {
     }).join('');
 }
 
-/* ---------- 마스터 셀렉트/칩 ---------- */
+/* ---------- 분류 셀렉트 + 힌트 ---------- */
+let partnerDraft = null;  // 선택된 파트너사 {id,nameKo,nameEn}
+
 function populateMasterSelects() {
     document.getElementById('lecCatSelect').innerHTML = productCategoryOptions('').replace('제품분류 선택', '분류 선택');
-    document.getElementById('lecSpeakerSelect').innerHTML = '<option value="">-- 연자 선택 --</option>' +
-        Masters.speakers.map(s => `<option value="${s.id}">${escapeHtml(s.nameKo || s.nameEn)}${s.affiliationKo ? ' (' + escapeHtml(s.affiliationKo) + ')' : ''}</option>`).join('');
-    document.getElementById('lecPartnerSelect').innerHTML = '<option value="">-- 파트너사 선택 --</option>' +
-        Masters.partners.map(p => `<option value="${p.id}">${escapeHtml(p.nameKo || p.nameEn)}</option>`).join('');
     document.getElementById('lecSpeakerHint').innerHTML = Masters.speakers.length ? '' :
         `<div class="master-empty-hint">등록된 연자가 없습니다. <a href="speakers.html" target="_blank">연자 관리</a>에서 먼저 등록하세요.</div>`;
     document.getElementById('lecPartnerHint').innerHTML = Masters.partners.length ? '' :
         `<div class="master-empty-hint">등록된 파트너사가 없습니다. <a href="partners.html" target="_blank">파트너사 관리</a>에서 먼저 등록하세요.</div>`;
 }
 document.addEventListener('masters-change', () => {
-    if (document.getElementById('lectureModal').classList.contains('open')) {
-        const pv = document.getElementById('lecPartnerSelect').value;
-        populateMasterSelects();
-        document.getElementById('lecPartnerSelect').value = pv;
-        onPartnerChange();
-    }
+    if (document.getElementById('lectureModal').classList.contains('open')) populateMasterSelects();
 });
 
-window.onPartnerChange = function () {
-    const p = Masters.partner(document.getElementById('lecPartnerSelect').value);
-    const products = (p && Array.isArray(p.products)) ? p.products : [];
+/* ---------- 타이핑 검색 자동완성 ---------- */
+function setupAutocomplete(input, listEl, getItems, onPick) {
+    let items = [], active = -1;
+    const close = () => { listEl.classList.remove('open'); listEl.innerHTML = ''; active = -1; items = []; };
+    const highlight = () => [...listEl.children].forEach((c, i) => c.classList.toggle('active', i === active));
+    const render = () => {
+        items = getItems(input.value.trim().toLowerCase()).slice(0, 8);
+        if (!items.length) { listEl.innerHTML = '<div class="ac-empty">일치하는 항목이 없습니다.</div>'; listEl.classList.add('open'); active = -1; return; }
+        active = 0;
+        listEl.innerHTML = items.map((it, i) => `<div class="ac-item ${i === 0 ? 'active' : ''}" data-i="${i}">${it.label}</div>`).join('');
+        listEl.classList.add('open');
+    };
+    const pick = i => { if (items[i]) { onPick(items[i].value); input.value = ''; close(); } };
+    input.addEventListener('focus', render);
+    input.addEventListener('input', render);
+    input.addEventListener('keydown', e => {
+        if (!listEl.classList.contains('open')) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, items.length - 1); highlight(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); highlight(); }
+        else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0) pick(active); }
+        else if (e.key === 'Escape') { close(); }
+    });
+    listEl.addEventListener('mousedown', e => {
+        const it = e.target.closest('.ac-item'); if (!it) return;
+        e.preventDefault(); pick(Number(it.dataset.i));
+    });
+    input.addEventListener('blur', () => setTimeout(close, 150));
+}
+
+setupAutocomplete(
+    document.getElementById('lecSpeakerInput'),
+    document.getElementById('lecSpeakerAc'),
+    q => Masters.speakers
+        .filter(s => [s.nameKo, s.nameEn, s.affiliationKo, s.affiliationEn].join(' ').toLowerCase().includes(q))
+        .map(s => ({ label: `${escapeHtml(s.nameKo || '')} <span class="sub">${escapeHtml(s.nameEn || '')}${s.affiliationKo ? ' · ' + escapeHtml(s.affiliationKo) : ''}</span>`, value: s })),
+    s => {
+        if (spkDraft.find(x => x.id === s.id)) { Toast.info('이미 추가된 연자입니다.'); return; }
+        spkDraft.push({ id: s.id, nameKo: s.nameKo || '', nameEn: s.nameEn || '', affiliationKo: s.affiliationKo || '', affiliationEn: s.affiliationEn || '' });
+        renderSpeakerChips();
+    }
+);
+setupAutocomplete(
+    document.getElementById('lecPartnerInput'),
+    document.getElementById('lecPartnerAc'),
+    q => Masters.partners
+        .filter(p => [p.nameKo, p.nameEn].join(' ').toLowerCase().includes(q))
+        .map(p => ({ label: `${escapeHtml(p.nameKo || '')} <span class="sub">${escapeHtml(p.nameEn || '')}</span>`, value: p })),
+    p => { partnerDraft = { id: p.id, nameKo: p.nameKo || '', nameEn: p.nameEn || '' }; renderPartnerChosen(); loadProducts(Masters.partner(p.id)); }
+);
+
+function loadProducts(partner) {
+    const products = (partner && Array.isArray(partner.products)) ? partner.products : [];
     const sel = document.getElementById('lecProductSelect');
     sel.innerHTML = '<option value="">-- 제품 선택 --</option>' +
         products.map((pr, i) => `<option value="${i}">${escapeHtml(pr.nameKo || pr.nameEn || '')}</option>`).join('');
     sel.disabled = !products.length;
-};
+}
+function renderPartnerChosen() {
+    document.getElementById('lecPartnerChosen').innerHTML = partnerDraft
+        ? `<span class="chip">${escapeHtml(partnerDraft.nameKo || partnerDraft.nameEn)}<span class="x" onclick="clearPartner()">×</span></span>` : '';
+}
+window.clearPartner = function () { partnerDraft = null; renderPartnerChosen(); loadProducts(null); };
 
+/* ---------- 분류/태그/연자 칩 ---------- */
 window.addCategory = function () {
     const v = document.getElementById('lecCatSelect').value;
     if (!v) return;
@@ -174,16 +222,6 @@ function renderTagChips() {
 }
 window.removeTag = function (i) { tagDraft.splice(i, 1); renderTagChips(); };
 
-window.addSelectedSpeaker = function () {
-    const id = document.getElementById('lecSpeakerSelect').value;
-    if (!id) { Toast.info('추가할 연자를 선택하세요.'); return; }
-    if (spkDraft.find(s => s.id === id)) { Toast.info('이미 추가된 연자입니다.'); return; }
-    const s = Masters.speaker(id);
-    if (!s) return;
-    spkDraft.push({ id: s.id, nameKo: s.nameKo || '', nameEn: s.nameEn || '', affiliationKo: s.affiliationKo || '', affiliationEn: s.affiliationEn || '' });
-    document.getElementById('lecSpeakerSelect').value = '';
-    renderSpeakerChips();
-};
 function renderSpeakerChips() {
     document.getElementById('lecSpeakerChips').innerHTML = spkDraft.map((s, i) =>
         `<span class="chip">${escapeHtml(s.nameKo || s.nameEn)}<span class="x" onclick="removeSpeaker(${i})">×</span></span>`).join('');
@@ -200,11 +238,12 @@ window.openLectureModal = function () {
     document.getElementById('lecTitleKo').value = '';
     document.getElementById('lecTitleEn').value = '';
     document.getElementById('lecDuration').value = 20;
-    catDraft = []; tagDraft = []; spkDraft = [];
-    renderCatChips(); renderTagChips(); renderSpeakerChips();
-    document.getElementById('lecPartnerSelect').value = '';
-    onPartnerChange();
+    catDraft = []; tagDraft = []; spkDraft = []; partnerDraft = null;
+    renderCatChips(); renderTagChips(); renderSpeakerChips(); renderPartnerChosen();
+    loadProducts(null);
     document.getElementById('lecTagInput').value = '';
+    document.getElementById('lecSpeakerInput').value = '';
+    document.getElementById('lecPartnerInput').value = '';
     document.getElementById('lectureModal').classList.add('open');
     setTimeout(() => document.getElementById('lecTitleKo').focus(), 50);
 };
@@ -222,25 +261,25 @@ window.editLecture = function (id) {
     catDraft = [...(l.categories || [])];
     tagDraft = [...(l.tags || [])];
     spkDraft = (l.speakers || []).map(s => ({ ...s }));
-    renderCatChips(); renderTagChips(); renderSpeakerChips();
-    document.getElementById('lecPartnerSelect').value = l.partnerId || '';
-    onPartnerChange();
-    if (l.partnerId) {
-        const p = Masters.partner(l.partnerId);
-        if (p && Array.isArray(p.products) && (l.productKo || l.productEn)) {
-            const idx = p.products.findIndex(pr => (pr.nameKo || '') === (l.productKo || '') && (pr.nameEn || '') === (l.productEn || ''));
-            if (idx >= 0) document.getElementById('lecProductSelect').value = String(idx);
-        }
+    partnerDraft = l.partnerId ? { id: l.partnerId, nameKo: l.partnerKo || '', nameEn: l.partnerEn || '' } : null;
+    renderCatChips(); renderTagChips(); renderSpeakerChips(); renderPartnerChosen();
+    const p = l.partnerId ? Masters.partner(l.partnerId) : null;
+    loadProducts(p);
+    if (p && Array.isArray(p.products) && (l.productKo || l.productEn)) {
+        const idx = p.products.findIndex(pr => (pr.nameKo || '') === (l.productKo || '') && (pr.nameEn || '') === (l.productEn || ''));
+        if (idx >= 0) document.getElementById('lecProductSelect').value = String(idx);
     }
     document.getElementById('lecTagInput').value = '';
+    document.getElementById('lecSpeakerInput').value = '';
+    document.getElementById('lecPartnerInput').value = '';
     document.getElementById('lectureModal').classList.add('open');
 };
 
 window.closeLectureModal = function () { document.getElementById('lectureModal').classList.remove('open'); };
 
 function buildLectureData() {
-    const pid = document.getElementById('lecPartnerSelect').value;
-    const partner = Masters.partner(pid);
+    const pid = partnerDraft ? partnerDraft.id : '';
+    const partner = pid ? Masters.partner(pid) : null;
     let productKo = '', productEn = '', productCategory = '', productDesc = '';
     if (partner) {
         const idx = document.getElementById('lecProductSelect').value;
@@ -263,8 +302,8 @@ function buildLectureData() {
         tags: [...tagDraft],
         speakers: spkDraft.map(s => ({ id: s.id || '', nameKo: s.nameKo || '', nameEn: s.nameEn || '', affiliationKo: s.affiliationKo || '', affiliationEn: s.affiliationEn || '' })),
         partnerId: pid || '',
-        partnerKo: partner ? (partner.nameKo || '') : '',
-        partnerEn: partner ? (partner.nameEn || '') : '',
+        partnerKo: partner ? (partner.nameKo || '') : (partnerDraft ? partnerDraft.nameKo : ''),
+        partnerEn: partner ? (partner.nameEn || '') : (partnerDraft ? partnerDraft.nameEn : ''),
         productKo, productEn, productCategory, productDesc
     };
 }
