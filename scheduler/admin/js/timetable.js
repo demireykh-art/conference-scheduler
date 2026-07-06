@@ -16,6 +16,18 @@ let speakerDraft = [];        // 강의 모달 연자 칩 배열
 
 /* ---------- 초기화 ---------- */
 document.getElementById('sidebarMount').innerHTML = renderSidebar('events');
+Masters.init();
+
+// 마스터(연자/파트너사) 로드/변경 시, 강의 모달이 열려 있으면 셀렉트 갱신
+document.addEventListener('masters-change', () => {
+    const modal = document.getElementById('lectureModal');
+    if (modal && modal.classList.contains('open')) {
+        const pv = document.getElementById('lecPartnerSelect').value;
+        populateMasterSelects();
+        document.getElementById('lecPartnerSelect').value = pv;
+        onPartnerChange();
+    }
+});
 
 if (!CONF_ID) {
     document.getElementById('sessions').innerHTML =
@@ -185,9 +197,17 @@ function renderSessionBlock(roomId, s) {
 }
 
 function renderLectureRow(roomId, sessionId, lec) {
+    const n = normalizeLecture(lec);
     const range = `${formatTime(lec._start)} - ${formatTime(lec._end)}`;
-    const partner = lec.partner ? `<span class="partner-badge">${escapeHtml(lec.partner)}</span>` : '';
-    const speakers = (lec.speakers && lec.speakers.length) ? lec.speakers.join(', ') : '미정';
+    const partner = n.partnerKo ? `<span class="partner-badge">${escapeHtml(n.partnerKo)}</span>` : '';
+    const speakers = n.speakers.length
+        ? n.speakers.map(s => {
+            const nm = s.nameKo || s.nameEn || '';
+            return s.affiliationKo ? `${nm} (${s.affiliationKo})` : nm;
+        }).join(', ')
+        : '미정';
+    const product = (n.productKo || n.productEn)
+        ? `<div class="lec-product">제품: ${escapeHtml(n.productKo || n.productEn)}</div>` : '';
     return `
     <div class="lecture-row" data-lec="${lec.id}">
         <span class="grip" title="드래그하여 순서 변경">⋮⋮</span>
@@ -197,9 +217,10 @@ function renderLectureRow(roomId, sessionId, lec) {
                 <span class="dur-badge">${lec.duration || 0}분</span>
                 ${partner}
             </div>
-            <div class="lec-title">${escapeHtml(lec.title || '(제목 없음)')}</div>
-            ${lec.subtitle ? `<div class="lec-subtitle">${escapeHtml(lec.subtitle)}</div>` : ''}
+            <div class="lec-title">${escapeHtml(n.titleKo || '(제목 없음)')}</div>
+            ${n.titleEn ? `<div class="lec-subtitle">${escapeHtml(n.titleEn)}</div>` : ''}
             <div class="lec-speaker">연자: ${escapeHtml(speakers)}</div>
+            ${product}
         </div>
         <div class="lec-actions">
             <button class="txt-btn" onclick="openMoveModal('${roomId}','${sessionId}','${lec.id}')">이동</button>
@@ -207,6 +228,35 @@ function renderLectureRow(roomId, sessionId, lec) {
             <button class="txt-btn danger" onclick="deleteLecture('${roomId}','${sessionId}','${lec.id}')">삭제</button>
         </div>
     </div>`;
+}
+
+/**
+ * 구/신 데이터 포맷 호환 정규화
+ * 구: {title, subtitle, speakers:[문자열], partner}
+ * 신: {titleKo, titleEn, speakers:[객체], partnerId, partnerKo, partnerEn, productKo, productEn}
+ */
+function normalizeLecture(lec) {
+    lec = lec || {};
+    let speakers = [];
+    if (Array.isArray(lec.speakers)) {
+        speakers = lec.speakers.map(s => typeof s === 'string'
+            ? { id: '', nameKo: s, nameEn: '', affiliationKo: '', affiliationEn: '' }
+            : {
+                id: s.id || '', nameKo: s.nameKo || '', nameEn: s.nameEn || '',
+                affiliationKo: s.affiliationKo || '', affiliationEn: s.affiliationEn || ''
+            });
+    }
+    return {
+        titleKo: lec.titleKo != null ? lec.titleKo : (lec.title || ''),
+        titleEn: lec.titleEn != null ? lec.titleEn : (lec.subtitle || ''),
+        duration: lec.duration,
+        speakers,
+        partnerId: lec.partnerId || '',
+        partnerKo: lec.partnerKo != null ? lec.partnerKo : (lec.partner || ''),
+        partnerEn: lec.partnerEn || '',
+        productKo: lec.productKo || '',
+        productEn: lec.productEn || ''
+    };
 }
 
 /* ============================================================
@@ -260,6 +310,51 @@ function persistSessionOrder(roomId, ids) {
 /* ============================================================
    강의 모달
    ============================================================ */
+// 등록된 연자/파트너사로 셀렉트 채우기
+function populateMasterSelects() {
+    const spkSel = document.getElementById('lecSpeakerSelect');
+    spkSel.innerHTML = '<option value="">-- 연자 선택 --</option>' +
+        Masters.speakers.map(s =>
+            `<option value="${s.id}">${escapeHtml(s.nameKo || s.nameEn)}${s.affiliationKo ? ' (' + escapeHtml(s.affiliationKo) + ')' : ''}</option>`
+        ).join('');
+
+    const ptnSel = document.getElementById('lecPartnerSelect');
+    ptnSel.innerHTML = '<option value="">-- 파트너사 선택 --</option>' +
+        Masters.partners.map(p => `<option value="${p.id}">${escapeHtml(p.nameKo || p.nameEn)}</option>`).join('');
+
+    document.getElementById('lecSpeakerHint').innerHTML = Masters.speakers.length ? '' :
+        `<div class="master-empty-hint">등록된 연자가 없습니다. <a href="speakers.html" target="_blank">연자 관리</a>에서 먼저 등록하세요.</div>`;
+    document.getElementById('lecPartnerHint').innerHTML = Masters.partners.length ? '' :
+        `<div class="master-empty-hint">등록된 파트너사가 없습니다. <a href="partners.html" target="_blank">파트너사 관리</a>에서 먼저 등록하세요.</div>`;
+}
+
+// 선택한 파트너사의 제품 목록으로 제품 셀렉트 채우기
+window.onPartnerChange = function () {
+    const pid = document.getElementById('lecPartnerSelect').value;
+    const prodSel = document.getElementById('lecProductSelect');
+    const p = Masters.partner(pid);
+    const products = (p && Array.isArray(p.products)) ? p.products : [];
+    prodSel.innerHTML = '<option value="">-- 제품 선택 --</option>' +
+        products.map((pr, i) => `<option value="${i}">${escapeHtml(pr.nameKo || pr.nameEn || '')}</option>`).join('');
+    prodSel.disabled = !products.length;
+};
+
+// 연자 추가 (칩)
+window.addSelectedSpeaker = function () {
+    const sel = document.getElementById('lecSpeakerSelect');
+    const id = sel.value;
+    if (!id) { Toast.info('추가할 연자를 선택하세요.'); return; }
+    if (speakerDraft.find(s => s.id === id)) { Toast.info('이미 추가된 연자입니다.'); return; }
+    const s = Masters.speaker(id);
+    if (!s) return;
+    speakerDraft.push({
+        id: s.id, nameKo: s.nameKo || '', nameEn: s.nameEn || '',
+        affiliationKo: s.affiliationKo || '', affiliationEn: s.affiliationEn || ''
+    });
+    sel.value = '';
+    renderSpeakerChips();
+};
+
 window.openLectureModal = function (roomId, sessionId, lecId) {
     if (!AdminAuth.requireEdit()) return;
     editingLecture = lecId ? { roomId, sessionId, lecId } : { roomId, sessionId };
@@ -267,60 +362,87 @@ window.openLectureModal = function (roomId, sessionId, lecId) {
     const isEdit = !!lecId;
     document.getElementById('lecModalTitle').textContent = isEdit ? '강의 수정' : '강의 추가';
 
-    let lec = { title: '', subtitle: '', duration: Number(room.defaultDuration) || 10, speakers: [], partner: '' };
-    if (isEdit) lec = { ...lec, ...room.sessions[sessionId].lectures[lecId] };
+    populateMasterSelects();
 
-    document.getElementById('lecTitle').value = lec.title || '';
-    document.getElementById('lecSubtitle').value = lec.subtitle || '';
-    document.getElementById('lecDuration').value = lec.duration ?? 10;
-    document.getElementById('lecPartner').value = lec.partner || '';
-    speakerDraft = Array.isArray(lec.speakers) ? [...lec.speakers] : (lec.speakers ? [lec.speakers] : []);
+    const n = isEdit
+        ? normalizeLecture(room.sessions[sessionId].lectures[lecId])
+        : normalizeLecture({ duration: Number(room.defaultDuration) || 10 });
+
+    document.getElementById('lecTitleKo').value = n.titleKo || '';
+    document.getElementById('lecTitleEn').value = n.titleEn || '';
+    document.getElementById('lecDuration').value = (isEdit ? n.duration : (Number(room.defaultDuration) || 10)) ?? 10;
+
+    speakerDraft = n.speakers.map(s => ({ ...s }));
     renderSpeakerChips();
-    document.getElementById('lecSpeakerInput').value = '';
+
+    // 파트너사 + 제품
+    document.getElementById('lecPartnerSelect').value = n.partnerId || '';
+    onPartnerChange();
+    if (n.partnerId) {
+        const p = Masters.partner(n.partnerId);
+        if (p && Array.isArray(p.products) && (n.productKo || n.productEn)) {
+            const idx = p.products.findIndex(pr =>
+                (pr.nameKo || '') === (n.productKo || '') && (pr.nameEn || '') === (n.productEn || ''));
+            if (idx >= 0) document.getElementById('lecProductSelect').value = String(idx);
+        }
+    }
+
     document.getElementById('lectureModal').classList.add('open');
-    setTimeout(() => document.getElementById('lecTitle').focus(), 50);
+    setTimeout(() => document.getElementById('lecTitleKo').focus(), 50);
 };
 window.closeLectureModal = function () { document.getElementById('lectureModal').classList.remove('open'); };
 
 function renderSpeakerChips() {
     document.getElementById('lecSpeakerChips').innerHTML = speakerDraft.map((s, i) =>
-        `<span class="chip">${escapeHtml(s)}<span class="x" onclick="removeSpeaker(${i})">×</span></span>`).join('');
+        `<span class="chip">${escapeHtml(s.nameKo || s.nameEn || '')}<span class="x" onclick="removeSpeaker(${i})">×</span></span>`).join('');
 }
 window.removeSpeaker = function (i) { speakerDraft.splice(i, 1); renderSpeakerChips(); };
-document.getElementById('lecSpeakerInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        const v = e.target.value.trim();
-        if (v && !speakerDraft.includes(v)) { speakerDraft.push(v); renderSpeakerChips(); }
-        e.target.value = '';
-    }
-});
 
 window.saveLecture = function () {
     if (!AdminAuth.requireEdit()) return;
-    const title = document.getElementById('lecTitle').value.trim();
-    if (!title) { Toast.warning('강의 제목을 입력하세요.'); return; }
-    // 입력 중이던 연자도 포함
-    const pending = document.getElementById('lecSpeakerInput').value.trim();
-    if (pending && !speakerDraft.includes(pending)) speakerDraft.push(pending);
+    const titleKo = document.getElementById('lecTitleKo').value.trim();
+    if (!titleKo) { Toast.warning('강의 제목(국문)을 입력하세요.'); return; }
+
+    // 파트너사 + 제품 (마스터에서 해석)
+    const pid = document.getElementById('lecPartnerSelect').value;
+    const partner = Masters.partner(pid);
+    let productKo = '', productEn = '';
+    if (partner) {
+        const pIdx = document.getElementById('lecProductSelect').value;
+        const products = Array.isArray(partner.products) ? partner.products : [];
+        if (pIdx !== '' && products[Number(pIdx)]) {
+            productKo = products[Number(pIdx)].nameKo || '';
+            productEn = products[Number(pIdx)].nameEn || '';
+        }
+    }
 
     const data = {
-        title,
-        subtitle: document.getElementById('lecSubtitle').value.trim(),
+        titleKo,
+        titleEn: document.getElementById('lecTitleEn').value.trim(),
         duration: Number(document.getElementById('lecDuration').value) || 0,
-        speakers: speakerDraft,
-        partner: document.getElementById('lecPartner').value.trim()
+        speakers: speakerDraft.map(s => ({
+            id: s.id || '', nameKo: s.nameKo || '', nameEn: s.nameEn || '',
+            affiliationKo: s.affiliationKo || '', affiliationEn: s.affiliationEn || ''
+        })),
+        partnerId: pid || '',
+        partnerKo: partner ? (partner.nameKo || '') : '',
+        partnerEn: partner ? (partner.nameEn || '') : '',
+        productKo, productEn,
+        // 구 포맷 필드 제거
+        title: null, subtitle: null, partner: null
     };
     const { roomId, sessionId, lecId } = editingLecture;
     const base = `rooms/${roomId}/sessions/${sessionId}/lectures`;
     if (lecId) {
         confRef().child(`${base}/${lecId}`).update(data)
-            .then(() => { Toast.success('저장되었습니다.'); closeLectureModal(); });
+            .then(() => { Toast.success('저장되었습니다.'); closeLectureModal(); })
+            .catch(e => Toast.error('저장 실패: ' + e.message));
     } else {
         const lectures = toOrderedArray(CONF.rooms[roomId].sessions[sessionId].lectures);
         data.order = lectures.length;
         confRef().child(`${base}/${uuid()}`).set(data)
-            .then(() => { Toast.success('강의가 추가되었습니다.'); closeLectureModal(); });
+            .then(() => { Toast.success('강의가 추가되었습니다.'); closeLectureModal(); })
+            .catch(e => Toast.error('추가 실패: ' + e.message));
     }
 };
 
@@ -419,20 +541,28 @@ function enableSort(container, itemSelector, idAttr, onReorder) {
 window.exportExcel = function () {
     if (typeof XLSX === 'undefined') { Toast.error('엑셀 모듈을 불러오지 못했습니다.'); return; }
     if (!CONF) return;
-    const rows = [['룸', '세션', '시작', '종료', '시간(분)', '제목', '부제', '연자', '파트너사']];
+    const rows = [['룸', '세션', '시작', '종료', '시간(분)',
+        '제목(국문)', '제목(영문)', '연자(국문)', '연자(영문)', '소속(국문)', '소속(영문)',
+        '파트너사(국문)', '파트너사(영문)', '제품(국문)', '제품(영문)']];
+    const join = arr => arr.filter(Boolean).join('; ');
     orderedRooms().forEach(r => {
         computeRoom(r).forEach(s => {
             s.lectures.forEach(lec => {
+                const n = normalizeLecture(lec);
                 rows.push([
-                    r.name, s.name, formatTime(lec._start), formatTime(lec._end),
-                    lec.duration || 0, lec.title || '', lec.subtitle || '',
-                    (lec.speakers || []).join(', '), lec.partner || ''
+                    r.name, s.name, formatTime(lec._start), formatTime(lec._end), lec.duration || 0,
+                    n.titleKo, n.titleEn,
+                    join(n.speakers.map(x => x.nameKo)), join(n.speakers.map(x => x.nameEn)),
+                    join(n.speakers.map(x => x.affiliationKo)), join(n.speakers.map(x => x.affiliationEn)),
+                    n.partnerKo, n.partnerEn, n.productKo, n.productEn
                 ]);
             });
         });
     });
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 18 }, { wch: 8 }, { wch: 7 }, { wch: 7 }, { wch: 8 }, { wch: 46 }, { wch: 30 }, { wch: 14 }, { wch: 14 }];
+    ws['!cols'] = [{ wch: 18 }, { wch: 8 }, { wch: 7 }, { wch: 7 }, { wch: 8 },
+        { wch: 40 }, { wch: 40 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 18 },
+        { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 16 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '시간표');
     const safe = (CONF.title || '시간표').replace(/[\\/:*?"<>|]/g, '_');

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>연자 관리 · ASLS 행사 관리</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <div id="sidebarMount"></div>
+        <main class="main">
+            <div class="main-topbar">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+                    <h1 class="main-title">연자 관리</h1>
+                </div>
+            </div>
+            <div class="main-body">
+                <div class="info-banner">
+                    <div class="info-ico">i</div>
+                    <div class="info-title">연자를 미리 등록해 두면, 강의 입력 시 목록에서 선택할 수 있어 오타·중복을 방지합니다.</div>
+                </div>
+                <div class="toolbar-row">
+                    <div>
+                        <input type="text" id="spkSearch" placeholder="🔍 이름/소속 검색" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.86rem;width:260px">
+                        <span style="margin-left:10px;color:var(--text-dim);font-size:0.85rem">총 <span id="spkCount">0</span>명</span>
+                    </div>
+                    <button class="btn btn-primary" onclick="openSpeakerModal()">+ 연자 등록</button>
+                </div>
+                <div class="card table-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>연자 (국문)</th>
+                                <th>연자 (영문)</th>
+                                <th>소속 (국문)</th>
+                                <th>소속 (영문)</th>
+                                <th style="text-align:right">관리</th>
+                            </tr>
+                        </thead>
+                        <tbody id="spkBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 연자 등록/수정 모달 -->
+    <div class="modal-overlay" id="spkModal">
+        <div class="modal">
+            <h3 id="spkModalTitle">연자 등록</h3>
+            <div class="modal-grid2">
+                <div class="modal-field">
+                    <label>연자 이름 (국문) *</label>
+                    <input type="text" id="spkNameKo" placeholder="예: 홍길동">
+                </div>
+                <div class="modal-field">
+                    <label>연자 이름 (영문)</label>
+                    <input type="text" id="spkNameEn" placeholder="예: Gil-dong Hong">
+                </div>
+            </div>
+            <div class="modal-grid2">
+                <div class="modal-field">
+                    <label>소속 (국문)</label>
+                    <input type="text" id="spkAffKo" placeholder="예: OO의원">
+                </div>
+                <div class="modal-field">
+                    <label>소속 (영문)</label>
+                    <input type="text" id="spkAffEn" placeholder="예: OO Clinic">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeSpeakerModal()">취소</button>
+                <button class="btn btn-primary" onclick="saveSpeaker()">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="js/admin-common.js"></script>
+    <script src="js/admin-auth.js"></script>
+    <script src="js/speakers.js"></script>
+</body>
+</html>
