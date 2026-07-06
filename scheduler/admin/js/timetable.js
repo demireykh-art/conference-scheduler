@@ -101,9 +101,9 @@ function renderRoomSettings() {
             <label>주제</label>
             <input type="text" value="${escapeHtml(room.topic || '')}" onchange="updateRoom('topic', this.value)">
         </div>
-        <div class="field">
+        <div class="field" style="min-width:200px">
             <label>날짜 (연자 중복 체크 기준)</label>
-            <input type="date" value="${escapeHtml(room.date || '')}" onchange="updateRoom('date', this.value)">
+            <div class="day-btns">${renderDayButtons(room)}</div>
         </div>
         <div class="field">
             <label>시작시간</label>
@@ -127,6 +127,44 @@ window.updateRoom = function (field, value) {
     if (field === 'defaultDuration') value = Number(value) || 0;
     confRef().child('rooms/' + CURRENT_ROOM + '/' + field).set(value)
         .catch(e => Toast.error('저장 실패: ' + e.message));
+};
+
+// 행사 기간(시작~종료)의 날짜들을 YYYY-MM-DD 배열로
+function enumerateDates(start, end) {
+    if (!start) return [];
+    const [sy, sm, sd] = start.split('-').map(Number);
+    const [ey, em, ed] = (end || start).split('-').map(Number);
+    const cur = new Date(sy, sm - 1, sd);
+    const last = new Date(ey, em - 1, ed);
+    const out = [];
+    let guard = 0;
+    while (cur <= last && guard < 400) {
+        out.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`);
+        cur.setDate(cur.getDate() + 1);
+        guard++;
+    }
+    return out;
+}
+function dayLabel(dstr) {
+    const [y, m, d] = dstr.split('-').map(Number);
+    const wd = ['일', '월', '화', '수', '목', '금', '토'][new Date(y, m - 1, d).getDay()];
+    return `${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')} (${wd})`;
+}
+// 룸 설정의 날짜 선택 버튼 (행사 기간 자동 표시, 한 번 클릭으로 지정/해제)
+function renderDayButtons(room) {
+    const days = enumerateDates(CONF.startDate, CONF.endDate);
+    if (!days.length) {
+        return '<span style="color:var(--text-dim);font-size:0.8rem">행사 날짜가 설정되지 않았습니다. (행사설정에서 기간 입력)</span>';
+    }
+    return days.map(d =>
+        `<button type="button" class="day-btn ${room.date === d ? 'active' : ''}" onclick="setRoomDate('${d}')">${dayLabel(d)}</button>`
+    ).join('');
+}
+window.setRoomDate = function (d) {
+    if (!AdminAuth.requireEdit()) return;
+    const room = getRoom(CURRENT_ROOM);
+    const newVal = (room && room.date === d) ? '' : d;   // 다시 클릭하면 해제
+    updateRoom('date', newVal);
 };
 
 window.addRoom = function () {
