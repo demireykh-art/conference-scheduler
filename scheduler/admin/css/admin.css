@@ -282,6 +282,38 @@ a { color: inherit; }
     color: var(--text-dim);
 }
 
+/* 포스터 업로드 미리보기 */
+.poster-preview {
+    width: 92px;
+    height: 122px;
+    border-radius: 7px;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    background: #eef0f3;
+    flex-shrink: 0;
+}
+.poster-preview.poster-empty {
+    display: grid;
+    place-items: center;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+}
+/* 목록 카드 포스터 다운로드 오버레이 */
+.conf-poster-wrap { position: relative; flex-shrink: 0; }
+.poster-dl-btn {
+    position: absolute;
+    right: 6px; bottom: 6px;
+    background: rgba(20, 24, 33, 0.72);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.72rem;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 4px;
+}
+.poster-dl-btn:hover { background: rgba(20, 24, 33, 0.9); }
+
 /* ============================================================
    시간표 페이지
    ============================================================ */
