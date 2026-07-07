@@ -142,6 +142,30 @@ window.toOrderedArray = function (obj) {
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 };
 
+/* 정렬 헬퍼 — 이름순/역순/등록순 (목록 페이지 공용) */
+window.sortList = function (arr, sort, nameKey) {
+    nameKey = nameKey || 'nameKo';
+    const a = arr.slice();
+    const byName = (x, y) => (x[nameKey] || '').localeCompare(y[nameKey] || '', 'ko');
+    switch (sort) {
+        case 'nameDesc': return a.sort((x, y) => byName(y, x));
+        case 'oldest': return a.sort((x, y) => (x.order ?? 0) - (y.order ?? 0));
+        case 'newest': return a.sort((x, y) => (y.order ?? 0) - (x.order ?? 0));
+        default: return a.sort(byName);   // nameAsc
+    }
+};
+
+// 정렬 드롭다운 옵션 HTML
+window.sortOptionsHtml = function (cur, nameLabel) {
+    nameLabel = nameLabel || '이름';
+    return [
+        ['nameAsc', nameLabel + '순 (가나다)'],
+        ['nameDesc', nameLabel + '순 (역순)'],
+        ['newest', '최신 등록순'],
+        ['oldest', '오래된 등록순']
+    ].map(([v, l]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`).join('');
+};
+
 /* ------------------------------------------------------------
    변경이력(감사 로그) — 누가·언제·무엇을 했는지 append-only 기록
    데이터: /adminActivityLog/<autoKey> = { ts, uid, userName, action, entity, summary, confId?, confTitle?, entityId? }
