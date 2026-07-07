@@ -13,6 +13,7 @@ let CONF_BOOTH = null;       // 선택한 행사의 부스 혜택 표
 let PLACED = {};              // { partnerId: { type: 배치수 } } — 선택한 행사 기준
 let PLACED_CONF_NAME = '';
 let CONF_PARTNERS = new Set(); // 선택한 행사에 참가하는 파트너사 id
+let CONF_PARTNER_MAP = {};     // { partnerId: { order, grade } } — 행사별 등급
 let PTN_SORT = 'nameAsc';
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('partners');
@@ -75,7 +76,8 @@ function subscribePlacedConf() {
     placedRef.on('value', snap => {
         const conf = snap.val() || {};
         PLACED_CONF_NAME = conf.title || '';
-        CONF_PARTNERS = new Set(Object.keys(conf.confPartners || {}));
+        CONF_PARTNER_MAP = conf.confPartners || {};
+        CONF_PARTNERS = new Set(Object.keys(CONF_PARTNER_MAP));
         CONF_BOOTH = (conf.boothBenefits && Array.isArray(conf.boothBenefits.columns) && Array.isArray(conf.boothBenefits.grades)) ? conf.boothBenefits : null;
         applyBooth();
         populateGradeSelect();
@@ -108,10 +110,17 @@ function populateGradeSelect() {
     sel.value = cur;
 }
 
+// 선택 행사 기준 파트너 등급 (없으면 예전 마스터 등급으로 폴백)
+function confGradeOf(p) {
+    const cp = CONF_PARTNER_MAP[p.id];
+    return (cp && cp.grade) || p.grade || '';
+}
+
 // 파트너 등급 → 혜택(숫자) 태그: "정규강의(일) 미배치 X · 배치 Y"
 function benefitTags(p) {
-    if (!p.grade || !BOOTH.cells[p.grade]) return '';
-    const cells = BOOTH.cells[p.grade];
+    const grade = confGradeOf(p);
+    if (!grade || !BOOTH.cells[grade]) return '';
+    const cells = BOOTH.cells[grade];
     const placed = PLACED[p.id] || {};
     const tags = [];
     BOOTH.columns.forEach(col => {
@@ -145,12 +154,24 @@ window.toggleParticipation = function (id, on) {
     if (!AdminAuth.requireEdit()) { renderPartners(); return; }
     if (!PLACED_CONF_ID) { Toast.warning('먼저 행사를 선택하세요.'); renderPartners(); return; }
     const ref = database.ref('/adminConferences/' + PLACED_CONF_ID + '/confPartners/' + id);
-    const op = on ? ref.set({ order: CONF_PARTNERS.size }) : ref.remove();
+    // update: 기존 등급을 유지하면서 참가만 토글
+    const op = on ? ref.update({ order: CONF_PARTNERS.size }) : ref.remove();
     const p = PARTNERS.find(x => x.id === id);
     op.then(() => logActivity('participate', 'partner',
         `파트너사 "${p ? p.nameKo : ''}" ${on ? '참가 추가' : '참가 해제'}`,
         { confId: PLACED_CONF_ID, confTitle: PLACED_CONF_NAME, entityId: id }))
         .catch(e => Toast.error('참가 설정 실패: ' + e.message));
+};
+
+// 선택 행사 기준 파트너 등급 저장 (행사별)
+window.setPartnerGrade = function (id, grade) {
+    if (!AdminAuth.requireEdit()) { renderPartners(); return; }
+    if (!PLACED_CONF_ID) { Toast.warning('먼저 행사를 선택하세요.'); renderPartners(); return; }
+    const p = PARTNERS.find(x => x.id === id);
+    database.ref('/adminConferences/' + PLACED_CONF_ID + '/confPartners/' + id).update({ grade: grade || '' })
+        .then(() => logActivity('update', 'partner', `파트너사 "${p ? p.nameKo : ''}" 등급 → ${grade || '(없음)'}`,
+            { confId: PLACED_CONF_ID, confTitle: PLACED_CONF_NAME, entityId: id }))
+        .catch(e => Toast.error('등급 저장 실패: ' + e.message));
 };
 
 function partnerProducts(p) { return Array.isArray(p.products) ? p.products : []; }
@@ -173,7 +194,7 @@ function renderPartners() {
 
     const body = document.getElementById('ptnBody');
     if (!list.length) {
-        body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:40px">
+        body.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-dim);padding:40px">
             ${PARTNERS.length ? '검색/필터 결과가 없습니다.' : '등록된 파트너사가 없습니다. <b>+ 파트너사 등록</b>으로 추가하세요.'}</td></tr>`;
         return;
     }
@@ -184,6 +205,13 @@ function renderPartners() {
             : '<span class="dim">-</span>';
         const tags = benefitTags(p);
         const joined = CONF_PARTNERS.has(p.id);
+        const grade = confGradeOf(p);
+        const gradeCell = joined
+            ? `<select class="row-grade" onchange="setPartnerGrade('${p.id}', this.value)">
+                    <option value="">(등급 없음)</option>
+                    ${BOOTH.grades.map(g => `<option value="${escapeHtml(g)}" ${g === grade ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}
+               </select>`
+            : (grade ? `<span class="grade-badge" style="opacity:.5" title="참가 후 이 행사 등급을 지정하세요">${escapeHtml(grade)}</span>` : '<span class="dim">-</span>');
         return `
         <tr class="${joined ? 'row-joined' : ''}">
             <td style="text-align:center">
@@ -191,9 +219,10 @@ function renderPartners() {
                     title="${hasConf ? '이 행사 참가여부' : '먼저 행사를 선택하세요'}"
                     onchange="toggleParticipation('${p.id}', this.checked)">
             </td>
-            <td><b>${escapeHtml(p.nameKo || '')}</b>${p.grade ? ` <span class="grade-badge">${escapeHtml(p.grade)}</span>` : ''}</td>
+            <td><b>${escapeHtml(p.nameKo || '')}</b></td>
             <td class="en">${escapeHtml(p.nameEn || '-')}</td>
             <td><span class="count-pill">${prods.length}</span> <span style="color:var(--text-dim);font-size:0.82rem">${prodText}</span></td>
+            <td>${gradeCell}</td>
             <td>${tags || '<span class="dim">-</span>'}</td>
             <td>
                 <div class="row-actions">
@@ -243,8 +272,6 @@ window.openPartnerModal = function () {
     document.getElementById('ptnModalTitle').textContent = '파트너사 등록';
     document.getElementById('ptnNameKo').value = '';
     document.getElementById('ptnNameEn').value = '';
-    populateGradeSelect();
-    document.getElementById('ptnGrade').value = '';
     document.getElementById('ptnProducts').innerHTML = '';
     document.getElementById('ptnModal').classList.add('open');
     setTimeout(() => document.getElementById('ptnNameKo').focus(), 50);
@@ -258,8 +285,6 @@ window.editPartner = function (id) {
     document.getElementById('ptnModalTitle').textContent = '파트너사 수정';
     document.getElementById('ptnNameKo').value = p.nameKo || '';
     document.getElementById('ptnNameEn').value = p.nameEn || '';
-    populateGradeSelect();
-    document.getElementById('ptnGrade').value = p.grade || '';
     document.getElementById('ptnProducts').innerHTML = '';
     partnerProducts(p).forEach(pr => addProductRow(pr));
     document.getElementById('ptnModal').classList.add('open');
@@ -278,7 +303,6 @@ window.savePartner = function () {
     const data = {
         nameKo,
         nameEn: document.getElementById('ptnNameEn').value.trim(),
-        grade: document.getElementById('ptnGrade').value || '',
         products: collectProducts(),
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     };
