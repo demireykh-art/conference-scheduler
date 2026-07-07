@@ -32,9 +32,13 @@ document.getElementById('lecSearch').addEventListener('input', renderPool);
     sel.addEventListener('change', () => { LEC_SORT = sel.value; renderPool(); });
 })();
 
-// 강의 유형 체크박스 렌더
-document.getElementById('lecTypeChecks').innerHTML = LECTURE_TYPES.map(t =>
-    `<label class="check-inline"><input type="checkbox" class="lec-type-check" value="${escapeHtml(t)}"> ${escapeHtml(t)}</label>`).join('');
+// 강의 유형 체크박스 렌더 (+ 학회강의: 비스폰)
+const EXTRA_LECTURE_TYPES = ['학회강의'];
+document.getElementById('lecTypeChecks').innerHTML =
+    LECTURE_TYPES.map(t =>
+        `<label class="check-inline"><input type="checkbox" class="lec-type-check" value="${escapeHtml(t)}"> ${escapeHtml(t)}</label>`).join('') +
+    EXTRA_LECTURE_TYPES.map(t =>
+        `<label class="check-inline"><input type="checkbox" class="lec-type-check" value="${escapeHtml(t)}"> ${escapeHtml(t)} <span style="color:var(--text-dim);font-size:0.72rem">(비스폰)</span></label>`).join('');
 function selectedTypes() { return [...document.querySelectorAll('#lecTypeChecks .lec-type-check:checked')].map(c => c.value); }
 function setTypes(arr) {
     const set = new Set(arr || []);
