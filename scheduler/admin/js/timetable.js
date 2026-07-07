@@ -214,7 +214,8 @@ const BREAK_PRESETS = [
     { ko: '개회사', en: 'Opening Remarks', dur: 10 },
     { ko: 'Coffee Break', en: 'Coffee Break', dur: 20 },
     { ko: '점심식사', en: 'Lunch', dur: 60 },
-    { ko: '폐회사', en: 'Closing Remarks', dur: 10 }
+    { ko: '폐회사', en: 'Closing Remarks', dur: 10 },
+    { ko: 'Q&A & Panel Discussion', en: 'Q&A & Panel Discussion', dur: 30, panel: true }
 ];
 let breakTarget = null;   // { roomId, sessionId }
 
@@ -224,6 +225,7 @@ window.openBreakModal = function (roomId, sessionId) {
     document.getElementById('breakTitleKo').value = '';
     document.getElementById('breakTitleEn').value = '';
     document.getElementById('breakDur').value = 20;
+    document.getElementById('breakIsPanel').checked = false;
     document.getElementById('breakPresets').innerHTML =
         BREAK_PRESETS.map((p, i) => `<span class="chip" style="cursor:pointer" onclick="applyBreakPreset(${i})">${escapeHtml(p.ko)}</span>`).join('');
     document.getElementById('breakModal').classList.add('open');
@@ -233,6 +235,7 @@ window.applyBreakPreset = function (i) {
     document.getElementById('breakTitleKo').value = p.ko;
     document.getElementById('breakTitleEn').value = p.en;
     document.getElementById('breakDur').value = p.dur;
+    document.getElementById('breakIsPanel').checked = !!p.panel;
 };
 window.closeBreakModal = function () { document.getElementById('breakModal').classList.remove('open'); };
 window.saveBreak = function () {
@@ -243,11 +246,14 @@ window.saveBreak = function () {
     const titleEn = document.getElementById('breakTitleEn').value.trim();
     if (!titleKo && !titleEn) { Toast.warning('제목을 입력하세요.'); return; }
     const dur = Number(document.getElementById('breakDur').value) || 0;
+    const isPanel = document.getElementById('breakIsPanel').checked;
     const order = toOrderedArray(CONF.rooms[t.roomId].sessions[t.sessionId].lectures).length;
-    const data = { isBreak: true, titleKo, titleEn, duration: dur, order };
+    const data = isPanel
+        ? { isPanel: true, titleKo, titleEn, duration: dur, order }
+        : { isBreak: true, titleKo, titleEn, duration: dur, order };
     confRef().child(`rooms/${t.roomId}/sessions/${t.sessionId}/lectures/${uuid()}`).set(data)
         .then(() => {
-            logActivity('create', 'lecture', `행사 항목 "${titleKo || titleEn}" 추가`, { confId: CONF_ID, confTitle: ctitle(), entityId: t.sessionId });
+            logActivity('create', 'lecture', `${isPanel ? '패널' : '행사 항목'} "${titleKo || titleEn}" 추가`, { confId: CONF_ID, confTitle: ctitle(), entityId: t.sessionId });
             Toast.success('추가되었습니다.'); closeBreakModal();
         })
         .catch(e => Toast.error('추가 실패: ' + e.message));
@@ -439,9 +445,49 @@ function renderSessionBlock(roomId, s) {
     </div>`;
 }
 
+// 세션 강의 연자 목록 (패널 표시용) — 원본 데이터에서 중복 제거
+function panelSpeakersOfSession(roomId, sessionId) {
+    const sess = CONF.rooms[roomId] && CONF.rooms[roomId].sessions && CONF.rooms[roomId].sessions[sessionId];
+    const map = new Map();
+    if (sess) Object.values(sess.lectures || {}).forEach(l => {
+        if (l.isBreak || l.isPanel) return;
+        (l.speakers || []).forEach(s => {
+            const key = (s.id || s.nameKo || '').trim();
+            if (key && !map.has(key)) map.set(key, s);
+        });
+    });
+    return [...map.values()];
+}
+
 function renderLectureRow(roomId, sessionId, lec, lang) {
     lang = lang || 'ko';
     const range = `${formatTime(lec._start)} - ${formatTime(lec._end)}`;
+    // Q&A / 패널 토론 — 이 세션 강의 연자 전원이 참여 (해당 시간 중복 체크)
+    if (lec.isPanel) {
+        const t = pickLang(lang, lec.titleKo, lec.titleEn) || 'Q&A & Panel Discussion';
+        const parts = panelSpeakersOfSession(roomId, sessionId);
+        const names = parts.map(s => escapeHtml(pickLang(lang, s.nameKo, s.nameEn))).join(', ') || '<span style="color:var(--text-dim)">이 세션에 연자 강의가 없습니다</span>';
+        const dup = CONFLICT_IDS.has(lec.id) ? '<span class="dup-badge" title="패널 연자 중 일부가 같은 시간 다른 곳과 겹침">중복</span>' : '';
+        return `
+        <div class="lecture-row panel-row" data-lec="${lec.id}">
+            <span class="grip" title="드래그하여 순서 변경">⋮⋮</span>
+            <div class="lec-main">
+                <div class="lec-tags">
+                    <span class="time-badge">${range}</span>
+                    <span class="dur-badge">${lec.duration || 0}분</span>
+                    <span class="chip panel-chip">패널 · 전체 연자</span>
+                    ${dup}
+                </div>
+                <div class="lec-title panel-title">${escapeHtml(t)}</div>
+                <div class="lec-speaker">패널 연자(${parts.length}): ${names}</div>
+            </div>
+            <div class="lec-actions">
+                <button class="txt-btn" onclick="openMoveModal('${roomId}','${sessionId}','${lec.id}')">이동</button>
+                <button class="txt-btn" onclick="openDurModal('${roomId}','${sessionId}','${lec.id}')">시간</button>
+                <button class="txt-btn danger" onclick="deleteLecture('${roomId}','${sessionId}','${lec.id}')">삭제</button>
+            </div>
+        </div>`;
+    }
     // 개회식/브레이크/점심 등 행사 항목 (연자·파트너 없음, 중복·혜택 계산 제외)
     if (lec.isBreak) {
         const t = pickLang(lang, lec.titleKo, lec.titleEn) || '행사 항목';
@@ -780,15 +826,27 @@ function collectPlaced() {
     return out;
 }
 
-// 강의 + 사회자 점유를 함께 수집 (사회자는 세션 전체 시간 동안 배정)
+// 세션의 모든 강의 연자 key (패널 참여자 = 이 세션 강의 연자 전원)
+function panelKeysOfSession(session) {
+    const keys = new Set();
+    (session.lectures || []).forEach(l => {
+        if (l.isBreak || l.isPanel) return;
+        speakerKeysOf(l.speakers).forEach(k => keys.add(k));
+    });
+    return [...keys];
+}
+
+// 강의 + 사회자 + 패널 점유를 함께 수집 (사회자는 세션 전체, 패널은 그 항목 시간 동안 세션 연자 전원)
 function collectOccupancy() {
     const out = [];
     orderedRooms().forEach(room => {
         computeRoom(room).forEach(session => {
             session.lectures.forEach(lec => {
+                if (lec.isBreak) return;                       // 브레이크는 점유 없음
+                const keys = lec.isPanel ? panelKeysOfSession(session) : speakerKeysOf(lec.speakers);
                 out.push({
-                    kind: 'lecture', roomId: room.id, sessionId: session.id, date: room.date || '',
-                    refId: lec.id, start: lec._start, end: lec._end, keys: speakerKeysOf(lec.speakers)
+                    kind: lec.isPanel ? 'panel' : 'lecture', roomId: room.id, sessionId: session.id, date: room.date || '',
+                    refId: lec.id, start: lec._start, end: lec._end, keys
                 });
             });
             const mod = session.moderator;
