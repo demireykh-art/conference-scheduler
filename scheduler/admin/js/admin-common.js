@@ -233,11 +233,13 @@ window.renderSidebar = function (activeKey) {
     const timetableHref = lastConf ? `timetable.html?id=${lastConf}` : 'index.html';
 
     const links = SIDE_MENU.map(g => {
-        const items = g.items.map(it => {
+        // 아직 개발 전(href 없는) 항목은 숨김 — 나중에 href 연결 시 다시 표시됨
+        const visible = g.items.filter(it => it.href || it.key === 'timetable');
+        if (!visible.length) return '';   // 항목이 전부 숨겨진 그룹(카카오·알림, 사이트)은 제목도 숨김
+        const items = visible.map(it => {
             const active = it.key === activeKey ? ' active' : '';
-            const href = it.key === 'timetable' ? timetableHref : (it.href || '#');
-            const soon = (it.href || it.key === 'timetable') ? '' : ' data-soon="1"';
-            return `<a class="side-link${active}" href="${href}"${soon}>${escapeHtml(it.label)}</a>`;
+            const href = it.key === 'timetable' ? timetableHref : it.href;
+            return `<a class="side-link${active}" href="${href}">${escapeHtml(it.label)}</a>`;
         }).join('');
         return `<div class="side-group-label">${escapeHtml(g.group)}</div>${items}`;
     }).join('');
