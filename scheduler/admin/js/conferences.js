@@ -69,11 +69,9 @@ function renderList() {
                 </div>
                 <div class="conf-actions">
                     <button class="btn btn-sm" onclick="editConference('${c.id}')">⚙️ 행사설정</button>
-                    <button class="btn btn-sm" data-soon="1">👥 연자/사회자</button>
-                    <button class="btn btn-sm" data-soon="1">🏢 파트너사</button>
+                    <button class="btn btn-sm" onclick="location.href='conf-speakers.html?id=${c.id}'">👥 연자/사회자</button>
+                    <button class="btn btn-sm" onclick="location.href='conf-partners.html?id=${c.id}'">🏢 파트너사</button>
                     <button class="btn btn-sm btn-primary" onclick="location.href='timetable.html?id=${c.id}'">🗓️ 시간표</button>
-                    <button class="btn btn-sm" data-soon="1">♡ 강의 좋아요</button>
-                    <button class="btn btn-sm" data-soon="1">🏷️ 무료등록코드</button>
                     <button class="btn btn-sm btn-danger-ghost" onclick="deleteConference('${c.id}')">🗑️ 삭제</button>
                 </div>
             </div>
