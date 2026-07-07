@@ -212,7 +212,7 @@ window.updateRoom = function (field, value) {
 
 /* ---------- 개회식 / 브레이크 / 행사 항목 ---------- */
 const BREAK_PRESETS = [
-    { ko: '개회식', en: 'Opening Ceremony', dur: 20 },
+    { ko: '개회식', en: 'Opening Ceremony', dur: 15 },
     { ko: '개회사', en: 'Opening Remarks', dur: 10 },
     { ko: 'Coffee Break', en: 'Coffee Break', dur: 20 },
     { ko: '점심식사', en: 'Lunch Break', dur: 60 },
