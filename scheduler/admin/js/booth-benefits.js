@@ -82,6 +82,7 @@ function bindEditing() {
             if (!AdminAuth.requireEdit()) { renderTable(); return; }
             const g = inp.dataset.grade, c = inp.dataset.col;
             BOOTH_REF.child('cells').child(g).child(c).set(inp.value.trim())
+                .then(() => logActivity('update', 'booth', `부스 혜택 [${g} · ${c}] → "${inp.value.trim()}"`))
                 .catch(e => Toast.error('저장 실패: ' + e.message));
         });
     });
@@ -115,6 +116,7 @@ window.addColumn = function () {
     while (BOOTH.columns.includes(n)) { n = '새 혜택 ' + i++; }
     BOOTH.columns.push(n);
     saveAll();
+    logActivity('create', 'booth', `부스 혜택 열 "${n}" 추가`);
 };
 window.delColumn = async function (ci) {
     if (!AdminAuth.requireEdit()) return;
@@ -124,6 +126,7 @@ window.delColumn = async function (ci) {
     BOOTH.columns.splice(ci, 1);
     Object.values(BOOTH.cells).forEach(row => { if (row) delete row[c]; });
     saveAll();
+    logActivity('delete', 'booth', `부스 혜택 열 "${c}" 삭제`);
 };
 window.renameColumn = function (ci, name) {
     const old = BOOTH.columns[ci];
@@ -133,6 +136,7 @@ window.renameColumn = function (ci, name) {
         if (row && row[old] != null) { row[name] = row[old]; delete row[old]; }
     });
     saveAll();
+    logActivity('update', 'booth', `부스 혜택 열 이름 "${old}" → "${name}"`);
 };
 
 window.addGrade = function () {
@@ -141,6 +145,7 @@ window.addGrade = function () {
     while (BOOTH.grades.includes(n)) { n = '새 등급 ' + i++; }
     BOOTH.grades.push(n);
     saveAll();
+    logActivity('create', 'booth', `부스 등급 "${n}" 추가`);
 };
 window.delGrade = async function (gi) {
     if (!AdminAuth.requireEdit()) return;
@@ -150,6 +155,7 @@ window.delGrade = async function (gi) {
     BOOTH.grades.splice(gi, 1);
     if (BOOTH.cells[g]) delete BOOTH.cells[g];
     saveAll();
+    logActivity('delete', 'booth', `부스 등급 "${g}" 삭제`);
 };
 window.renameGrade = function (gi, name) {
     const old = BOOTH.grades[gi];
@@ -157,4 +163,5 @@ window.renameGrade = function (gi, name) {
     BOOTH.grades[gi] = name;
     if (BOOTH.cells[old]) { BOOTH.cells[name] = BOOTH.cells[old]; delete BOOTH.cells[old]; }
     saveAll();
+    logActivity('update', 'booth', `부스 등급 이름 "${old}" → "${name}"`);
 };

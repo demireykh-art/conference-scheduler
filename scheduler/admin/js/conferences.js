@@ -209,14 +209,20 @@ window.saveConference = function () {
 
     if (EDIT_ID) {
         CONF_ROOT.child(EDIT_ID).update(data)
-            .then(() => { Toast.success('저장되었습니다.'); closeConferenceModal(); })
+            .then(() => {
+                logActivity('update', 'conference', `행사 "${title}" 수정`, { confId: EDIT_ID, confTitle: title, entityId: EDIT_ID });
+                Toast.success('저장되었습니다.'); closeConferenceModal();
+            })
             .catch(e => Toast.error('저장 실패: ' + e.message));
     } else {
         const id = uuid();
         data.order = CONFS.length;
         data.createdAt = firebase.database.ServerValue.TIMESTAMP;
         CONF_ROOT.child(id).set(data)
-            .then(() => { Toast.success('행사가 등록되었습니다.'); closeConferenceModal(); })
+            .then(() => {
+                logActivity('create', 'conference', `행사 "${title}" 등록`, { confId: id, confTitle: title, entityId: id });
+                Toast.success('행사가 등록되었습니다.'); closeConferenceModal();
+            })
             .catch(e => Toast.error('등록 실패: ' + e.message));
     }
 };
@@ -227,7 +233,10 @@ window.deleteConference = async function (id) {
     const ok = await confirmDialog(`"${c ? c.title : ''}" 행사를 삭제할까요?\n시간표 등 모든 데이터가 함께 삭제됩니다.`, { danger: true, okText: '삭제' });
     if (!ok) return;
     CONF_ROOT.child(id).remove()
-        .then(() => Toast.success('삭제되었습니다.'))
+        .then(() => {
+            logActivity('delete', 'conference', `행사 "${c ? c.title : ''}" 삭제`, { confId: id, confTitle: c ? c.title : '', entityId: id });
+            Toast.success('삭제되었습니다.');
+        })
         .catch(e => Toast.error('삭제 실패: ' + e.message));
 };
 

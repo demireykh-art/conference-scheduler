@@ -142,6 +142,29 @@ window.toOrderedArray = function (obj) {
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 };
 
+/* ------------------------------------------------------------
+   변경이력(감사 로그) — 누가·언제·무엇을 했는지 append-only 기록
+   데이터: /adminActivityLog/<autoKey> = { ts, uid, userName, action, entity, summary, confId?, confTitle?, entityId? }
+   ------------------------------------------------------------ */
+window.logActivity = function (action, entity, summary, extra) {
+    try {
+        const u = (window.AdminAuth && AdminAuth.user) || null;
+        if (!u) return;   // 로그인 상태에서만 기록
+        const entry = {
+            ts: firebase.database.ServerValue.TIMESTAMP,
+            uid: u.uid,
+            userName: u.displayName || u.email || '',
+            action: action || 'update',
+            entity: entity || '',
+            summary: summary || ''
+        };
+        if (extra && typeof extra === 'object') {
+            ['confId', 'confTitle', 'entityId'].forEach(k => { if (extra[k]) entry[k] = extra[k]; });
+        }
+        database.ref('/adminActivityLog').push(entry).catch(() => { });
+    } catch (e) { /* 로깅 실패는 무시 (본 작업에 영향 없음) */ }
+};
+
 /* 정렬 헬퍼 — 이름순/역순/등록순 (목록 페이지 공용) */
 window.sortList = function (arr, sort, nameKey) {
     nameKey = nameKey || 'nameKo';
@@ -273,6 +296,7 @@ const SIDE_MENU = [
     },
     {
         group: '관리', items: [
+            { key: 'activity', label: '🕘 변경이력', href: 'activity.html' },
             { key: 'users', label: '👥 사용자 관리', href: 'users.html' }
         ]
     }

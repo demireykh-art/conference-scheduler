@@ -114,13 +114,20 @@ window.saveSpeaker = function () {
 
     if (SPK_EDIT_ID) {
         SPK_ROOT.child(SPK_EDIT_ID).update(data)
-            .then(() => { Toast.success('저장되었습니다.'); closeSpeakerModal(); })
+            .then(() => {
+                logActivity('update', 'speaker', `연자 "${nameKo}" 수정`, { entityId: SPK_EDIT_ID });
+                Toast.success('저장되었습니다.'); closeSpeakerModal();
+            })
             .catch(e => Toast.error('저장 실패: ' + e.message));
     } else {
         data.order = SPEAKERS.length;
         data.createdAt = firebase.database.ServerValue.TIMESTAMP;
-        SPK_ROOT.child(uuid()).set(data)
-            .then(() => { Toast.success('연자가 등록되었습니다.'); closeSpeakerModal(); })
+        const id = uuid();
+        SPK_ROOT.child(id).set(data)
+            .then(() => {
+                logActivity('create', 'speaker', `연자 "${nameKo}" 등록`, { entityId: id });
+                Toast.success('연자가 등록되었습니다.'); closeSpeakerModal();
+            })
             .catch(e => Toast.error('등록 실패: ' + e.message));
     }
 };
@@ -131,7 +138,10 @@ window.deleteSpeaker = async function (id) {
     const ok = await confirmDialog(`"${s ? s.nameKo : ''}" 연자를 삭제할까요?`, { danger: true, okText: '삭제' });
     if (!ok) return;
     SPK_ROOT.child(id).remove()
-        .then(() => Toast.success('삭제되었습니다.'))
+        .then(() => {
+            logActivity('delete', 'speaker', `연자 "${s ? s.nameKo : ''}" 삭제`, { entityId: id });
+            Toast.success('삭제되었습니다.');
+        })
         .catch(e => Toast.error('삭제 실패: ' + e.message));
 };
 

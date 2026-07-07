@@ -379,15 +379,24 @@ window.saveLecture = function () {
     if (!data.titleKo) { Toast.warning('강의 제목(국문)을 입력하세요.'); return; }
     data.updatedAt = firebase.database.ServerValue.TIMESTAMP;
 
+    const confTitle = (CONFS.find(c => c.id === CONF_ID) || {}).title || '';
     if (LEC_EDIT_ID) {
         adminConfRef().child('lecturePool/' + LEC_EDIT_ID).update(data)
-            .then(() => { propagateToPlacements(LEC_EDIT_ID, data); Toast.success('저장되었습니다.'); closeLectureModal(); })
+            .then(() => {
+                propagateToPlacements(LEC_EDIT_ID, data);
+                logActivity('update', 'lecture', `강의 "${data.titleKo}" 수정`, { confId: CONF_ID, confTitle, entityId: LEC_EDIT_ID });
+                Toast.success('저장되었습니다.'); closeLectureModal();
+            })
             .catch(e => Toast.error('저장 실패: ' + e.message));
     } else {
         data.order = POOL.length;
         data.createdAt = firebase.database.ServerValue.TIMESTAMP;
-        adminConfRef().child('lecturePool/' + uuid()).set(data)
-            .then(() => { Toast.success('강의가 등록되었습니다.'); closeLectureModal(); })
+        const id = uuid();
+        adminConfRef().child('lecturePool/' + id).set(data)
+            .then(() => {
+                logActivity('create', 'lecture', `강의 "${data.titleKo}" 등록`, { confId: CONF_ID, confTitle, entityId: id });
+                Toast.success('강의가 등록되었습니다.'); closeLectureModal();
+            })
             .catch(e => Toast.error('등록 실패: ' + e.message));
     }
 };
@@ -420,8 +429,12 @@ window.deleteLecture = async function (id) {
         : `"${l ? l.titleKo : ''}" 강의를 삭제할까요?`;
     const ok = await confirmDialog(msg, { danger: true, okText: '삭제' });
     if (!ok) return;
+    const confTitle = (CONFS.find(c => c.id === CONF_ID) || {}).title || '';
     adminConfRef().child('lecturePool/' + id).remove()
-        .then(() => Toast.success('삭제되었습니다.'))
+        .then(() => {
+            logActivity('delete', 'lecture', `강의 "${l ? l.titleKo : ''}" 삭제`, { confId: CONF_ID, confTitle, entityId: id });
+            Toast.success('삭제되었습니다.');
+        })
         .catch(e => Toast.error('삭제 실패: ' + e.message));
 };
 

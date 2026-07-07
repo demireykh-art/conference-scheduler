@@ -133,7 +133,11 @@ window.toggleParticipation = function (id, on) {
     if (!PLACED_CONF_ID) { Toast.warning('먼저 행사를 선택하세요.'); renderPartners(); return; }
     const ref = database.ref('/adminConferences/' + PLACED_CONF_ID + '/confPartners/' + id);
     const op = on ? ref.set({ order: CONF_PARTNERS.size }) : ref.remove();
-    op.catch(e => Toast.error('참가 설정 실패: ' + e.message));
+    const p = PARTNERS.find(x => x.id === id);
+    op.then(() => logActivity('participate', 'partner',
+        `파트너사 "${p ? p.nameKo : ''}" ${on ? '참가 추가' : '참가 해제'}`,
+        { confId: PLACED_CONF_ID, confTitle: PLACED_CONF_NAME, entityId: id }))
+        .catch(e => Toast.error('참가 설정 실패: ' + e.message));
 };
 
 function partnerProducts(p) { return Array.isArray(p.products) ? p.products : []; }
@@ -268,13 +272,20 @@ window.savePartner = function () {
 
     if (PTN_EDIT_ID) {
         PTN_ROOT.child(PTN_EDIT_ID).update(data)
-            .then(() => { Toast.success('저장되었습니다.'); closePartnerModal(); })
+            .then(() => {
+                logActivity('update', 'partner', `파트너사 "${nameKo}" 수정`, { entityId: PTN_EDIT_ID });
+                Toast.success('저장되었습니다.'); closePartnerModal();
+            })
             .catch(e => Toast.error('저장 실패: ' + e.message));
     } else {
         data.order = PARTNERS.length;
         data.createdAt = firebase.database.ServerValue.TIMESTAMP;
-        PTN_ROOT.child(uuid()).set(data)
-            .then(() => { Toast.success('파트너사가 등록되었습니다.'); closePartnerModal(); })
+        const id = uuid();
+        PTN_ROOT.child(id).set(data)
+            .then(() => {
+                logActivity('create', 'partner', `파트너사 "${nameKo}" 등록`, { entityId: id });
+                Toast.success('파트너사가 등록되었습니다.'); closePartnerModal();
+            })
             .catch(e => Toast.error('등록 실패: ' + e.message));
     }
 };
@@ -285,7 +296,10 @@ window.deletePartner = async function (id) {
     const ok = await confirmDialog(`"${p ? p.nameKo : ''}" 파트너사를 삭제할까요?\n등록된 제품 정보도 함께 삭제됩니다.`, { danger: true, okText: '삭제' });
     if (!ok) return;
     PTN_ROOT.child(id).remove()
-        .then(() => Toast.success('삭제되었습니다.'))
+        .then(() => {
+            logActivity('delete', 'partner', `파트너사 "${p ? p.nameKo : ''}" 삭제`, { entityId: id });
+            Toast.success('삭제되었습니다.');
+        })
         .catch(e => Toast.error('삭제 실패: ' + e.message));
 };
 
