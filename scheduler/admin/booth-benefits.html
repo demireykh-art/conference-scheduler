@@ -26,10 +26,18 @@
             <div class="main-body">
                 <div class="info-banner">
                     <div class="info-ico">i</div>
-                    <div class="info-title">부스 등급별 강의 혜택 표입니다. 셀을 클릭해 바로 수정할 수 있습니다. (숫자는 파트너사 등급 혜택 태그로 연동됩니다)</div>
+                    <div class="info-title">행사별 부스 등급 혜택 표입니다. 위에서 행사를 선택하고 셀을 클릭해 바로 수정하세요. (숫자는 해당 행사 파트너사 등급 혜택 태그로 연동됩니다)</div>
                 </div>
-                <div class="card table-card">
-                    <table class="data-table booth-table" id="boothTable"></table>
+
+                <div class="field" style="max-width:420px;margin-bottom:16px">
+                    <label>행사 선택</label>
+                    <select id="boothConfSelect" onchange="onBoothConfChange()" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.9rem"></select>
+                </div>
+
+                <div id="boothArea" style="display:none">
+                    <div class="card table-card">
+                        <table class="data-table booth-table" id="boothTable"></table>
+                    </div>
                 </div>
             </div>
         </main>
