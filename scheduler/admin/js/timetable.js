@@ -924,8 +924,26 @@ window.saveDuration = function () {
     if (!AdminAuth.requireEdit()) return;
     const { roomId, sessionId, lecId } = editingDuration;
     const dur = Number(document.getElementById('durInput').value) || 0;
-    confRef().child(`rooms/${roomId}/sessions/${sessionId}/lectures/${lecId}/duration`).set(dur)
-        .then(() => { Toast.success('시간이 수정되었습니다.'); closeDurModal(); })
+    const cur = CONF.rooms[roomId] && CONF.rooms[roomId].sessions[sessionId] && CONF.rooms[roomId].sessions[sessionId].lectures[lecId];
+    const lectureId = cur && cur.lectureId;   // 강의 풀과 연결된 강의면 목록·다른 배치도 함께 반영
+
+    const updates = {};
+    updates[`rooms/${roomId}/sessions/${sessionId}/lectures/${lecId}/duration`] = dur;
+    if (lectureId) {
+        // 강의 관리(풀) 반영
+        updates[`lecturePool/${lectureId}/duration`] = dur;
+        updates[`lecturePool/${lectureId}/updatedAt`] = firebase.database.ServerValue.TIMESTAMP;
+        // 같은 풀 강의를 배치한 모든 사본도 동일 시간으로 반영
+        Object.entries(CONF.rooms || {}).forEach(([rid, room]) => {
+            Object.entries(room.sessions || {}).forEach(([sid, sess]) => {
+                Object.entries(sess.lectures || {}).forEach(([lid, l]) => {
+                    if (l.lectureId === lectureId) updates[`rooms/${rid}/sessions/${sid}/lectures/${lid}/duration`] = dur;
+                });
+            });
+        });
+    }
+    confRef().update(updates)
+        .then(() => { Toast.success('시간이 수정되었습니다.' + (lectureId ? ' (강의 목록·다른 배치에도 반영)' : '')); closeDurModal(); })
         .catch(e => Toast.error('저장 실패: ' + e.message));
 };
 
