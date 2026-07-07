@@ -4,20 +4,27 @@
  */
 
 const BOOTH_REF = database.ref('/adminBoothBenefits');
-let BOOTH = { columns: [], grades: [], cells: {} };
+// 기본값으로 시작 → 권한/데이터가 없어도 표가 비지 않음
+let BOOTH = {
+    columns: DEFAULT_BOOTH_COLUMNS.slice(),
+    grades: DEFAULT_BOOTH_GRADES.slice(),
+    cells: JSON.parse(JSON.stringify(DEFAULT_BOOTH_CELLS))
+};
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('booth');
+renderTable();   // 기본 표 먼저 표시
 
 BOOTH_REF.on('value', snap => {
     const v = snap.val();
-    if (!v || !Array.isArray(v.columns) || !Array.isArray(v.grades)) {
-        // 최초 진입 → 기본값 시드
-        BOOTH = { columns: DEFAULT_BOOTH_COLUMNS.slice(), grades: DEFAULT_BOOTH_GRADES.slice(), cells: DEFAULT_BOOTH_CELLS };
-        if (AdminAuth.canEdit()) BOOTH_REF.set(BOOTH);
-    } else {
-        BOOTH = { columns: v.columns || [], grades: v.grades || [], cells: v.cells || {} };
+    if (v && Array.isArray(v.columns) && Array.isArray(v.grades)) {
+        BOOTH = { columns: v.columns, grades: v.grades, cells: v.cells || {} };
+    } else if (AdminAuth.canEdit()) {
+        BOOTH_REF.set(BOOTH).catch(() => { });   // 최초 시드(권한 있으면)
     }
     renderTable();
+}, err => {
+    console.warn('부스 혜택 읽기 실패(규칙에 /adminBoothBenefits 필요):', err.code);
+    renderTable();   // 기본값 유지
 });
 
 function cellVal(g, c) { return (BOOTH.cells[g] && BOOTH.cells[g][c] != null) ? BOOTH.cells[g][c] : ''; }
