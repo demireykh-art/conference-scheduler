@@ -8,6 +8,8 @@ let PARTNERS = [];
 let PTN_EDIT_ID = null;
 let PTN_SEARCH = '';
 let BOOTH = { columns: DEFAULT_BOOTH_COLUMNS.slice(), grades: DEFAULT_BOOTH_GRADES.slice(), cells: JSON.parse(JSON.stringify(DEFAULT_BOOTH_CELLS)) };
+let BOOTH_TEMPLATE = null;   // 전역 템플릿(행사에 표가 없을 때 fallback)
+let CONF_BOOTH = null;       // 선택한 행사의 부스 혜택 표
 let PLACED = {};              // { partnerId: { type: 배치수 } } — 선택한 행사 기준
 let PLACED_CONF_NAME = '';
 let CONF_PARTNERS = new Set(); // 선택한 행사에 참가하는 파트너사 id
@@ -21,15 +23,23 @@ PTN_ROOT.on('value', snap => {
     renderPartners();
 });
 
-// 부스 등급별 혜택
-database.ref('/adminBoothBenefits').on('value', snap => {
-    const v = snap.val();
-    if (v && Array.isArray(v.columns) && Array.isArray(v.grades)) {
-        BOOTH = { columns: v.columns, grades: v.grades, cells: v.cells || {} };
+// 부스 혜택 표는 행사별(/adminConferences/<id>/boothBenefits) — 아래 subscribePlacedConf에서 반영.
+// 행사에 표가 없을 때를 위한 전역 템플릿 1회 로드.
+database.ref('/adminBoothBenefits').once('value').then(s => {
+    const v = s.val();
+    if (v && Array.isArray(v.columns) && Array.isArray(v.grades)) BOOTH_TEMPLATE = v;
+    applyBooth(); populateGradeSelect(); renderPartners();
+}).catch(() => { populateGradeSelect(); renderPartners(); });
+
+// 현재 선택 행사의 부스 표 → BOOTH 반영 (없으면 템플릿 → 기본값)
+function applyBooth() {
+    const src = CONF_BOOTH || BOOTH_TEMPLATE;
+    if (src && Array.isArray(src.columns) && Array.isArray(src.grades)) {
+        BOOTH = { columns: src.columns, grades: src.grades, cells: src.cells || {} };
+    } else {
+        BOOTH = { columns: DEFAULT_BOOTH_COLUMNS.slice(), grades: DEFAULT_BOOTH_GRADES.slice(), cells: JSON.parse(JSON.stringify(DEFAULT_BOOTH_CELLS)) };
     }
-    populateGradeSelect();
-    renderPartners();
-}, () => { populateGradeSelect(); renderPartners(); });   // 읽기 실패 시 기본값 유지
+}
 
 // 선택한 행사 기준으로 배치된 강의 수 집계 (파트너 + 강의유형)
 let CONF_LIST = [];
@@ -66,6 +76,9 @@ function subscribePlacedConf() {
         const conf = snap.val() || {};
         PLACED_CONF_NAME = conf.title || '';
         CONF_PARTNERS = new Set(Object.keys(conf.confPartners || {}));
+        CONF_BOOTH = (conf.boothBenefits && Array.isArray(conf.boothBenefits.columns) && Array.isArray(conf.boothBenefits.grades)) ? conf.boothBenefits : null;
+        applyBooth();
+        populateGradeSelect();
         PLACED = {};
         Object.values(conf.rooms || {}).forEach(room =>
             Object.values(room.sessions || {}).forEach(sess =>
