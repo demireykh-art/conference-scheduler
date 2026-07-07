@@ -272,6 +272,15 @@ function renderSessions() {
 function renderSessionBlock(roomId, s) {
     const range = `${formatTime(s._start)} - ${formatTime(s._end)}`;
     const lectures = s.lectures.map(lec => renderLectureRow(roomId, s.id, lec)).join('');
+    const mod = s.moderator;
+    let modHtml = '';
+    if (mod && (mod.id || mod.nameKo)) {
+        const m = (mod.id && Masters.speaker(mod.id)) || mod;
+        const nm = escapeHtml(mod.nameKo || mod.nameEn || '');
+        const aff = mod.affiliationKo ? ` <span class="mod-aff">(${escapeHtml(mod.affiliationKo)})</span>` : '';
+        const dup = CONFLICT_IDS.has('mod:' + s.id) ? '<span class="dup-badge" title="사회자가 같은 날 다른 곳과 시간 겹침">중복</span>' : '';
+        modHtml = `<div class="session-mod"><span class="mod-inline">${speakerAvatar(m, 20)}사회자: ${nm}${aff}</span>${dup}</div>`;
+    }
     return `
     <div class="session-block" data-session="${s.id}">
         <div class="session-head">
@@ -279,6 +288,7 @@ function renderSessionBlock(roomId, s) {
             <div>
                 <h3 class="session-title">${escapeHtml(s.name || '(세션)')}</h3>
                 <div class="session-sub">${range} · ${s._count}건 · 총 ${s._total}분</div>
+                ${modHtml}
             </div>
             <div class="spacer"></div>
             <button class="btn btn-primary btn-sm" onclick="openPlaceModal('${roomId}','${s.id}')">+ 강의 배치</button>
@@ -366,13 +376,65 @@ function normalizeLecture(lec) {
 }
 
 /* ============================================================
-   세션 모달
+   세션 모달 + 사회자(Moderator)
    ============================================================ */
+let moderatorDraft = null;   // { id, nameKo, nameEn, affiliationKo }
+
+// 연자를 이 행사 연자/사회자 목록(confSpeakers)에 없으면 추가
+function ensureConfSpeaker(id, role) {
+    if (!id) return;
+    const ref = confRef().child('confSpeakers/' + id);
+    ref.once('value').then(s => {
+        if (!s.exists()) ref.set({ role: role || '연자', order: 999 }).catch(() => { });
+    }).catch(() => { });
+}
+
+function setModerator(s) {
+    moderatorDraft = { id: s.id || '', nameKo: s.nameKo || '', nameEn: s.nameEn || '', affiliationKo: s.affiliationKo || '' };
+    renderModChosen();
+}
+window.clearModerator = function () { moderatorDraft = null; renderModChosen(); };
+function renderModChosen() {
+    const el = document.getElementById('modChosen');
+    if (!el) return;
+    if (!moderatorDraft) { el.innerHTML = ''; return; }
+    const m = (moderatorDraft.id && Masters.speaker(moderatorDraft.id)) || moderatorDraft;
+    const aff = moderatorDraft.affiliationKo ? ` (${escapeHtml(moderatorDraft.affiliationKo)})` : '';
+    el.innerHTML = `<span class="chip">${speakerAvatar(m, 20)} ${escapeHtml(moderatorDraft.nameKo || moderatorDraft.nameEn)}${aff}<span class="x" onclick="clearModerator()">×</span></span>`;
+}
+
+// 사회자 검색 자동완성 (연자 마스터에서 검색 + 새로 등록)
+setupAutocomplete(
+    document.getElementById('modInput'),
+    document.getElementById('modAc'),
+    q => {
+        const ql = q.toLowerCase();
+        const items = Masters.speakers
+            .filter(s => [s.nameKo, s.nameEn, s.affiliationKo, s.affiliationEn].join(' ').toLowerCase().includes(ql))
+            .map(s => ({ label: `${escapeHtml(s.nameKo || '')} <span class="sub">${escapeHtml(s.nameEn || '')}${s.affiliationKo ? ' · ' + escapeHtml(s.affiliationKo) : ''}</span>`, value: { type: 'existing', s } }));
+        const exact = Masters.speakers.some(s => (s.nameKo || '').toLowerCase() === ql);
+        if (q && !exact) items.push({ label: `➕ "<b>${escapeHtml(q)}</b>" 새 연자로 등록`, value: { type: 'new', name: q } });
+        return items;
+    },
+    async val => {
+        if (val.type === 'existing') { setModerator(val.s); return; }
+        const name = (val.name || '').trim(); if (!name) return;
+        const ok = await confirmDialog(`"${name}" 님이 목록에 없습니다.\n새 연자로 등록하고 사회자로 지정할까요? (연자 관리에도 추가됨)`, { okText: '등록' });
+        if (!ok) return;
+        const id = uuid();
+        database.ref('/adminSpeakers/' + id).set({ nameKo: name, nameEn: '', affiliationKo: '', affiliationEn: '', order: Masters.speakers.length, createdAt: firebase.database.ServerValue.TIMESTAMP })
+            .then(() => { setModerator({ id, nameKo: name }); Toast.success(`"${name}" 등록`); })
+            .catch(e => Toast.error('등록 실패: ' + e.message));
+    }
+);
+
 window.openSessionModal = function () {
     if (!AdminAuth.requireEdit()) return;
     editingSession = { roomId: CURRENT_ROOM };
     document.getElementById('sessionModalTitle').textContent = '세션 추가';
     document.getElementById('sessionName').value = '';
+    document.getElementById('modInput').value = '';
+    moderatorDraft = null; renderModChosen();
     document.getElementById('sessionModal').classList.add('open');
 };
 window.editSession = function (roomId, sessionId) {
@@ -381,6 +443,11 @@ window.editSession = function (roomId, sessionId) {
     editingSession = { roomId, sessionId };
     document.getElementById('sessionModalTitle').textContent = '세션 수정';
     document.getElementById('sessionName').value = s.name || '';
+    document.getElementById('modInput').value = '';
+    moderatorDraft = (s.moderator && (s.moderator.id || s.moderator.nameKo))
+        ? { id: s.moderator.id || '', nameKo: s.moderator.nameKo || '', nameEn: s.moderator.nameEn || '', affiliationKo: s.moderator.affiliationKo || '' }
+        : null;
+    renderModChosen();
     document.getElementById('sessionModal').classList.add('open');
 };
 window.closeSessionModal = function () { document.getElementById('sessionModal').classList.remove('open'); };
@@ -389,18 +456,29 @@ window.saveSession = function () {
     const name = document.getElementById('sessionName').value.trim();
     if (!name) { Toast.warning('세션 이름을 입력하세요.'); return; }
     const { roomId, sessionId } = editingSession;
+    const mod = moderatorDraft ? {
+        id: moderatorDraft.id || '', nameKo: moderatorDraft.nameKo || '',
+        nameEn: moderatorDraft.nameEn || '', affiliationKo: moderatorDraft.affiliationKo || ''
+    } : null;
     if (sessionId) {
-        confRef().child(`rooms/${roomId}/sessions/${sessionId}/name`).set(name)
+        const updates = {};
+        updates[`rooms/${roomId}/sessions/${sessionId}/name`] = name;
+        updates[`rooms/${roomId}/sessions/${sessionId}/moderator`] = mod;   // null이면 제거
+        confRef().update(updates)
             .then(() => {
-                logActivity('update', 'session', `세션 "${name}" 수정`, { confId: CONF_ID, confTitle: ctitle(), entityId: sessionId });
+                if (mod && mod.id) ensureConfSpeaker(mod.id, '사회자');
+                logActivity('update', 'session', `세션 "${name}" 수정${mod ? ` (사회자: ${mod.nameKo})` : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: sessionId });
                 Toast.success('저장되었습니다.'); closeSessionModal();
             });
     } else {
         const sessions = toOrderedArray(CONF.rooms[roomId].sessions);
         const id = uuid();
-        confRef().child(`rooms/${roomId}/sessions/${id}`).set({ name, order: sessions.length })
+        const data = { name, order: sessions.length };
+        if (mod) data.moderator = mod;
+        confRef().child(`rooms/${roomId}/sessions/${id}`).set(data)
             .then(() => {
-                logActivity('create', 'session', `세션 "${name}" 추가`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
+                if (mod && mod.id) ensureConfSpeaker(mod.id, '사회자');
+                logActivity('create', 'session', `세션 "${name}" 추가${mod ? ` (사회자: ${mod.nameKo})` : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
                 Toast.success('세션이 추가되었습니다.'); closeSessionModal();
             });
     }
@@ -510,6 +588,8 @@ window.placeLecture = function (poolId) {
     };
     confRef().child(`rooms/${roomId}/sessions/${sessionId}/lectures/${uuid()}`).set(data)
         .then(() => {
+            // 배치된 강의의 연자를 이 행사 연자/사회자 목록에 자동 추가
+            (pool.speakers || []).forEach(s => { if (s && s.id) ensureConfSpeaker(s.id, '연자'); });
             logActivity('place', 'lecture', `강의 "${data.titleKo}" 시간표 배치`, { confId: CONF_ID, confTitle: ctitle(), entityId: pool.id });
             Toast.success(`"${data.titleKo}" 배치됨`); renderPlaceList();
         })
@@ -536,18 +616,46 @@ function collectPlaced() {
     });
     return out;
 }
-// 현재 배치 전체에서 충돌하는 강의 id 집합 (렌더 때마다 다시 계산 → 자동 갱신)
+
+// 강의 + 사회자 점유를 함께 수집 (사회자는 세션 전체 시간 동안 배정)
+function collectOccupancy() {
+    const out = [];
+    orderedRooms().forEach(room => {
+        computeRoom(room).forEach(session => {
+            session.lectures.forEach(lec => {
+                out.push({
+                    kind: 'lecture', roomId: room.id, sessionId: session.id, date: room.date || '',
+                    refId: lec.id, start: lec._start, end: lec._end, keys: speakerKeysOf(lec.speakers)
+                });
+            });
+            const mod = session.moderator;
+            const modKey = mod && (mod.id || mod.nameKo);
+            if (modKey) {
+                out.push({
+                    kind: 'moderator', roomId: room.id, sessionId: session.id, date: room.date || '',
+                    refId: 'mod:' + session.id, start: session._start, end: session._end,
+                    keys: [String(modKey).trim()].filter(Boolean)
+                });
+            }
+        });
+    });
+    return out;
+}
+
+// 충돌하는 항목 id 집합 (강의 id + 'mod:세션id'). 렌더마다 재계산 → 자동 갱신
+// 사회자는 세션 전체 동안 묶임. 단, 같은 세션 내부(사회자↔그 세션 연자)는 제외.
 function computeConflictIds() {
-    const placed = collectPlaced();
+    const occ = collectOccupancy();
     const ids = new Set();
-    for (let i = 0; i < placed.length; i++) {
-        for (let j = i + 1; j < placed.length; j++) {
-            const a = placed[i], b = placed[j];
+    for (let i = 0; i < occ.length; i++) {
+        for (let j = i + 1; j < occ.length; j++) {
+            const a = occ[i], b = occ[j];
             if ((a.date || '') !== (b.date || '')) continue;                 // 다른 날짜면 충돌 아님
-            if (!a.speakerKeys.some(k => b.speakerKeys.includes(k))) continue; // 같은 연자 아님
+            if (a.roomId === b.roomId && a.sessionId === b.sessionId) continue; // 같은 세션 내부는 제외
+            if (!a.keys.some(k => b.keys.includes(k))) continue;             // 같은 사람 아님
             const buffer = (a.roomId === b.roomId) ? 0 : SPEAKER_TRAVEL_MIN;  // 같은 룸은 이동 불필요
             if (a.start < b.end + buffer && b.start < a.end + buffer) {
-                ids.add(a.lecId); ids.add(b.lecId);
+                ids.add(a.refId); ids.add(b.refId);
             }
         }
     }
