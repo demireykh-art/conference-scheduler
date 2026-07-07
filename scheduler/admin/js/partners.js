@@ -7,6 +7,9 @@ const PTN_ROOT = database.ref('/adminPartners');
 let PARTNERS = [];
 let PTN_EDIT_ID = null;
 let PTN_SEARCH = '';
+let BOOTH = { columns: [], grades: [], cells: {} };
+let PLACED = {};              // { partnerId: { type: 배치수 } } — 마지막에 연 행사 기준
+let PLACED_CONF_NAME = '';
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('partners');
 
@@ -15,6 +18,68 @@ PTN_ROOT.on('value', snap => {
         .sort((a, b) => (a.nameKo || '').localeCompare(b.nameKo || '', 'ko'));
     renderPartners();
 });
+
+// 부스 등급별 혜택
+database.ref('/adminBoothBenefits').on('value', snap => {
+    const v = snap.val() || {};
+    BOOTH = {
+        columns: v.columns || DEFAULT_BOOTH_COLUMNS.slice(),
+        grades: v.grades || DEFAULT_BOOTH_GRADES.slice(),
+        cells: v.cells || {}
+    };
+    populateGradeSelect();
+    renderPartners();
+});
+
+// 마지막에 연 행사 기준으로 배치된 강의 수 집계 (파트너 + 강의유형)
+(function subscribePlaced() {
+    let lastConf = '';
+    try { lastConf = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { }
+    if (!lastConf) return;
+    database.ref('/adminConferences/' + lastConf).on('value', snap => {
+        const conf = snap.val() || {};
+        PLACED_CONF_NAME = conf.title || '';
+        PLACED = {};
+        Object.values(conf.rooms || {}).forEach(room =>
+            Object.values(room.sessions || {}).forEach(sess =>
+                Object.values(sess.lectures || {}).forEach(lec => {
+                    if (!lec.partnerId) return;
+                    (Array.isArray(lec.types) ? lec.types : []).forEach(t => {
+                        PLACED[lec.partnerId] = PLACED[lec.partnerId] || {};
+                        PLACED[lec.partnerId][t] = (PLACED[lec.partnerId][t] || 0) + 1;
+                    });
+                })));
+        renderPartners();
+    });
+})();
+
+function populateGradeSelect() {
+    const sel = document.getElementById('ptnGrade');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">(등급 없음)</option>' +
+        BOOTH.grades.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
+    sel.value = cur;
+}
+
+// 파트너 등급 → 혜택(숫자) 태그: "정규강의(일) 미배치 X · 배치 Y"
+function benefitTags(p) {
+    if (!p.grade || !BOOTH.cells[p.grade]) return '';
+    const cells = BOOTH.cells[p.grade];
+    const placed = PLACED[p.id] || {};
+    const tags = [];
+    BOOTH.columns.forEach(col => {
+        const val = cells[col];
+        if (val == null || String(val).trim() === '') return;
+        const n = parseInt(val, 10);
+        if (!isNaN(n) && String(n) === String(val).trim()) {   // 숫자 혜택만
+            const done = placed[col] || 0;
+            const un = Math.max(0, n - done);
+            tags.push(`<span class="benefit-tag">${escapeHtml(col)} <span class="un">미배치 ${un}</span>${done ? ` · <b>배치 ${done}</b>` : ''}</span>`);
+        }
+    });
+    return tags.join('');
+}
 
 document.getElementById('ptnSearch').addEventListener('input', e => {
     PTN_SEARCH = e.target.value.trim().toLowerCase();
@@ -31,9 +96,12 @@ function renderPartners() {
             || partnerProducts(p).some(pr => [pr.nameKo, pr.nameEn].some(v => (v || '').toLowerCase().includes(q))))
         : PARTNERS;
 
+    const placedNote = document.getElementById('placedConf');
+    if (placedNote) placedNote.textContent = PLACED_CONF_NAME ? `배치 기준 행사: ${PLACED_CONF_NAME}` : '';
+
     const body = document.getElementById('ptnBody');
     if (!list.length) {
-        body.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-dim);padding:40px">
+        body.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:40px">
             ${PARTNERS.length ? '검색 결과가 없습니다.' : '등록된 파트너사가 없습니다. <b>+ 파트너사 등록</b>으로 추가하세요.'}</td></tr>`;
         return;
     }
@@ -42,11 +110,13 @@ function renderPartners() {
         const prodText = prods.length
             ? prods.map(pr => escapeHtml(pr.nameKo || pr.nameEn || '')).join(', ')
             : '<span class="dim">-</span>';
+        const tags = benefitTags(p);
         return `
         <tr>
-            <td><b>${escapeHtml(p.nameKo || '')}</b></td>
+            <td><b>${escapeHtml(p.nameKo || '')}</b>${p.grade ? ` <span class="grade-badge">${escapeHtml(p.grade)}</span>` : ''}</td>
             <td class="en">${escapeHtml(p.nameEn || '-')}</td>
             <td><span class="count-pill">${prods.length}</span> <span style="color:var(--text-dim);font-size:0.82rem">${prodText}</span></td>
+            <td>${tags || '<span class="dim">-</span>'}</td>
             <td>
                 <div class="row-actions">
                     <button class="btn btn-sm" onclick="editPartner('${p.id}')">수정</button>
@@ -95,6 +165,8 @@ window.openPartnerModal = function () {
     document.getElementById('ptnModalTitle').textContent = '파트너사 등록';
     document.getElementById('ptnNameKo').value = '';
     document.getElementById('ptnNameEn').value = '';
+    populateGradeSelect();
+    document.getElementById('ptnGrade').value = '';
     document.getElementById('ptnProducts').innerHTML = '';
     document.getElementById('ptnModal').classList.add('open');
     setTimeout(() => document.getElementById('ptnNameKo').focus(), 50);
@@ -108,6 +180,8 @@ window.editPartner = function (id) {
     document.getElementById('ptnModalTitle').textContent = '파트너사 수정';
     document.getElementById('ptnNameKo').value = p.nameKo || '';
     document.getElementById('ptnNameEn').value = p.nameEn || '';
+    populateGradeSelect();
+    document.getElementById('ptnGrade').value = p.grade || '';
     document.getElementById('ptnProducts').innerHTML = '';
     partnerProducts(p).forEach(pr => addProductRow(pr));
     document.getElementById('ptnModal').classList.add('open');
@@ -126,6 +200,7 @@ window.savePartner = function () {
     const data = {
         nameKo,
         nameEn: document.getElementById('ptnNameEn').value.trim(),
+        grade: document.getElementById('ptnGrade').value || '',
         products: collectProducts(),
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     };

@@ -198,6 +198,7 @@ const SIDE_MENU = [
             { key: 'lectures', label: '강의 관리', href: 'lectures.html' },
             { key: 'speakers', label: '연자 관리', href: 'speakers.html' },
             { key: 'partners', label: '파트너사 관리', href: 'partners.html' },
+            { key: 'booth', label: '부스 등급별 혜택', href: 'booth-benefits.html' },
             { key: 'registrants', label: '등록자 관리' },
             { key: 'foreign', label: '외국인 등록자 관리' },
             { key: 'abstracts', label: '초록/간행물 관리' }
@@ -269,8 +270,22 @@ window.PRODUCT_CATEGORIES = [
     'Others'
 ];
 
-// 강의 유형 (체크박스, 태그처럼 표시)
-window.LECTURE_TYPES = ['런천강의', '학술강의'];
+// 부스 등급별 혜택 — 기본 컬럼/등급/셀 (부스 표 시드 + 파트너사 등급/유형 연동)
+window.DEFAULT_BOOTH_COLUMNS = ['정규강의(일)', '일반강의(토)', '일반강의(일)', '정규룸 런천', '일반룸 런천', '오픈렉처'];
+window.DEFAULT_BOOTH_GRADES = ['얼티밋', '엘리트', '다이아몬드', '에메랄드', '플래티넘', '골드', '클래식', '베이직'];
+window.DEFAULT_BOOTH_CELLS = {
+    '얼티밋': { '정규강의(일)': '별도 협의', '일반강의(토)': '별도 협의', '일반강의(일)': '별도 협의', '정규룸 런천': '별도 협의', '일반룸 런천': '별도 협의', '오픈렉처': '별도 협의' },
+    '엘리트': { '정규강의(일)': '4', '정규룸 런천': '1', '오픈렉처': '1' },
+    '다이아몬드': { '정규강의(일)': '3', '일반강의(일)': '1', '오픈렉처': '1' },
+    '에메랄드': { '정규강의(일)': '3', '일반강의(토)': '1', '오픈렉처': '1' },
+    '플래티넘': { '정규강의(일)': '2', '일반강의(토)': '1', '오픈렉처': '1' },
+    '골드': { '정규강의(일)': '1', '일반강의(토)': '신청가능(유료)', '오픈렉처': '신청가능(유료)' },
+    '클래식': { '오픈렉처': '신청가능(유료)' },
+    '베이직': { '오픈렉처': '신청가능(유료)' }
+};
+
+// 강의 유형 (체크박스, 태그처럼 표시) — 부스 혜택 컬럼과 동일하게 맞춰 연동
+window.LECTURE_TYPES = window.DEFAULT_BOOTH_COLUMNS.slice();
 
 window.productCategoryOptions = function (selected) {
     return '<option value="">-- 제품분류 선택 --</option>' +

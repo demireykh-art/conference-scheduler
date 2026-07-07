@@ -401,6 +401,28 @@ a { color: inherit; }
     color: var(--text-dim); font-size: 0.75rem;
 }
 
+/* 부스 등급별 혜택 표 (편집형) */
+.booth-table th { text-align: center; vertical-align: middle; }
+.booth-table td { text-align: center; vertical-align: middle; }
+.booth-table th:first-child, .booth-table td:first-child { text-align: left; }
+.booth-table input.booth-cell {
+    width: 100%; min-width: 76px; text-align: center;
+    border: 1px solid transparent; background: transparent;
+    padding: 6px 6px; border-radius: 6px; font-size: 0.85rem;
+}
+.booth-table input.booth-cell:hover { border-color: var(--border); }
+.booth-table input.booth-cell:focus { border-color: var(--primary); background: #fff; outline: none; box-shadow: 0 0 0 3px rgba(47,111,237,.1); }
+.booth-colname, .booth-gradename { outline: none; padding: 1px 3px; border-radius: 4px; }
+.booth-colname:focus, .booth-gradename:focus { background: #fff8e0; }
+.booth-del { background: none; border: none; color: #cdd2da; cursor: pointer; font-size: 0.72rem; padding: 1px 3px; }
+.booth-del:hover { color: var(--danger); }
+
+/* 파트너 등급 혜택 태그 */
+.grade-badge { display:inline-block; background:#efe9ff; color:#6b46c1; font-size:0.72rem; font-weight:600; padding:1px 8px; border-radius:999px; }
+.benefit-tag { display:inline-block; background:#eef4ff; color:#2f6fed; font-size:0.72rem; padding:2px 8px; border-radius:6px; margin:2px 4px 2px 0; white-space:nowrap; }
+.benefit-tag b { color:#12a150; }
+.benefit-tag .un { color:#e5484d; font-weight:600; }
+
 .count-pill {
     display: inline-block; min-width: 22px; text-align: center;
     background: #eef4ff; color: var(--primary);
