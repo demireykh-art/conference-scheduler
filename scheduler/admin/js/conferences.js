@@ -46,7 +46,7 @@ function renderList() {
         return;
     }
 
-    box.innerHTML = list.map(c => {
+    box.innerHTML = list.map((c, i) => {
         const st = confStatus(c);
         const poster = c.posterUrl
             ? `<div class="conf-poster-wrap">
@@ -55,7 +55,12 @@ function renderList() {
                </div>`
             : `<div class="conf-poster">포스터<br>없음</div>`;
         return `
-        <div class="card conf-card">
+        <div class="card conf-card" data-id="${c.id}">
+            <div class="conf-reorder">
+                <button class="reorder-arrow" onclick="moveConf('${c.id}',-1)" title="위로" ${i === 0 ? 'disabled' : ''}>▲</button>
+                <span class="drag-grip" title="드래그해서 순서 변경">⠿</span>
+                <button class="reorder-arrow" onclick="moveConf('${c.id}',1)" title="아래로" ${i === list.length - 1 ? 'disabled' : ''}>▼</button>
+            </div>
             ${poster}
             <div class="conf-info">
                 <div class="conf-title-row">
@@ -77,6 +82,76 @@ function renderList() {
             </div>
         </div>`;
     }).join('');
+
+    enableConfDrag();
+}
+
+/* ---------- 순서 변경 (화살표 + 드래그) ---------- */
+function currentFilteredList() {
+    return CURRENT_TAB === 'public'
+        ? CONFS.filter(c => c.visibility !== 'private')
+        : CONFS.filter(c => c.visibility === 'private');
+}
+
+// 새 순서대로 order 값을 0,1,2… 로 재기록
+function persistOrder(arr) {
+    const updates = {};
+    arr.forEach((c, idx) => { updates[c.id + '/order'] = idx; });
+    CONF_ROOT.update(updates).catch(e => Toast.error('순서 저장 실패: ' + e.message));
+}
+
+window.moveConf = function (id, dir) {
+    if (!AdminAuth.requireEdit()) return;
+    const list = currentFilteredList();
+    const i = list.findIndex(c => c.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    const arr = list.slice();
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    persistOrder(arr);
+};
+
+let dragConfId = null;
+function enableConfDrag() {
+    document.querySelectorAll('#confList .conf-card').forEach(card => {
+        const grip = card.querySelector('.drag-grip');
+        if (grip) {
+            grip.addEventListener('mousedown', () => { card.draggable = true; });
+            grip.addEventListener('mouseup', () => { card.draggable = false; });
+        }
+        card.addEventListener('dragstart', e => {
+            dragConfId = card.dataset.id;
+            card.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        card.addEventListener('dragend', () => {
+            card.draggable = false;
+            card.classList.remove('dragging');
+            document.querySelectorAll('#confList .conf-card.drop-target').forEach(el => el.classList.remove('drop-target'));
+            dragConfId = null;
+        });
+        card.addEventListener('dragover', e => {
+            if (!dragConfId || card.dataset.id === dragConfId) return;
+            e.preventDefault();
+            card.classList.add('drop-target');
+        });
+        card.addEventListener('dragleave', () => card.classList.remove('drop-target'));
+        card.addEventListener('drop', e => {
+            e.preventDefault();
+            card.classList.remove('drop-target');
+            const targetId = card.dataset.id;
+            if (!dragConfId || targetId === dragConfId) return;
+            if (!AdminAuth.requireEdit()) return;
+            const list = currentFilteredList();
+            const from = list.findIndex(c => c.id === dragConfId);
+            const to = list.findIndex(c => c.id === targetId);
+            if (from < 0 || to < 0) return;
+            const arr = list.slice();
+            const [moved] = arr.splice(from, 1);
+            arr.splice(to, 0, moved);
+            persistOrder(arr);
+        });
+    });
 }
 
 /* ---------- 모달 ---------- */
