@@ -162,7 +162,7 @@ window.confirmDialog = function (message, { danger = false, okText = '확인' } 
 const SIDE_MENU = [
     {
         group: '학술대회 · 행사', items: [
-            { key: 'events', label: '행사 개설/관리', href: 'index.html' },
+            { key: 'timetable', label: '🗓️ 시간표' },
             { key: 'lectures', label: '강의 관리', href: 'lectures.html' },
             { key: 'speakers', label: '연자 관리', href: 'speakers.html' },
             { key: 'partners', label: '파트너사 관리', href: 'partners.html' },
@@ -190,11 +190,16 @@ const SIDE_MENU = [
 ];
 
 window.renderSidebar = function (activeKey) {
+    // '시간표' 바로가기 → 마지막에 연 행사의 시간표 (없으면 행사 목록)
+    let lastConf = '';
+    try { lastConf = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { }
+    const timetableHref = lastConf ? `timetable.html?id=${lastConf}` : 'index.html';
+
     const links = SIDE_MENU.map(g => {
         const items = g.items.map(it => {
             const active = it.key === activeKey ? ' active' : '';
-            const href = it.href ? it.href : '#';
-            const soon = it.href ? '' : ' data-soon="1"';
+            const href = it.key === 'timetable' ? timetableHref : (it.href || '#');
+            const soon = (it.href || it.key === 'timetable') ? '' : ' data-soon="1"';
             return `<a class="side-link${active}" href="${href}"${soon}>${escapeHtml(it.label)}</a>`;
         }).join('');
         return `<div class="side-group-label">${escapeHtml(g.group)}</div>${items}`;
@@ -206,7 +211,7 @@ window.renderSidebar = function (activeKey) {
                 <span>ASLS 행사 관리</span>
                 <span class="collapse-icon" onclick="document.getElementById('sidebar').classList.remove('open')">‹</span>
             </div>
-            <a class="sidebar-home" href="../index.html">🏠 메인 화면</a>
+            <a class="sidebar-home${activeKey === 'events' ? ' active' : ''}" href="index.html">🗓️ 행사 개설/관리</a>
             ${links}
             <div class="sidebar-footer" id="sideLogout">로그아웃</div>
         </aside>`;

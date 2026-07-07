@@ -47,6 +47,7 @@ window.onConfChange = function () {
 
 let _poolSub = null, _roomsSub = null;
 function subscribeConf() {
+    try { if (CONF_ID) localStorage.setItem('asls_lastConfId', CONF_ID); } catch (e) { }
     document.getElementById('poolArea').style.display = '';
     if (_poolSub) _poolSub.off();
     if (_roomsSub) _roomsSub.off();
