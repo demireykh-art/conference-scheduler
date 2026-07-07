@@ -288,6 +288,7 @@ function renderLectureRow(roomId, sessionId, lec) {
                 <span class="time-badge">${range}</span>
                 <span class="dur-badge">${lec.duration || 0}분</span>
                 ${partner}
+                ${(n.types || []).map(t => `<span class="chip type">${escapeHtml(t)}</span>`).join('')}
             </div>
             <div class="lec-title">${escapeHtml(n.titleKo || '(제목 없음)')}</div>
             ${n.titleEn ? `<div class="lec-subtitle">${escapeHtml(n.titleEn)}</div>` : ''}
@@ -329,7 +330,8 @@ function normalizeLecture(lec) {
         productKo: lec.productKo || '',
         productEn: lec.productEn || '',
         productCategory: lec.productCategory || '',
-        productDesc: lec.productDesc || ''
+        productDesc: lec.productDesc || '',
+        types: Array.isArray(lec.types) ? lec.types : []
     };
 }
 
@@ -419,7 +421,7 @@ function renderPlaceList() {
     if (cat) list = list.filter(l => (l.categories || []).includes(cat));
     if (hidePlaced) list = list.filter(l => !placed.has(l.id));
     if (q) list = list.filter(l => {
-        const hay = [l.titleKo, l.titleEn, ...(l.tags || []), ...(l.categories || []),
+        const hay = [l.titleKo, l.titleEn, ...(l.tags || []), ...(l.categories || []), ...(l.types || []),
         ...((l.speakers || []).map(s => s.nameKo + ' ' + s.nameEn)), l.partnerKo, l.productKo].join(' ').toLowerCase();
         return hay.includes(q);
     });
@@ -435,12 +437,13 @@ function renderPlaceList() {
         const isPlaced = placed.has(l.id);
         const cats = (l.categories || []).map(c => `<span class="chip cat">${escapeHtml(c)}</span>`).join('');
         const tags = (l.tags || []).map(t => `<span class="chip tag">${escapeHtml(t)}</span>`).join('');
+        const types = (l.types || []).map(t => `<span class="chip type">${escapeHtml(t)}</span>`).join('');
         const spk = (l.speakers || []).map(s => escapeHtml(s.nameKo || s.nameEn)).join(', ') || '미정';
         return `
         <div class="place-row ${isPlaced ? 'is-placed' : ''}">
             <div class="p-main">
                 <div class="p-title">${escapeHtml(l.titleKo || '(제목 없음)')} <span style="color:var(--text-dim);font-weight:400">· ${l.duration || 0}분</span></div>
-                <div class="chips" style="margin:4px 0">${cats}${tags}</div>
+                <div class="chips" style="margin:4px 0">${types}${cats}${tags}</div>
                 <div class="p-meta">연자: ${spk}${l.partnerKo ? ' · ' + escapeHtml(l.partnerKo) : ''}${isPlaced ? ' · <b>이미 배치됨</b>' : ''}</div>
             </div>
             <button class="btn btn-primary btn-sm" onclick="placeLecture('${l.id}')">배치</button>
@@ -469,7 +472,7 @@ window.placeLecture = function (poolId) {
         lectureId: pool.id,
         titleKo: pool.titleKo || '', titleEn: pool.titleEn || '',
         duration: Number(pool.duration) || 0,
-        categories: pool.categories || [], tags: pool.tags || [],
+        categories: pool.categories || [], tags: pool.tags || [], types: pool.types || [],
         speakers: (pool.speakers || []).map(s => ({ ...s })),
         partnerId: pool.partnerId || '', partnerKo: pool.partnerKo || '', partnerEn: pool.partnerEn || '',
         productKo: pool.productKo || '', productEn: pool.productEn || '',

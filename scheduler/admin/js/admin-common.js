@@ -262,6 +262,9 @@ window.PRODUCT_CATEGORIES = [
     'Others'
 ];
 
+// 강의 유형 (체크박스, 태그처럼 표시)
+window.LECTURE_TYPES = ['런천강의', '학술강의'];
+
 window.productCategoryOptions = function (selected) {
     return '<option value="">-- 제품분류 선택 --</option>' +
         PRODUCT_CATEGORIES.map(c =>
