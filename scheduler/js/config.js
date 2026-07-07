@@ -107,4 +107,10 @@ firebase.initializeApp(window.AppConfig.firebase);
 window.auth = firebase.auth();
 window.database = firebase.database();
 
+// 로그인 세션 지속성 — 브라우저를 닫았다 열어도 유지 (자동 로그아웃 방지)
+if (window.auth && firebase.auth.Auth && firebase.auth.Auth.Persistence) {
+    window.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+        .catch(e => console.warn('인증 지속성 설정 실패:', e && e.message));
+}
+
 console.log('✅ config.js 로드 완료');

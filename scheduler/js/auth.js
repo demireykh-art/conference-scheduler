@@ -68,16 +68,13 @@ window.registerOrCheckUser = function(user) {
 window.resetSessionTimeout = function() {
     lastActivityTime = Date.now();
 
+    // 자동 로그아웃 비활성화 — 사용 중 로그아웃 방지 (세션 유지)
+    // Firebase 인증은 같은 도메인의 모든 탭이 세션을 공유하므로,
+    // 이 타이머가 signOut()을 호출하면 관리자 페이지까지 함께 로그아웃되던 문제를 제거.
     if (sessionTimeoutId) {
         clearTimeout(sessionTimeoutId);
+        sessionTimeoutId = null;
     }
-
-    sessionTimeoutId = setTimeout(() => {
-        if (AppState.currentUser) {
-            Toast.warning('⏰ 보안을 위해 2시간 동안 활동이 없어 자동 로그아웃됩니다.');
-            signOut();
-        }
-    }, AppConfig.SESSION_TIMEOUT);
 };
 
 /**
