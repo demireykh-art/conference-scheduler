@@ -29,12 +29,38 @@ database.ref('/adminBoothBenefits').on('value', snap => {
     renderPartners();
 }, () => { populateGradeSelect(); renderPartners(); });   // 읽기 실패 시 기본값 유지
 
-// 마지막에 연 행사 기준으로 배치된 강의 수 집계 (파트너 + 강의유형)
-(function subscribePlaced() {
-    let lastConf = '';
-    try { lastConf = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { }
-    if (!lastConf) return;
-    database.ref('/adminConferences/' + lastConf).on('value', snap => {
+// 선택한 행사 기준으로 배치된 강의 수 집계 (파트너 + 강의유형)
+let CONF_LIST = [];
+let PLACED_CONF_ID = '';
+try { PLACED_CONF_ID = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { }
+let placedRef = null;
+
+// 행사 목록 구독 → 드롭다운 채우기
+database.ref('/adminConferences').on('value', snap => {
+    CONF_LIST = toOrderedArray(snap.val());
+    if (!PLACED_CONF_ID || !CONF_LIST.find(c => c.id === PLACED_CONF_ID)) {
+        PLACED_CONF_ID = CONF_LIST.length ? CONF_LIST[0].id : '';
+    }
+    populateConfSelect();
+    subscribePlacedConf();
+});
+
+function populateConfSelect() {
+    const sel = document.getElementById('placedConfSelect');
+    if (!sel) return;
+    sel.innerHTML = CONF_LIST.length
+        ? CONF_LIST.map(c => `<option value="${c.id}">${escapeHtml(c.title || '(제목 없음)')}</option>`).join('')
+        : '<option value="">(행사 없음)</option>';
+    sel.value = PLACED_CONF_ID;
+}
+
+function subscribePlacedConf() {
+    if (placedRef) { placedRef.off(); placedRef = null; }
+    PLACED = {};
+    PLACED_CONF_NAME = '';
+    if (!PLACED_CONF_ID) { renderPartners(); return; }
+    placedRef = database.ref('/adminConferences/' + PLACED_CONF_ID);
+    placedRef.on('value', snap => {
         const conf = snap.val() || {};
         PLACED_CONF_NAME = conf.title || '';
         PLACED = {};
@@ -49,7 +75,13 @@ database.ref('/adminBoothBenefits').on('value', snap => {
                 })));
         renderPartners();
     });
-})();
+}
+
+window.changePlacedConf = function (id) {
+    PLACED_CONF_ID = id;
+    try { localStorage.setItem('asls_lastConfId', id); } catch (e) { }
+    subscribePlacedConf();
+};
 
 function populateGradeSelect() {
     const sel = document.getElementById('ptnGrade');
