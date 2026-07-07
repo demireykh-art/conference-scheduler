@@ -9,6 +9,7 @@ let CONFS = [];
 let CONF_ID = new URLSearchParams(location.search).get('id') || '';
 let CONF_ROOMS = null;      // 배치 여부 판단용
 let POOL = [];
+let LEC_SORT = 'nameAsc';
 let LEC_EDIT_ID = null;
 let catDraft = [], tagDraft = [], spkDraft = [];
 
@@ -22,6 +23,14 @@ document.getElementById('catFilter').innerHTML =
     '<option value="">전체 분류</option>' + PRODUCT_CATEGORIES.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
 
 document.getElementById('lecSearch').addEventListener('input', renderPool);
+
+// 정렬 드롭다운 (제목순/등록순)
+(function initLecSort() {
+    const sel = document.getElementById('lecSort');
+    if (!sel) return;
+    sel.innerHTML = sortOptionsHtml(LEC_SORT, '제목');
+    sel.addEventListener('change', () => { LEC_SORT = sel.value; renderPool(); });
+})();
 
 // 강의 유형 체크박스 렌더
 document.getElementById('lecTypeChecks').innerHTML = LECTURE_TYPES.map(t =>
@@ -86,7 +95,7 @@ function renderPool() {
     const q = document.getElementById('lecSearch').value.trim().toLowerCase();
     const cat = document.getElementById('catFilter').value;
 
-    let list = POOL.slice().sort((a, b) => (a.titleKo || '').localeCompare(b.titleKo || '', 'ko'));
+    let list = sortList(POOL, LEC_SORT, 'titleKo');
     if (cat) list = list.filter(l => (l.categories || []).includes(cat));
     if (q) list = list.filter(l => {
         const hay = [l.titleKo, l.titleEn, ...(l.tags || []), ...(l.categories || []), ...(l.types || []),
