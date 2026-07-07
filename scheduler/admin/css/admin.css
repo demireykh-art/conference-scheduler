@@ -197,6 +197,9 @@ a { color: inherit; }
 .badge-upcoming { background: #e5f0ff; color: #2f6fed; }
 .badge-ongoing { background: #e6f7ee; color: var(--success); }
 .badge-ended { background: #eef0f3; color: #7b8494; }
+.role-admin { background: #fff4e0; color: #b26a00; }
+.role-editor { background: #e6f7ee; color: #12a150; }
+.role-pending { background: #fdecec; color: #e5484d; }
 
 .icon-line { color: var(--text-dim); font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; }
 
