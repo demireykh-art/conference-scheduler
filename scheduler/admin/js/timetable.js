@@ -208,6 +208,51 @@ window.updateRoom = function (field, value) {
         .catch(e => Toast.error('저장 실패: ' + e.message));
 };
 
+/* ---------- 개회식 / 브레이크 / 행사 항목 ---------- */
+const BREAK_PRESETS = [
+    { ko: '개회식', en: 'Opening Ceremony', dur: 20 },
+    { ko: '개회사', en: 'Opening Remarks', dur: 10 },
+    { ko: 'Coffee Break', en: 'Coffee Break', dur: 20 },
+    { ko: '점심식사', en: 'Lunch', dur: 60 },
+    { ko: '폐회사', en: 'Closing Remarks', dur: 10 }
+];
+let breakTarget = null;   // { roomId, sessionId }
+
+window.openBreakModal = function (roomId, sessionId) {
+    if (!AdminAuth.requireEdit()) return;
+    breakTarget = { roomId, sessionId };
+    document.getElementById('breakTitleKo').value = '';
+    document.getElementById('breakTitleEn').value = '';
+    document.getElementById('breakDur').value = 20;
+    document.getElementById('breakPresets').innerHTML =
+        BREAK_PRESETS.map((p, i) => `<span class="chip" style="cursor:pointer" onclick="applyBreakPreset(${i})">${escapeHtml(p.ko)}</span>`).join('');
+    document.getElementById('breakModal').classList.add('open');
+};
+window.applyBreakPreset = function (i) {
+    const p = BREAK_PRESETS[i]; if (!p) return;
+    document.getElementById('breakTitleKo').value = p.ko;
+    document.getElementById('breakTitleEn').value = p.en;
+    document.getElementById('breakDur').value = p.dur;
+};
+window.closeBreakModal = function () { document.getElementById('breakModal').classList.remove('open'); };
+window.saveBreak = function () {
+    if (!AdminAuth.requireEdit()) return;
+    const t = breakTarget || {};
+    if (!t.roomId || !t.sessionId) return;
+    const titleKo = document.getElementById('breakTitleKo').value.trim();
+    const titleEn = document.getElementById('breakTitleEn').value.trim();
+    if (!titleKo && !titleEn) { Toast.warning('제목을 입력하세요.'); return; }
+    const dur = Number(document.getElementById('breakDur').value) || 0;
+    const order = toOrderedArray(CONF.rooms[t.roomId].sessions[t.sessionId].lectures).length;
+    const data = { isBreak: true, titleKo, titleEn, duration: dur, order };
+    confRef().child(`rooms/${t.roomId}/sessions/${t.sessionId}/lectures/${uuid()}`).set(data)
+        .then(() => {
+            logActivity('create', 'lecture', `행사 항목 "${titleKo || titleEn}" 추가`, { confId: CONF_ID, confTitle: ctitle(), entityId: t.sessionId });
+            Toast.success('추가되었습니다.'); closeBreakModal();
+        })
+        .catch(e => Toast.error('추가 실패: ' + e.message));
+};
+
 // 세션 언어: 룸 전체 적용에서 제외(개별설정) 토글
 window.setSessionLangExcluded = function (roomId, sessionId, on) {
     if (!AdminAuth.requireEdit()) { renderSessions(); return; }
@@ -384,6 +429,7 @@ function renderSessionBlock(roomId, s) {
             </div>
             <div class="spacer"></div>
             <button class="btn btn-primary btn-sm" onclick="openPlaceModal('${roomId}','${s.id}')">+ 강의 배치</button>
+            <button class="btn btn-sm" onclick="openBreakModal('${roomId}','${s.id}')">+ 개회/브레이크</button>
             <button class="txt-btn" onclick="editSession('${roomId}','${s.id}')">수정</button>
             <button class="txt-btn danger" onclick="deleteSession('${roomId}','${s.id}')">삭제</button>
         </div>
@@ -395,8 +441,29 @@ function renderSessionBlock(roomId, s) {
 
 function renderLectureRow(roomId, sessionId, lec, lang) {
     lang = lang || 'ko';
-    const n = normalizeLecture(lec);
     const range = `${formatTime(lec._start)} - ${formatTime(lec._end)}`;
+    // 개회식/브레이크/점심 등 행사 항목 (연자·파트너 없음, 중복·혜택 계산 제외)
+    if (lec.isBreak) {
+        const t = pickLang(lang, lec.titleKo, lec.titleEn) || '행사 항목';
+        return `
+        <div class="lecture-row break-row" data-lec="${lec.id}">
+            <span class="grip" title="드래그하여 순서 변경">⋮⋮</span>
+            <div class="lec-main">
+                <div class="lec-tags">
+                    <span class="time-badge">${range}</span>
+                    <span class="dur-badge">${lec.duration || 0}분</span>
+                    <span class="chip break-chip">행사</span>
+                </div>
+                <div class="lec-title break-title">${escapeHtml(t)}</div>
+            </div>
+            <div class="lec-actions">
+                <button class="txt-btn" onclick="openMoveModal('${roomId}','${sessionId}','${lec.id}')">이동</button>
+                <button class="txt-btn" onclick="openDurModal('${roomId}','${sessionId}','${lec.id}')">시간</button>
+                <button class="txt-btn danger" onclick="deleteLecture('${roomId}','${sessionId}','${lec.id}')">삭제</button>
+            </div>
+        </div>`;
+    }
+    const n = normalizeLecture(lec);
     const partner = n.partnerKo ? `<span class="partner-badge">${escapeHtml(pickLang(lang, n.partnerKo, n.partnerEn))}</span>` : '';
     const speakers = n.speakers.length
         ? n.speakers.map(s => {

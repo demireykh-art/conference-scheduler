@@ -111,6 +111,36 @@
         </div>
     </div>
 
+    <!-- ================= 개회식/브레이크/행사 항목 모달 ================= -->
+    <div class="modal-overlay" id="breakModal">
+        <div class="modal" style="max-width:420px">
+            <h3>개회식 · 브레이크 · 행사 항목</h3>
+            <div class="modal-field">
+                <label>빠른 선택</label>
+                <div class="chips" id="breakPresets"></div>
+            </div>
+            <div class="modal-grid2">
+                <div class="modal-field">
+                    <label>제목 (국문)</label>
+                    <input type="text" id="breakTitleKo" placeholder="예: 개회식 / Coffee Break / 점심식사">
+                </div>
+                <div class="modal-field">
+                    <label>제목 (영문)</label>
+                    <input type="text" id="breakTitleEn" placeholder="예: Opening Ceremony">
+                </div>
+            </div>
+            <div class="modal-field">
+                <label>시간 (분)</label>
+                <input type="number" id="breakDur" min="0" step="5" style="max-width:140px">
+            </div>
+            <div style="font-size:0.74rem;color:var(--text-dim)">행사 항목은 연자·파트너가 없고 중복·혜택 계산에서 제외됩니다. 세션 안에서 자유롭게 순서를 드래그할 수 있습니다.</div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeBreakModal()">취소</button>
+                <button class="btn btn-primary" onclick="saveBreak()">추가</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ================= 강의 이동 모달 ================= -->
     <div class="modal-overlay" id="moveModal">
         <div class="modal" style="max-width:360px">
