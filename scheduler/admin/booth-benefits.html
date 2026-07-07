@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>부스 등급별 혜택 · ASLS 행사 관리</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <div id="sidebarMount"></div>
+        <main class="main">
+            <div class="main-topbar">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+                    <h1 class="main-title">부스 등급별 혜택</h1>
+                </div>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-sm" onclick="addColumn()">+ 혜택 열</button>
+                    <button class="btn btn-sm" onclick="addGrade()">+ 등급 행</button>
+                </div>
+            </div>
+            <div class="main-body">
+                <div class="info-banner">
+                    <div class="info-ico">i</div>
+                    <div class="info-title">부스 등급별 강의 혜택 표입니다. 셀을 클릭해 바로 수정할 수 있습니다. (숫자는 파트너사 등급 혜택 태그로 연동됩니다)</div>
+                </div>
+                <div class="card table-card">
+                    <table class="data-table booth-table" id="boothTable"></table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="js/admin-common.js"></script>
+    <script src="js/admin-auth.js"></script>
+    <script src="js/booth-benefits.js"></script>
+</body>
+</html>

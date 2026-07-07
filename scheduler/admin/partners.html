@@ -28,6 +28,7 @@
                     <div>
                         <input type="text" id="ptnSearch" placeholder="🔍 파트너사/제품 검색" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.86rem;width:260px">
                         <span style="margin-left:10px;color:var(--text-dim);font-size:0.85rem">총 <span id="ptnCount">0</span>개사</span>
+                        <span id="placedConf" style="margin-left:10px;color:var(--text-dim);font-size:0.82rem"></span>
                     </div>
                     <button class="btn btn-primary" onclick="openPartnerModal()">+ 파트너사 등록</button>
                 </div>
@@ -38,6 +39,7 @@
                                 <th>파트너사 (국문)</th>
                                 <th>파트너사 (영문)</th>
                                 <th>제품</th>
+                                <th>등급 혜택 (미배치/배치)</th>
                                 <th style="text-align:right">관리</th>
                             </tr>
                         </thead>
@@ -61,6 +63,11 @@
                     <label>파트너사 (영문)</label>
                     <input type="text" id="ptnNameEn" placeholder="예: ABC Co., Ltd.">
                 </div>
+            </div>
+            <div class="modal-field">
+                <label>부스 등급</label>
+                <select id="ptnGrade"></select>
+                <div style="font-size:0.72rem;color:var(--text-dim)">등급을 선택하면 그 등급의 강의 혜택 수가 파트너사 목록에 태그로 표시됩니다.</div>
             </div>
             <div class="modal-field">
                 <label>제품 목록 (선택)</label>
