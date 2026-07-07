@@ -104,6 +104,7 @@ function renderRoomTabs(rooms) {
         <button class="room-tab ${r.id === CURRENT_ROOM ? 'active' : ''}" data-room="${r.id}"
             onclick="selectRoom('${r.id}')">
             <span class="grip" title="드래그하여 순서 변경">⋮⋮</span>${escapeHtml(r.name || '(이름 없음)')}
+            <span class="room-tab-date ${r.date ? '' : 'nodate'}">${r.date ? escapeHtml(dayLabel(r.date)) : '날짜미정'}</span>
         </button>`).join('');
     box.innerHTML = tabs + `<button class="room-tab add-tab" onclick="openRoomModal()">+ 룸 추가</button>`;
 
@@ -153,10 +154,52 @@ function renderRoomSettings() {
             <input type="checkbox" ${room.visible !== false ? 'checked' : ''} onchange="updateRoom('visible', this.checked)">
             사용자 화면 공개
         </label>
+        <button class="btn btn-sm" onclick="duplicateRoom()">📑 다른 날짜로 복제</button>
         <button class="btn btn-danger-ghost btn-sm" onclick="deleteRoom('${room.id}')">룸 삭제</button>
-        <div class="settings-hint">체크 해제 시 학술대회 상세 페이지의 프로그램 탭에서 이 룸이 보이지 않습니다.</div>
+        <div class="settings-hint">‘다른 날짜로 복제’는 이 룸(세션·강의 포함)을 그대로 복사한 <b>독립된 새 룸</b>을 만듭니다. 여러 날 같은 룸을 쓸 때 사용하세요. 복제 후 날짜를 지정하면 두 룸은 서로 영향을 주지 않습니다.</div>
     `;
 }
+
+// 이 룸을 독립된 새 룸으로 복제 (룸·세션·강의 모두 새 id → 서로 영향 없음). 날짜는 복제 후 지정.
+window.duplicateRoom = function () {
+    if (!AdminAuth.requireEdit()) return;
+    const room = getRoom(CURRENT_ROOM);
+    if (!room) return;
+    const newId = uuid();
+    const copy = {
+        name: room.name || '',
+        topic: room.topic || '',
+        date: '',                         // 새 날짜는 복제 후 지정
+        startTime: room.startTime || '09:00',
+        defaultDuration: Number(room.defaultDuration) || 10,
+        visible: room.visible !== false,
+        lang: room.lang || 'ko',
+        order: orderedRooms().length,
+        sessions: {}
+    };
+    toOrderedArray(room.sessions).forEach((s, si) => {
+        const sc = { name: s.name || '', order: si };
+        if (s.moderator) sc.moderator = { ...s.moderator };
+        if (s.lang) sc.lang = s.lang;
+        if (s.langExcluded) sc.langExcluded = true;
+        const lects = toOrderedArray(s.lectures);
+        if (lects.length) {
+            sc.lectures = {};
+            lects.forEach((l, li) => {
+                const { id, _start, _end, ...rest } = l;   // 계산값·id 제거
+                sc.lectures[uuid()] = { ...rest, order: li };
+            });
+        }
+        copy.sessions[uuid()] = sc;
+    });
+    confRef().child('rooms/' + newId).set(copy)
+        .then(() => {
+            CURRENT_ROOM = newId;
+            logActivity('create', 'room', `룸 "${copy.name}" 복제(다른 날짜용)`, { confId: CONF_ID, confTitle: ctitle(), entityId: newId });
+            Toast.success('룸을 복제했습니다. 아래 날짜 버튼에서 이 룸의 날짜를 지정하세요.');
+        })
+        .catch(e => Toast.error('복제 실패: ' + e.message));
+};
 
 window.updateRoom = function (field, value) {
     if (!AdminAuth.requireEdit()) { renderRoomSettings(); return; }

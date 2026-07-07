@@ -632,6 +632,12 @@ a { color: inherit; }
 .room-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
 .room-tab.add-tab { color: var(--primary); font-weight: 600; }
 .room-tab.dragover { background: var(--primary-soft); }
+.room-tab-date {
+    font-size: 0.7rem; font-weight: 600; color: var(--text-dim);
+    background: #eef0f3; border-radius: 5px; padding: 1px 6px;
+}
+.room-tab.active .room-tab-date { background: var(--primary-soft, #eef2ff); color: var(--primary); }
+.room-tab-date.nodate { background: #fdecea; color: #c0392b; }
 
 /* 룸 설정 바 */
 .room-settings {
