@@ -235,11 +235,8 @@ function renderSessions() {
 
     // 세션 순서 드래그
     enableSort(box, '.session-block', 'data-session', ids => persistSessionOrder(room.id, ids), 'session');
-    // 각 세션 내 강의 순서 드래그
-    sessions.forEach(s => {
-        const listEl = box.querySelector(`.lecture-list[data-session="${s.id}"]`);
-        if (listEl) enableSort(listEl, '.lecture-row', 'data-lec', ids => persistLectureOrder(room.id, s.id, ids), 'lecture');
-    });
+    // 강의 드래그 (세션 내 순서변경 + 세션 간 이동 모두 지원)
+    enableLectureDrag(room.id);
 }
 
 function renderSessionBlock(roomId, s) {
@@ -660,6 +657,87 @@ function enableSort(container, itemSelector, idAttr, onReorder, type) {
             onReorder(ids);
         });
     });
+}
+
+/* ---------- 강의 드래그: 세션 내 순서변경 + 세션 간 이동 ---------- */
+function enableLectureDrag(roomId) {
+    const box = document.getElementById('sessions');
+    const lists = [...box.querySelectorAll('.lecture-list[data-session]')];
+
+    box.querySelectorAll('.lecture-row').forEach(row => {
+        const grip = row.querySelector('.grip');
+        if (grip) {
+            const arm = () => { pendingDragItem = row; row.setAttribute('draggable', 'true'); };
+            grip.addEventListener('mousedown', arm);
+            grip.addEventListener('touchstart', arm, { passive: true });
+        }
+        row.addEventListener('dragstart', e => {
+            if (pendingDragItem !== row) return;
+            activeDrag = { type: 'lecture', el: row };
+            row.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', '');
+        });
+        row.addEventListener('dragend', () => {
+            row.classList.remove('dragging'); row.removeAttribute('draggable');
+            box.querySelectorAll('.dragover').forEach(x => x.classList.remove('dragover'));
+            activeDrag = null; pendingDragItem = null;
+        });
+        row.addEventListener('dragover', e => {
+            if (!activeDrag || activeDrag.type !== 'lecture') return;
+            e.preventDefault();
+            if (activeDrag.el !== row) row.classList.add('dragover');
+        });
+        row.addEventListener('dragleave', () => row.classList.remove('dragover'));
+        row.addEventListener('drop', e => {
+            if (!activeDrag || activeDrag.type !== 'lecture') return;
+            e.preventDefault();
+            row.classList.remove('dragover');
+            const dragEl = activeDrag.el;
+            if (!dragEl || dragEl === row) return;
+            const sameParent = dragEl.parentElement === row.parentElement;
+            const rows = [...row.parentElement.querySelectorAll('.lecture-row')];
+            const from = sameParent ? rows.indexOf(dragEl) : -1;
+            const to = rows.indexOf(row);
+            if (sameParent && from < to) row.after(dragEl); else row.before(dragEl);
+            rebuildRoomLecturesFromDOM(roomId);
+        });
+    });
+
+    // 빈 영역/세션 끝에 드롭 → 그 세션 마지막에 배치
+    lists.forEach(list => {
+        list.addEventListener('dragover', e => {
+            if (!activeDrag || activeDrag.type !== 'lecture') return;
+            e.preventDefault();
+        });
+        list.addEventListener('drop', e => {
+            if (!activeDrag || activeDrag.type !== 'lecture') return;
+            if (e.target.closest('.lecture-row')) return;   // 행 위 드롭은 행 핸들러가 처리
+            e.preventDefault();
+            if (activeDrag.el) { list.appendChild(activeDrag.el); rebuildRoomLecturesFromDOM(roomId); }
+        });
+    });
+}
+
+// DOM(각 세션 리스트의 강의 순서)을 기준으로 룸 전체 강의 배치를 재구성해 저장
+function rebuildRoomLecturesFromDOM(roomId) {
+    if (!AdminAuth.canEdit()) return;   // 뷰어면 무시(재렌더로 원복)
+    const room = CONF.rooms[roomId];
+    if (!room) return;
+    // 강의 id → 원본 데이터
+    const lecById = {};
+    Object.values(room.sessions || {}).forEach(sess => {
+        Object.entries(sess.lectures || {}).forEach(([lid, l]) => { lecById[lid] = l; });
+    });
+    const updates = {};
+    document.querySelectorAll('#sessions .lecture-list[data-session]').forEach(listEl => {
+        const sid = listEl.getAttribute('data-session');
+        const ids = [...listEl.querySelectorAll('.lecture-row')].map(el => el.getAttribute('data-lec'));
+        const newLectures = {};
+        ids.forEach((lid, i) => { if (lecById[lid]) newLectures[lid] = { ...lecById[lid], order: i }; });
+        updates[`rooms/${roomId}/sessions/${sid}/lectures`] = Object.keys(newLectures).length ? newLectures : null;
+    });
+    confRef().update(updates).catch(e => Toast.error('이동 저장 실패: ' + e.message));
 }
 
 /* ============================================================
