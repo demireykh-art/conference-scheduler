@@ -218,6 +218,11 @@ const SIDE_MENU = [
             { key: 'office', label: '사무국 안내' },
             { key: 'board', label: '게시판 통합 관리' }
         ]
+    },
+    {
+        group: '관리', items: [
+            { key: 'users', label: '👥 사용자 관리', href: 'users.html' }
+        ]
     }
 ];
 
