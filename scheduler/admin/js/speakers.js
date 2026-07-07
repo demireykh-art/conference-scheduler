@@ -7,6 +7,7 @@ const SPK_ROOT = database.ref('/adminSpeakers');
 let SPEAKERS = [];
 let SPK_EDIT_ID = null;
 let SPK_SEARCH = '';
+let spkPhotoData = '';   // 업로드한 사진 data URL
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('speakers');
 
@@ -37,7 +38,7 @@ function renderSpeakers() {
     }
     body.innerHTML = list.map(s => `
         <tr>
-            <td><b>${escapeHtml(s.nameKo || '')}</b></td>
+            <td><div style="display:flex;align-items:center;gap:9px">${speakerAvatar(s, 32)}<b>${escapeHtml(s.nameKo || '')}</b></div></td>
             <td class="en">${escapeHtml(s.nameEn || '-')}</td>
             <td>${escapeHtml(s.affiliationKo || '-')}</td>
             <td class="en">${escapeHtml(s.affiliationEn || '-')}</td>
@@ -54,7 +55,10 @@ window.openSpeakerModal = function () {
     if (!AdminAuth.requireEdit()) return;
     SPK_EDIT_ID = null;
     document.getElementById('spkModalTitle').textContent = '연자 등록';
-    ['spkNameKo', 'spkNameEn', 'spkAffKo', 'spkAffEn'].forEach(id => document.getElementById(id).value = '');
+    ['spkNameKo', 'spkNameEn', 'spkAffKo', 'spkAffEn', 'spkCv'].forEach(id => document.getElementById(id).value = '');
+    spkPhotoData = '';
+    document.getElementById('spkPhotoFile').value = '';
+    refreshSpkPhotoPreview();
     document.getElementById('spkModal').classList.add('open');
     setTimeout(() => document.getElementById('spkNameKo').focus(), 50);
 };
@@ -69,6 +73,10 @@ window.editSpeaker = function (id) {
     document.getElementById('spkNameEn').value = s.nameEn || '';
     document.getElementById('spkAffKo').value = s.affiliationKo || '';
     document.getElementById('spkAffEn').value = s.affiliationEn || '';
+    document.getElementById('spkCv').value = s.cv || '';
+    spkPhotoData = s.photo || '';
+    document.getElementById('spkPhotoFile').value = '';
+    refreshSpkPhotoPreview();
     document.getElementById('spkModal').classList.add('open');
 };
 
@@ -90,6 +98,8 @@ window.saveSpeaker = function () {
         nameEn: document.getElementById('spkNameEn').value.trim(),
         affiliationKo: affKo,
         affiliationEn: document.getElementById('spkAffEn').value.trim(),
+        cv: document.getElementById('spkCv').value.trim(),
+        photo: spkPhotoData || '',
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     };
 
@@ -115,5 +125,32 @@ window.deleteSpeaker = async function (id) {
         .then(() => Toast.success('삭제되었습니다.'))
         .catch(e => Toast.error('삭제 실패: ' + e.message));
 };
+
+/* ---------- 사진 업로드/미리보기 ---------- */
+function refreshSpkPhotoPreview() {
+    const img = document.getElementById('spkPhotoPreview');
+    const empty = document.getElementById('spkPhotoEmpty');
+    const clr = document.getElementById('spkPhotoClear');
+    if (spkPhotoData) {
+        img.src = spkPhotoData; img.style.display = ''; empty.style.display = 'none'; clr.style.display = '';
+    } else {
+        img.removeAttribute('src'); img.style.display = 'none'; empty.style.display = ''; clr.style.display = 'none';
+    }
+}
+window.clearSpkPhoto = function () {
+    spkPhotoData = '';
+    document.getElementById('spkPhotoFile').value = '';
+    refreshSpkPhotoPreview();
+};
+document.getElementById('spkPhotoFile').addEventListener('change', async e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { Toast.warning('이미지 파일만 업로드할 수 있습니다.'); e.target.value = ''; return; }
+    try {
+        spkPhotoData = await compressImage(file, 400, 0.82);
+        refreshSpkPhotoPreview();
+    } catch (err) { Toast.error('이미지 처리 실패: ' + err.message); }
+    e.target.value = '';
+});
 
 // 배경 클릭으로는 닫지 않음 — 닫기/취소 버튼으로만 닫힘 (입력 보호)

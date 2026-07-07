@@ -53,6 +53,19 @@
     <div class="modal-overlay" id="spkModal">
         <div class="modal">
             <h3 id="spkModalTitle">연자 등록</h3>
+            <div class="modal-field">
+                <label>사진</label>
+                <div style="display:flex;gap:14px;align-items:center">
+                    <img id="spkPhotoPreview" class="spk-photo-preview" style="display:none" alt="사진">
+                    <div id="spkPhotoEmpty" class="spk-photo-preview spk-photo-empty">사진</div>
+                    <div style="display:flex;flex-direction:column;gap:6px">
+                        <input type="file" id="spkPhotoFile" accept="image/*" style="display:none">
+                        <button type="button" class="btn btn-sm" onclick="document.getElementById('spkPhotoFile').click()">🖼️ 사진 선택</button>
+                        <button type="button" class="btn btn-sm btn-danger-ghost" id="spkPhotoClear" onclick="clearSpkPhoto()" style="display:none">✕ 제거</button>
+                        <div style="font-size:0.72rem;color:var(--text-dim)">원형으로 표시됩니다 (자동 축소).</div>
+                    </div>
+                </div>
+            </div>
             <div class="modal-grid2">
                 <div class="modal-field">
                     <label>연자 이름 (국문) *</label>
@@ -72,6 +85,10 @@
                     <label>소속 (영문)</label>
                     <input type="text" id="spkAffEn" placeholder="예: OO Clinic">
                 </div>
+            </div>
+            <div class="modal-field">
+                <label>CV / 약력</label>
+                <textarea id="spkCv" rows="4" placeholder="학력·경력·주요 이력 등"></textarea>
             </div>
             <div class="modal-actions">
                 <button class="btn" onclick="closeSpeakerModal()">취소</button>

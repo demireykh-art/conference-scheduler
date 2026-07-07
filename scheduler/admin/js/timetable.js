@@ -21,7 +21,9 @@ const SPEAKER_TRAVEL_MIN = 10; // 다른 룸 이동 시간(분)
 
 /* ---------- 초기화 ---------- */
 document.getElementById('sidebarMount').innerHTML = renderSidebar('timetable');
-Masters.init();   // 연자 이름 표시(중복 알림)용
+Masters.init();   // 연자 이름·사진 표시(중복 알림)용
+// 마스터(연자 사진 등) 로드/변경 시 시간표 다시 그림
+document.addEventListener('masters-change', () => { if (CONF) renderAll(); });
 
 // 배치 모달 분류 필터 + 검색 이벤트
 document.getElementById('placeCatFilter').innerHTML =
@@ -266,10 +268,12 @@ function renderLectureRow(roomId, sessionId, lec) {
     const partner = n.partnerKo ? `<span class="partner-badge">${escapeHtml(n.partnerKo)}</span>` : '';
     const speakers = n.speakers.length
         ? n.speakers.map(s => {
-            const nm = s.nameKo || s.nameEn || '';
-            return s.affiliationKo ? `${nm} (${s.affiliationKo})` : nm;
-        }).join(', ')
-        : '미정';
+            const m = (s.id && Masters.speaker(s.id)) || s;   // 사진은 마스터에서
+            const nm = escapeHtml(s.nameKo || s.nameEn || '');
+            const aff = s.affiliationKo ? ` <span style="color:var(--text-dim)">(${escapeHtml(s.affiliationKo)})</span>` : '';
+            return `<span class="spk-inline">${speakerAvatar(m, 22)}${nm}${aff}</span>`;
+        }).join('')
+        : '<span style="color:var(--text-dim)">미정</span>';
     let product = '';
     if (n.productKo || n.productEn) {
         const cat = n.productCategory ? ` · ${escapeHtml(n.productCategory)}` : '';
@@ -287,7 +291,7 @@ function renderLectureRow(roomId, sessionId, lec) {
             </div>
             <div class="lec-title">${escapeHtml(n.titleKo || '(제목 없음)')}</div>
             ${n.titleEn ? `<div class="lec-subtitle">${escapeHtml(n.titleEn)}</div>` : ''}
-            <div class="lec-speaker">연자: ${escapeHtml(speakers)}</div>
+            <div class="lec-speaker">연자: ${speakers}</div>
             ${product}
         </div>
         <div class="lec-actions">
