@@ -621,6 +621,16 @@ a { color: inherit; }
     padding: 2px 8px;
     border-radius: 5px;
 }
+/* 연자 중복 배지 (태그줄 제일 우측) */
+.dup-badge {
+    margin-left: auto;
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 5px;
+}
 .lec-title { font-size: 0.94rem; font-weight: 600; color: var(--text); line-height: 1.4; }
 .lec-subtitle { font-size: 0.8rem; color: var(--text-dim); margin-top: 2px; }
 .lec-speaker { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }

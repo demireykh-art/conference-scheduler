@@ -16,6 +16,7 @@ let placingTarget = null;     // { roomId, sessionId } (배치 대상 세션)
 let editingDuration = null;   // { roomId, sessionId, lecId }
 let POOL = [];                // 이 행사의 강의 풀
 let newRoomDate = '';         // 룸 추가 모달에서 선택한 날짜
+let CONFLICT_IDS = new Set(); // 현재 중복(연자 겹침) 강의 id 집합
 
 const SPEAKER_TRAVEL_MIN = 10; // 다른 룸 이동 시간(분)
 
@@ -223,6 +224,7 @@ function renderSessions() {
     const room = getRoom(CURRENT_ROOM);
     if (!room) { box.innerHTML = ''; return; }
 
+    CONFLICT_IDS = computeConflictIds();   // 중복 강의 재계산 (자동 갱신)
     const sessions = computeRoom(room);
     if (!sessions.length) {
         box.innerHTML = `<div class="card empty-state">아직 세션이 없습니다.<br><b>+ 세션 추가</b>로 오전/점심/오후 등을 만드세요.</div>`;
@@ -289,6 +291,7 @@ function renderLectureRow(roomId, sessionId, lec) {
                 <span class="dur-badge">${lec.duration || 0}분</span>
                 ${partner}
                 ${(n.types || []).map(t => `<span class="chip type">${escapeHtml(t)}</span>`).join('')}
+                ${CONFLICT_IDS.has(lec.id) ? '<span class="dup-badge" title="같은 날 동일 연자 시간 겹침(또는 이동 10분 부족)">중복</span>' : ''}
             </div>
             <div class="lec-title">${escapeHtml(n.titleKo || '(제목 없음)')}</div>
             ${n.titleEn ? `<div class="lec-subtitle">${escapeHtml(n.titleEn)}</div>` : ''}
@@ -457,17 +460,7 @@ window.placeLecture = function (poolId) {
     const pool = POOL.find(l => l.id === poolId);
     if (!pool) { Toast.error('강의를 찾을 수 없습니다.'); return; }
 
-    // 배치될 시각 = 대상 세션의 현재 종료 시각
-    const room = getRoom(roomId);
-    const sessions = computeRoom(room);
-    const targetSession = sessions.find(s => s.id === sessionId);
-    const startMin = targetSession ? targetSession._end : parseTime(room.startTime || '09:00');
-    const endMin = startMin + (Number(pool.duration) || 0);
-
-    // 연자 중복(동선) 체크
-    const conflict = findSpeakerConflict(roomId, room.date || '', startMin, endMin, pool.speakers || [], null);
-    if (conflict) { Toast.error(conflictMessage(conflict), 7000); return; }
-
+    // 중복이어도 배치는 허용 — 중복은 시간표에서 빨간 '중복' 배지로 표시됨
     const data = {
         lectureId: pool.id,
         titleKo: pool.titleKo || '', titleEn: pool.titleEn || '',
@@ -504,6 +497,24 @@ function collectPlaced() {
     });
     return out;
 }
+// 현재 배치 전체에서 충돌하는 강의 id 집합 (렌더 때마다 다시 계산 → 자동 갱신)
+function computeConflictIds() {
+    const placed = collectPlaced();
+    const ids = new Set();
+    for (let i = 0; i < placed.length; i++) {
+        for (let j = i + 1; j < placed.length; j++) {
+            const a = placed[i], b = placed[j];
+            if ((a.date || '') !== (b.date || '')) continue;                 // 다른 날짜면 충돌 아님
+            if (!a.speakerKeys.some(k => b.speakerKeys.includes(k))) continue; // 같은 연자 아님
+            const buffer = (a.roomId === b.roomId) ? 0 : SPEAKER_TRAVEL_MIN;  // 같은 룸은 이동 불필요
+            if (a.start < b.end + buffer && b.start < a.end + buffer) {
+                ids.add(a.lecId); ids.add(b.lecId);
+            }
+        }
+    }
+    return ids;
+}
+
 // 후보 강의가 기존 배치와 연자·시간 충돌하는지 (같은 날짜만, 다른 룸은 이동 10분 버퍼)
 function findSpeakerConflict(targetRoomId, targetDate, candStart, candEnd, candSpeakers, ignoreLecId) {
     const candKeys = speakerKeysOf(candSpeakers);
@@ -590,15 +601,6 @@ window.confirmMove = function () {
     const { roomId, sessionId, lecId } = movingLecture;
     const lec = CONF.rooms[roomId].sessions[sessionId].lectures[lecId];
     if (!lec) return;
-    // 이동 대상에서의 시각으로 연자 중복 체크 (자기 자신 제외)
-    const toRoomObj = getRoom(toRoom);
-    const toSessions = computeRoom(toRoomObj);
-    const tSession = toSessions.find(s => s.id === toSession);
-    const startMin = tSession ? tSession._end : parseTime(toRoomObj.startTime || '09:00');
-    const endMin = startMin + (Number(lec.duration) || 0);
-    const conflict = findSpeakerConflict(toRoom, toRoomObj.date || '', startMin, endMin, lec.speakers || [], lecId);
-    if (conflict) { Toast.error(conflictMessage(conflict), 7000); return; }
-
     const targetLectures = toOrderedArray(CONF.rooms[toRoom].sessions[toSession].lectures);
     const moved = { ...lec, order: targetLectures.length };
     const updates = {};
