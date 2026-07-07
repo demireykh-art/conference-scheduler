@@ -272,6 +272,44 @@ a { color: inherit; }
     padding: 20px;
     margin-bottom: 16px;
 }
+.conf-card.dragging { opacity: 0.5; }
+.conf-card.drop-target { outline: 2px dashed var(--primary); outline-offset: 2px; }
+
+/* 행사 순서 변경 (화살표 + 드래그 그립) */
+.conf-reorder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-shrink: 0;
+    margin: -4px 0;
+}
+.reorder-arrow {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 6px;
+    width: 26px; height: 24px;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+}
+.reorder-arrow:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.reorder-arrow:disabled { opacity: 0.3; cursor: default; }
+.drag-grip {
+    cursor: grab;
+    color: var(--text-dim);
+    font-size: 1.1rem;
+    line-height: 1;
+    user-select: none;
+    letter-spacing: -1px;
+}
+.drag-grip:active { cursor: grabbing; }
+@media (max-width: 720px) {
+    .conf-reorder { flex-direction: row; margin: 0 0 4px; }
+}
 .conf-poster {
     width: 150px;
     height: 190px;
