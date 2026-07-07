@@ -18,6 +18,8 @@ BOOTH_REF.on('value', snap => {
     const v = snap.val();
     if (v && Array.isArray(v.columns) && Array.isArray(v.grades)) {
         BOOTH = { columns: v.columns, grades: v.grades, cells: v.cells || {} };
+        // 기존 데이터 마이그레이션: 정규강의(일) → 정규강의(일,20분)/(일,15분)
+        if (migrateColumns() && AdminAuth.canEdit()) { saveAll(); return; }
     } else if (AdminAuth.canEdit()) {
         BOOTH_REF.set(BOOTH).catch(() => { });   // 최초 시드(권한 있으면)
     }
@@ -28,6 +30,25 @@ BOOTH_REF.on('value', snap => {
 });
 
 function cellVal(g, c) { return (BOOTH.cells[g] && BOOTH.cells[g][c] != null) ? BOOTH.cells[g][c] : ''; }
+
+// 정규강의(일) 열을 정규강의(일,20분)/(일,15분) 두 열로 분리 (셀 값은 양쪽에 복제 → 수동 수정)
+function migrateColumns() {
+    const OLD = '정규강의(일)';
+    const NEW = ['정규강의(일,20분)', '정규강의(일,15분)'];
+    const idx = BOOTH.columns.indexOf(OLD);
+    if (idx === -1) return false;   // 이미 분리됨 / 없음
+    if (NEW.some(n => BOOTH.columns.includes(n))) {
+        // 새 열이 이미 있으면 옛 열만 제거
+        BOOTH.columns.splice(idx, 1);
+        Object.values(BOOTH.cells).forEach(r => { if (r) delete r[OLD]; });
+        return true;
+    }
+    BOOTH.columns.splice(idx, 1, ...NEW);
+    Object.values(BOOTH.cells).forEach(r => {
+        if (r && r[OLD] != null) { NEW.forEach(n => { if (r[n] == null) r[n] = r[OLD]; }); delete r[OLD]; }
+    });
+    return true;
+}
 
 function renderTable() {
     const t = document.getElementById('boothTable');
