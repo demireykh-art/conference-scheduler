@@ -604,18 +604,21 @@ window.confirmMove = function () {
    드래그 정렬 (공통) — 종류(type)+컨테이너별로 격리
    강의를 드래그해도 상위 세션이 함께 이동하지 않도록 함
    ============================================================ */
-let activeDrag = null; // { type, el, container }
+let activeDrag = null;      // { type, el, container }
+let pendingDragItem = null; // 그립을 잡은 아이템 (어느 것을 드래그하는지 확실히 구분)
 
 function enableSort(container, itemSelector, idAttr, onReorder, type) {
     if (!container) return;
     container.querySelectorAll(itemSelector).forEach(item => {
         const grip = item.querySelector('.grip');
         if (grip) {
-            grip.addEventListener('mousedown', () => item.setAttribute('draggable', 'true'));
-            grip.addEventListener('touchstart', () => item.setAttribute('draggable', 'true'), { passive: true });
+            const arm = () => { pendingDragItem = item; item.setAttribute('draggable', 'true'); };
+            grip.addEventListener('mousedown', arm);
+            grip.addEventListener('touchstart', arm, { passive: true });
         }
         item.addEventListener('dragstart', e => {
-            if (e.target !== item) return;   // 자식(강의)에서 버블링된 이벤트 무시 → 세션이 끌려가지 않음
+            // 이 아이템의 그립을 잡은 게 아니면 무시 (자식 강의 드래그가 세션을 끌지 않도록)
+            if (pendingDragItem !== item) return;
             activeDrag = { type, el: item, container };
             item.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
@@ -625,6 +628,7 @@ function enableSort(container, itemSelector, idAttr, onReorder, type) {
             item.classList.remove('dragging'); item.removeAttribute('draggable');
             container.querySelectorAll('.dragover').forEach(x => x.classList.remove('dragover'));
             activeDrag = null;
+            pendingDragItem = null;
         });
         const sameCtx = () => activeDrag && activeDrag.type === type && activeDrag.container === container;
         item.addEventListener('dragover', e => {
