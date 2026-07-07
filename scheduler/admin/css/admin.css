@@ -428,6 +428,11 @@ a { color: inherit; }
 /* 분류/태그 칩 색상 */
 .chip.cat { background: #eef4ff; color: #2f6fed; }
 .chip.tag { background: #eef7e8; color: #3d7a17; }
+.chip.type { background: #fff3e0; color: #e65100; }
+
+/* 강의 유형 체크박스 */
+.type-checks { display: flex; gap: 18px; flex-wrap: wrap; padding-top: 2px; }
+.type-checks .check-inline { font-size: 0.88rem; }
 
 /* 타이핑 검색 자동완성 */
 .ac-wrap { position: relative; }

@@ -23,6 +23,15 @@ document.getElementById('catFilter').innerHTML =
 
 document.getElementById('lecSearch').addEventListener('input', renderPool);
 
+// 강의 유형 체크박스 렌더
+document.getElementById('lecTypeChecks').innerHTML = LECTURE_TYPES.map(t =>
+    `<label class="check-inline"><input type="checkbox" class="lec-type-check" value="${escapeHtml(t)}"> ${escapeHtml(t)}</label>`).join('');
+function selectedTypes() { return [...document.querySelectorAll('#lecTypeChecks .lec-type-check:checked')].map(c => c.value); }
+function setTypes(arr) {
+    const set = new Set(arr || []);
+    document.querySelectorAll('#lecTypeChecks .lec-type-check').forEach(c => { c.checked = set.has(c.value); });
+}
+
 // 행사 목록 로드 → 셀렉트 (1회 로드; 풀은 별도 구독)
 database.ref('/adminConferences').once('value').then(snap => {
     CONFS = toOrderedArray(snap.val());
@@ -80,7 +89,7 @@ function renderPool() {
     let list = POOL.slice().sort((a, b) => (a.titleKo || '').localeCompare(b.titleKo || '', 'ko'));
     if (cat) list = list.filter(l => (l.categories || []).includes(cat));
     if (q) list = list.filter(l => {
-        const hay = [l.titleKo, l.titleEn, ...(l.tags || []), ...(l.categories || []),
+        const hay = [l.titleKo, l.titleEn, ...(l.tags || []), ...(l.categories || []), ...(l.types || []),
         ...((l.speakers || []).map(s => s.nameKo + ' ' + s.nameEn)), l.partnerKo, l.productKo]
             .join(' ').toLowerCase();
         return hay.includes(q);
@@ -98,13 +107,14 @@ function renderPool() {
     body.innerHTML = list.map(l => {
         const cats = (l.categories || []).map(c => `<span class="chip cat">${escapeHtml(c)}</span>`).join('');
         const tags = (l.tags || []).map(t => `<span class="chip tag">${escapeHtml(t)}</span>`).join('');
+        const types = (l.types || []).map(t => `<span class="chip type">${escapeHtml(t)}</span>`).join('');
         const spk = (l.speakers || []).map(s => escapeHtml(s.nameKo || s.nameEn)).join(', ') || '<span class="dim">-</span>';
         const pp = [l.partnerKo, l.productKo].filter(Boolean).map(escapeHtml).join(' · ') || '<span class="dim">-</span>';
         const isPlaced = placed.has(l.id);
         return `
         <tr>
             <td><b>${escapeHtml(l.titleKo || '(제목 없음)')}</b>${l.titleEn ? `<div class="dim" style="font-size:0.8rem">${escapeHtml(l.titleEn)}</div>` : ''}</td>
-            <td><div class="chips" style="margin:0">${cats || ''}${tags || ''}</div></td>
+            <td><div class="chips" style="margin:0">${types || ''}${cats || ''}${tags || ''}</div></td>
             <td>${spk}</td>
             <td class="dim" style="font-size:0.82rem">${pp}</td>
             <td style="text-align:center">${l.duration || 0}분</td>
@@ -282,6 +292,7 @@ window.openLectureModal = function () {
     document.getElementById('lecTitleEn').value = '';
     document.getElementById('lecDuration').value = 20;
     catDraft = []; tagDraft = []; spkDraft = []; partnerDraft = null;
+    setTypes([]);
     renderCatChips(); renderTagChips(); renderSpeakerChips(); renderPartnerChosen();
     loadProducts(null);
     document.getElementById('lecTagInput').value = '';
@@ -303,6 +314,7 @@ window.editLecture = function (id) {
     document.getElementById('lecDuration').value = l.duration ?? 20;
     catDraft = [...(l.categories || [])];
     tagDraft = [...(l.tags || [])];
+    setTypes(l.types || []);
     spkDraft = (l.speakers || []).map(s => ({ ...s }));
     partnerDraft = l.partnerId ? { id: l.partnerId, nameKo: l.partnerKo || '', nameEn: l.partnerEn || '' } : null;
     renderCatChips(); renderTagChips(); renderSpeakerChips(); renderPartnerChosen();
@@ -343,6 +355,7 @@ function buildLectureData() {
         duration: Number(document.getElementById('lecDuration').value) || 0,
         categories: [...catDraft],
         tags: [...tagDraft],
+        types: selectedTypes(),
         speakers: spkDraft.map(s => ({ id: s.id || '', nameKo: s.nameKo || '', nameEn: s.nameEn || '', affiliationKo: s.affiliationKo || '', affiliationEn: s.affiliationEn || '' })),
         partnerId: pid || '',
         partnerKo: partner ? (partner.nameKo || '') : (partnerDraft ? partnerDraft.nameKo : ''),
