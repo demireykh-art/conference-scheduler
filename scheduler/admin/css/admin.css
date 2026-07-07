@@ -564,6 +564,10 @@ a { color: inherit; }
 .data-table tr.row-joined { background: rgba(79, 110, 247, 0.06); }
 .data-table .join-check { width: 17px; height: 17px; cursor: pointer; }
 .data-table .join-check:disabled { cursor: not-allowed; opacity: 0.4; }
+.data-table .row-grade {
+    padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 0.82rem; background: #fff; cursor: pointer; max-width: 140px;
+}
 
 /* 강의 배치 리스트 (시간표 모달) */
 .place-list { max-height: 46vh; overflow-y: auto; margin-top: 6px; }
