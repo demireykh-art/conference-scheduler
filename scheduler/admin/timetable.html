@@ -133,7 +133,10 @@
                 <label>시간 (분)</label>
                 <input type="number" id="breakDur" min="0" step="5" style="max-width:140px">
             </div>
-            <div style="font-size:0.74rem;color:var(--text-dim)">행사 항목은 연자·파트너가 없고 중복·혜택 계산에서 제외됩니다. 세션 안에서 자유롭게 순서를 드래그할 수 있습니다.</div>
+            <label class="check-inline" style="margin-top:2px">
+                <input type="checkbox" id="breakIsPanel"> <b>전체 연자 패널 (Q&amp;A)</b> — 이 세션 강의 연자 전원이 참여, 해당 시간 중복 체크
+            </label>
+            <div style="font-size:0.74rem;color:var(--text-dim)">행사 항목은 연자·파트너가 없고 중복·혜택 계산에서 제외됩니다. (패널은 예외로, 이 세션 연자 전원이 그 시간 동안 배정되어 중복을 체크합니다.) 세션 안에서 자유롭게 순서를 드래그할 수 있습니다.</div>
             <div class="modal-actions">
                 <button class="btn" onclick="closeBreakModal()">취소</button>
                 <button class="btn btn-primary" onclick="saveBreak()">추가</button>

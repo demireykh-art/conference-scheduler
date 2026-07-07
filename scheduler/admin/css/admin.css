@@ -735,6 +735,11 @@ a { color: inherit; }
 .break-row .break-title { font-weight: 700; color: #9a6b00; }
 .chip.break-chip { background: #f6c343; color: #5a4300; font-weight: 700; }
 
+/* Q&A / 패널 토론 행 */
+.lecture-row.panel-row { background: #f2ecff; }
+.panel-row .panel-title { font-weight: 700; color: #5b3ea6; }
+.chip.panel-chip { background: #7c5cd6; color: #fff; font-weight: 700; }
+
 .session-mod { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
 .mod-inline { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; font-weight: 600; color: var(--text); }
 .mod-inline .spk-avatar { flex-shrink: 0; }
