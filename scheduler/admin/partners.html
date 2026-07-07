@@ -25,10 +25,14 @@
                     <div class="info-title">파트너사와 제품을 미리 등록해 두면, 강의 입력 시 목록에서 선택할 수 있어 오타·중복을 방지합니다.</div>
                 </div>
                 <div class="toolbar-row">
-                    <div>
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                         <input type="text" id="ptnSearch" placeholder="🔍 파트너사/제품 검색" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.86rem;width:260px">
-                        <span style="margin-left:10px;color:var(--text-dim);font-size:0.85rem">총 <span id="ptnCount">0</span>개사</span>
-                        <span id="placedConf" style="margin-left:10px;color:var(--text-dim);font-size:0.82rem"></span>
+                        <span style="color:var(--text-dim);font-size:0.85rem">총 <span id="ptnCount">0</span>개사</span>
+                        <span style="display:inline-flex;align-items:center;gap:6px">
+                            <span style="color:var(--text-dim);font-size:0.82rem">배치 기준 행사</span>
+                            <select id="placedConfSelect" onchange="changePlacedConf(this.value)"
+                                style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.82rem;max-width:260px"></select>
+                        </span>
                     </div>
                     <button class="btn btn-primary" onclick="openPartnerModal()">+ 파트너사 등록</button>
                 </div>
