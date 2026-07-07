@@ -709,6 +709,10 @@ a { color: inherit; }
 .session-title { font-size: 1.02rem; font-weight: 700; margin: 0; }
 .session-sub { font-size: 0.78rem; color: var(--text-dim); margin-top: 2px; }
 .session-head .spacer { flex: 1; }
+.session-mod { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+.mod-inline { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; font-weight: 600; color: var(--text); }
+.mod-inline .spk-avatar { flex-shrink: 0; }
+.mod-aff { font-weight: 400; color: var(--text-dim); }
 
 /* 강의 행 */
 .lecture-row {
