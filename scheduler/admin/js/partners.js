@@ -8,8 +8,10 @@ let PARTNERS = [];
 let PTN_EDIT_ID = null;
 let PTN_SEARCH = '';
 let BOOTH = { columns: DEFAULT_BOOTH_COLUMNS.slice(), grades: DEFAULT_BOOTH_GRADES.slice(), cells: JSON.parse(JSON.stringify(DEFAULT_BOOTH_CELLS)) };
-let PLACED = {};              // { partnerId: { type: 배치수 } } — 마지막에 연 행사 기준
+let PLACED = {};              // { partnerId: { type: 배치수 } } — 선택한 행사 기준
 let PLACED_CONF_NAME = '';
+let CONF_PARTNERS = new Set(); // 선택한 행사에 참가하는 파트너사 id
+let PTN_SORT = 'nameAsc';
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('partners');
 
@@ -63,6 +65,7 @@ function subscribePlacedConf() {
     placedRef.on('value', snap => {
         const conf = snap.val() || {};
         PLACED_CONF_NAME = conf.title || '';
+        CONF_PARTNERS = new Set(Object.keys(conf.confPartners || {}));
         PLACED = {};
         Object.values(conf.rooms || {}).forEach(room =>
             Object.values(room.sessions || {}).forEach(sess =>
@@ -116,23 +119,45 @@ document.getElementById('ptnSearch').addEventListener('input', e => {
     renderPartners();
 });
 
+// 정렬 드롭다운
+(function initSort() {
+    const sel = document.getElementById('ptnSort');
+    if (!sel) return;
+    sel.innerHTML = sortOptionsHtml(PTN_SORT, '이름');
+    sel.addEventListener('change', () => { PTN_SORT = sel.value; renderPartners(); });
+})();
+
+// 선택 행사 참가여부 토글
+window.toggleParticipation = function (id, on) {
+    if (!AdminAuth.requireEdit()) { renderPartners(); return; }
+    if (!PLACED_CONF_ID) { Toast.warning('먼저 행사를 선택하세요.'); renderPartners(); return; }
+    const ref = database.ref('/adminConferences/' + PLACED_CONF_ID + '/confPartners/' + id);
+    const op = on ? ref.set({ order: CONF_PARTNERS.size }) : ref.remove();
+    op.catch(e => Toast.error('참가 설정 실패: ' + e.message));
+};
+
 function partnerProducts(p) { return Array.isArray(p.products) ? p.products : []; }
 
 function renderPartners() {
     document.getElementById('ptnCount').textContent = PARTNERS.length;
+    const partCountEl = document.getElementById('ptnPartCount');
+    if (partCountEl) partCountEl.textContent = CONF_PARTNERS.size;
+
     const q = PTN_SEARCH;
-    const list = q
+    const onlyPart = document.getElementById('ptnOnlyParticipating');
+    const hasConf = !!PLACED_CONF_ID;
+
+    let list = q
         ? PARTNERS.filter(p => [p.nameKo, p.nameEn].some(v => (v || '').toLowerCase().includes(q))
             || partnerProducts(p).some(pr => [pr.nameKo, pr.nameEn].some(v => (v || '').toLowerCase().includes(q))))
-        : PARTNERS;
-
-    const placedNote = document.getElementById('placedConf');
-    if (placedNote) placedNote.textContent = PLACED_CONF_NAME ? `배치 기준 행사: ${PLACED_CONF_NAME}` : '';
+        : PARTNERS.slice();
+    if (onlyPart && onlyPart.checked) list = list.filter(p => CONF_PARTNERS.has(p.id));
+    list = sortList(list, PTN_SORT, 'nameKo');
 
     const body = document.getElementById('ptnBody');
     if (!list.length) {
-        body.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:40px">
-            ${PARTNERS.length ? '검색 결과가 없습니다.' : '등록된 파트너사가 없습니다. <b>+ 파트너사 등록</b>으로 추가하세요.'}</td></tr>`;
+        body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:40px">
+            ${PARTNERS.length ? '검색/필터 결과가 없습니다.' : '등록된 파트너사가 없습니다. <b>+ 파트너사 등록</b>으로 추가하세요.'}</td></tr>`;
         return;
     }
     body.innerHTML = list.map(p => {
@@ -141,8 +166,14 @@ function renderPartners() {
             ? prods.map(pr => escapeHtml(pr.nameKo || pr.nameEn || '')).join(', ')
             : '<span class="dim">-</span>';
         const tags = benefitTags(p);
+        const joined = CONF_PARTNERS.has(p.id);
         return `
-        <tr>
+        <tr class="${joined ? 'row-joined' : ''}">
+            <td style="text-align:center">
+                <input type="checkbox" class="join-check" ${joined ? 'checked' : ''} ${hasConf ? '' : 'disabled'}
+                    title="${hasConf ? '이 행사 참가여부' : '먼저 행사를 선택하세요'}"
+                    onchange="toggleParticipation('${p.id}', this.checked)">
+            </td>
             <td><b>${escapeHtml(p.nameKo || '')}</b>${p.grade ? ` <span class="grade-badge">${escapeHtml(p.grade)}</span>` : ''}</td>
             <td class="en">${escapeHtml(p.nameEn || '-')}</td>
             <td><span class="count-pill">${prods.length}</span> <span style="color:var(--text-dim);font-size:0.82rem">${prodText}</span></td>

@@ -7,6 +7,7 @@ const SPK_ROOT = database.ref('/adminSpeakers');
 let SPEAKERS = [];
 let SPK_EDIT_ID = null;
 let SPK_SEARCH = '';
+let SPK_SORT = 'nameAsc';
 let spkPhotoData = '';   // 업로드한 사진 data URL
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('speakers');
@@ -22,13 +23,21 @@ document.getElementById('spkSearch').addEventListener('input', e => {
     renderSpeakers();
 });
 
+(function initSort() {
+    const sel = document.getElementById('spkSort');
+    if (!sel) return;
+    sel.innerHTML = sortOptionsHtml(SPK_SORT, '이름');
+    sel.addEventListener('change', () => { SPK_SORT = sel.value; renderSpeakers(); });
+})();
+
 function renderSpeakers() {
     document.getElementById('spkCount').textContent = SPEAKERS.length;
     const q = SPK_SEARCH;
-    const list = q
+    let list = q
         ? SPEAKERS.filter(s => [s.nameKo, s.nameEn, s.affiliationKo, s.affiliationEn]
             .some(v => (v || '').toLowerCase().includes(q)))
-        : SPEAKERS;
+        : SPEAKERS.slice();
+    list = sortList(list, SPK_SORT, 'nameKo');
 
     const body = document.getElementById('spkBody');
     if (!list.length) {

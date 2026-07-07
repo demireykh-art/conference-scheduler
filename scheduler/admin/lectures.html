@@ -33,8 +33,9 @@
 
                 <div id="poolArea" style="display:none">
                     <div class="filter-bar">
-                        <input type="text" id="lecSearch" placeholder="🔍 제목·연자·태그 검색" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.86rem;width:260px">
+                        <input type="text" id="lecSearch" placeholder="🔍 제목·연자·태그 검색" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.86rem;width:240px">
                         <select id="catFilter" onchange="renderPool()" style="padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.86rem"></select>
+                        <select id="lecSort" style="padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.86rem"></select>
                         <span style="color:var(--text-dim);font-size:0.85rem">총 <span id="lecCount">0</span>개 · 미배치 <span id="unplacedCount">0</span>개</span>
                         <span style="flex:1"></span>
                         <button class="btn btn-primary" onclick="openLectureModal()">+ 강의 등록</button>

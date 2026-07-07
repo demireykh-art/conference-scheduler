@@ -553,6 +553,18 @@ a { color: inherit; }
     margin-bottom: 14px;
 }
 
+/* 파트너사 관리 — 행사 선택/참가 바 */
+.conf-participation-bar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 12px 14px; margin-bottom: 14px;
+    background: var(--primary-soft, #eef2ff);
+    border: 1px solid var(--border); border-radius: 10px;
+}
+.conf-participation-bar .cpb-label { font-weight: 600; font-size: 0.86rem; }
+.data-table tr.row-joined { background: rgba(79, 110, 247, 0.06); }
+.data-table .join-check { width: 17px; height: 17px; cursor: pointer; }
+.data-table .join-check:disabled { cursor: not-allowed; opacity: 0.4; }
+
 /* 강의 배치 리스트 (시간표 모달) */
 .place-list { max-height: 46vh; overflow-y: auto; margin-top: 6px; }
 .place-row {
