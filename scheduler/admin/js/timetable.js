@@ -5,6 +5,7 @@
  */
 
 const CONF_ID = new URLSearchParams(location.search).get('id');
+try { if (CONF_ID) localStorage.setItem('asls_lastConfId', CONF_ID); } catch (e) { }
 const confRef = () => database.ref('/adminConferences/' + CONF_ID);
 
 let CONF = null;              // 전체 행사 객체
@@ -19,7 +20,7 @@ let newRoomDate = '';         // 룸 추가 모달에서 선택한 날짜
 const SPEAKER_TRAVEL_MIN = 10; // 다른 룸 이동 시간(분)
 
 /* ---------- 초기화 ---------- */
-document.getElementById('sidebarMount').innerHTML = renderSidebar('events');
+document.getElementById('sidebarMount').innerHTML = renderSidebar('timetable');
 Masters.init();   // 연자 이름 표시(중복 알림)용
 
 // 배치 모달 분류 필터 + 검색 이벤트
