@@ -105,6 +105,7 @@ function renderRoomTabs(rooms) {
             onclick="selectRoom('${r.id}')">
             <span class="grip" title="드래그하여 순서 변경">⋮⋮</span>${escapeHtml(r.name || '(이름 없음)')}
             <span class="room-tab-date ${r.date ? '' : 'nodate'}">${r.date ? escapeHtml(dayLabel(r.date)) : '날짜미정'}</span>
+            ${r.kmaSubmit ? '<span class="room-tab-kma" title="의협제출 대상">의협</span>' : ''}
         </button>`).join('');
     box.innerHTML = tabs + `<button class="room-tab add-tab" onclick="openRoomModal()">+ 룸 추가</button>`;
 
@@ -151,12 +152,12 @@ function renderRoomSettings() {
             </div>
         </div>
         <label class="check-inline">
-            <input type="checkbox" ${room.visible !== false ? 'checked' : ''} onchange="updateRoom('visible', this.checked)">
-            사용자 화면 공개
+            <input type="checkbox" ${room.kmaSubmit ? 'checked' : ''} onchange="updateRoom('kmaSubmit', this.checked)">
+            의협제출
         </label>
         <button class="btn btn-sm" onclick="duplicateRoom()">📑 다른 날짜로 복제</button>
         <button class="btn btn-danger-ghost btn-sm" onclick="deleteRoom('${room.id}')">룸 삭제</button>
-        <div class="settings-hint">‘다른 날짜로 복제’는 이 룸(세션·강의 포함)을 그대로 복사한 <b>독립된 새 룸</b>을 만듭니다. 여러 날 같은 룸을 쓸 때 사용하세요. 복제 후 날짜를 지정하면 두 룸은 서로 영향을 주지 않습니다.</div>
+        <div class="settings-hint"><b>의협제출</b> 체크 시, 나중에 의협 제출용 프린트에 이 룸의 강의만 추려서 출력합니다. · ‘다른 날짜로 복제’는 이 룸(세션·강의 포함)을 그대로 복사한 <b>독립된 새 룸</b>을 만듭니다.</div>
     `;
 }
 
@@ -173,6 +174,7 @@ window.duplicateRoom = function () {
         startTime: room.startTime || '09:00',
         defaultDuration: Number(room.defaultDuration) || 10,
         visible: room.visible !== false,
+        kmaSubmit: !!room.kmaSubmit,
         lang: room.lang || 'ko',
         order: orderedRooms().length,
         sessions: {}
@@ -335,7 +337,7 @@ window.saveNewRoom = function () {
     const name = document.getElementById('newRoomName').value.trim() || `룸 ${orderedRooms().length + 1}`;
     const id = uuid();
     confRef().child('rooms/' + id).set({
-        name, topic: '', date: newRoomDate, startTime: '09:00', defaultDuration: 10, visible: true, order: orderedRooms().length
+        name, topic: '', date: newRoomDate, startTime: '09:00', defaultDuration: 10, visible: true, kmaSubmit: false, order: orderedRooms().length
     }).then(() => {
         logActivity('create', 'room', `룸 "${name}" 추가`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
         CURRENT_ROOM = id; closeRoomModal(); Toast.success('룸이 추가되었습니다.');
