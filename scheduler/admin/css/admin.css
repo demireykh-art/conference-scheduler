@@ -402,20 +402,35 @@ a { color: inherit; }
 }
 
 /* 부스 등급별 혜택 표 (편집형) */
-.booth-table th { text-align: center; vertical-align: middle; }
-.booth-table td { text-align: center; vertical-align: middle; }
-.booth-table th:first-child, .booth-table td:first-child { text-align: left; }
-.booth-table input.booth-cell {
-    width: 100%; min-width: 76px; text-align: center;
-    border: 1px solid transparent; background: transparent;
-    padding: 6px 6px; border-radius: 6px; font-size: 0.85rem;
+.booth-table { table-layout: fixed; }
+.booth-table th, .booth-table td {
+    text-align: center; vertical-align: middle; padding: 12px 10px;
 }
+.booth-table th.booth-th { position: relative; min-width: 120px; }
+.booth-table .booth-corner, .booth-table .booth-grade-td { text-align: left; }
+.booth-colname { font-weight: 600; }
+.booth-colname, .booth-gradename { outline: none; padding: 1px 4px; border-radius: 4px; }
+.booth-colname:focus, .booth-gradename:focus { background: #fff8e0; }
+.booth-grade-td { position: relative; padding-right: 24px; min-width: 108px; }
+.booth-cell-td { padding: 6px 8px; }
+.booth-table input.booth-cell {
+    width: 100%; text-align: center;
+    border: 1px solid transparent; background: transparent;
+    padding: 7px 6px; border-radius: 6px; font-size: 0.88rem; color: var(--text);
+}
+.booth-table input.booth-cell::placeholder { color: #c8ccd4; }
 .booth-table input.booth-cell:hover { border-color: var(--border); }
 .booth-table input.booth-cell:focus { border-color: var(--primary); background: #fff; outline: none; box-shadow: 0 0 0 3px rgba(47,111,237,.1); }
-.booth-colname, .booth-gradename { outline: none; padding: 1px 3px; border-radius: 4px; }
-.booth-colname:focus, .booth-gradename:focus { background: #fff8e0; }
-.booth-del { background: none; border: none; color: #cdd2da; cursor: pointer; font-size: 0.72rem; padding: 1px 3px; }
+/* 삭제 ✕ — 평소 숨기고, 헤더/행에 마우스 올릴 때만 표시 */
+.booth-del {
+    background: none; border: none; color: #c2c8d0; cursor: pointer;
+    font-size: 0.95rem; line-height: 1; padding: 2px;
+    opacity: 0; transition: opacity .12s;
+}
 .booth-del:hover { color: var(--danger); }
+.booth-th .booth-del { position: absolute; top: 6px; right: 6px; }
+.booth-grade-td .booth-del { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); }
+.booth-th:hover .booth-del, .booth-grade-td:hover .booth-del { opacity: 1; }
 
 /* 파트너 등급 혜택 태그 */
 .grade-badge { display:inline-block; background:#efe9ff; color:#6b46c1; font-size:0.72rem; font-weight:600; padding:1px 8px; border-radius:999px; }

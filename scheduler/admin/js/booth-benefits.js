@@ -32,22 +32,19 @@ function cellVal(g, c) { return (BOOTH.cells[g] && BOOTH.cells[g][c] != null) ? 
 function renderTable() {
     const t = document.getElementById('boothTable');
     const head = `<thead><tr>
-        <th style="min-width:120px">부스등급</th>
-        ${BOOTH.columns.map((c, ci) => `<th>
-            <div style="display:flex;align-items:center;gap:6px;justify-content:space-between">
-                <span class="booth-colname" contenteditable="true" data-col="${ci}">${escapeHtml(c)}</span>
-                <button class="booth-del" title="열 삭제" onclick="delColumn(${ci})">✕</button>
-            </div></th>`).join('')}
+        <th class="booth-th booth-corner">부스등급</th>
+        ${BOOTH.columns.map((c, ci) => `<th class="booth-th">
+            <span class="booth-colname" contenteditable="true" data-col="${ci}">${escapeHtml(c)}</span>
+            <button class="booth-del" title="열 삭제" onclick="delColumn(${ci})">×</button>
+        </th>`).join('')}
     </tr></thead>`;
 
     const body = `<tbody>${BOOTH.grades.map((g, gi) => `<tr>
-        <td>
-            <div style="display:flex;align-items:center;gap:6px;justify-content:space-between">
-                <b class="booth-gradename" contenteditable="true" data-grade="${gi}">${escapeHtml(g)}</b>
-                <button class="booth-del" title="행 삭제" onclick="delGrade(${gi})">✕</button>
-            </div>
+        <td class="booth-grade-td">
+            <b class="booth-gradename" contenteditable="true" data-grade="${gi}">${escapeHtml(g)}</b>
+            <button class="booth-del" title="행 삭제" onclick="delGrade(${gi})">×</button>
         </td>
-        ${BOOTH.columns.map(c => `<td>
+        ${BOOTH.columns.map(c => `<td class="booth-cell-td">
             <input class="booth-cell" type="text" value="${escapeHtml(cellVal(g, c))}"
                    data-grade="${escapeHtml(g)}" data-col="${escapeHtml(c)}" placeholder="-">
         </td>`).join('')}
