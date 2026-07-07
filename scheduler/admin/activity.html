@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>변경이력 · ASLS 행사 관리</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <div id="sidebarMount"></div>
+        <main class="main">
+            <div class="main-topbar">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+                    <h1 class="main-title">변경이력</h1>
+                </div>
+            </div>
+            <div class="main-body">
+                <div class="info-banner">
+                    <div class="info-ico">i</div>
+                    <div class="info-title">누가·언제·무엇을 변경했는지 기록됩니다. 최근 항목이 위에 표시되며 실시간으로 갱신됩니다.</div>
+                </div>
+
+                <div class="toolbar-row">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                        <input type="text" id="logSearch" placeholder="🔍 내용/사용자 검색" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.86rem;width:220px">
+                        <select id="logConf" style="padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.84rem"></select>
+                        <select id="logEntity" style="padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.84rem"></select>
+                        <select id="logUser" style="padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.84rem"></select>
+                        <span style="color:var(--text-dim);font-size:0.85rem"><span id="logCount">0</span>건</span>
+                    </div>
+                </div>
+
+                <div class="card table-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width:150px">일시</th>
+                                <th style="width:130px">사용자</th>
+                                <th style="width:80px">작업</th>
+                                <th>내용</th>
+                                <th style="width:160px">행사</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logBody"></tbody>
+                    </table>
+                </div>
+                <div style="text-align:center;margin-top:14px">
+                    <button class="btn" id="loadMoreBtn" onclick="loadMore()" style="display:none">더 보기 (+200)</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="js/admin-common.js"></script>
+    <script src="js/admin-auth.js"></script>
+    <script src="js/activity.js"></script>
+</body>
+</html>

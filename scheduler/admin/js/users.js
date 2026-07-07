@@ -111,8 +111,12 @@ function renderUsers() {
 
 window.setRole = function (uid, role) {
     if (!AdminAuth.isAdmin()) { Toast.error('권한이 없습니다.'); return; }
+    const tu = USERS.find(x => x.uid === uid);
     database.ref('/users/' + uid + '/role').set(role)
-        .then(() => Toast.success(`역할이 "${ROLE_LABEL[role] || role}"(으)로 변경되었습니다.`))
+        .then(() => {
+            logActivity('update', 'user', `사용자 "${tu ? (tu.displayName || tu.email) : uid}" 역할 → ${ROLE_LABEL[role] || role}`, { entityId: uid });
+            Toast.success(`역할이 "${ROLE_LABEL[role] || role}"(으)로 변경되었습니다.`);
+        })
         .catch(e => Toast.error('변경 실패: ' + e.message));
 };
 
@@ -122,6 +126,9 @@ window.deleteUser = async function (uid) {
     const ok = await confirmDialog(`"${u ? (u.displayName || u.email) : ''}" 사용자를 삭제할까요?\n(다시 로그인하면 승인대기로 재등록됩니다.)`, { danger: true, okText: '삭제' });
     if (!ok) return;
     database.ref('/users/' + uid).remove()
-        .then(() => Toast.success('삭제되었습니다.'))
+        .then(() => {
+            logActivity('delete', 'user', `사용자 "${u ? (u.displayName || u.email) : uid}" 삭제`, { entityId: uid });
+            Toast.success('삭제되었습니다.');
+        })
         .catch(e => Toast.error('삭제 실패: ' + e.message));
 };

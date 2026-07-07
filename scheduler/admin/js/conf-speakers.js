@@ -75,20 +75,29 @@ setupAutocomplete(
     }
 );
 
+function confTitleText() { return document.getElementById('confName').textContent || ''; }
+
 function addPerson(id) {
     if (!AdminAuth.requireEdit()) return;
     if (CONF_SPK.find(e => e.id === id)) { Toast.info('이미 추가된 연자입니다.'); return; }
+    const m = Masters.speaker(id) || {};
     cRef().child('confSpeakers/' + id).set({ role: '연자', order: CONF_SPK.length })
+        .then(() => logActivity('participate', 'speaker', `연자 "${m.nameKo || m.nameEn || ''}" 행사 추가`, { confId: CONF_ID, confTitle: confTitleText(), entityId: id }))
         .catch(e => Toast.error('추가 실패: ' + e.message));
 }
 window.setRole = function (id, role) {
     if (!AdminAuth.requireEdit()) return;
-    cRef().child('confSpeakers/' + id + '/role').set(role).catch(e => Toast.error('저장 실패: ' + e.message));
+    const m = Masters.speaker(id) || {};
+    cRef().child('confSpeakers/' + id + '/role').set(role)
+        .then(() => logActivity('update', 'speaker', `연자 "${m.nameKo || m.nameEn || ''}" 역할 → ${role}`, { confId: CONF_ID, confTitle: confTitleText(), entityId: id }))
+        .catch(e => Toast.error('저장 실패: ' + e.message));
 };
 window.removePerson = async function (id) {
     if (!AdminAuth.requireEdit()) return;
     const m = Masters.speaker(id) || {};
     const ok = await confirmDialog(`"${m.nameKo || m.nameEn || ''}" 을(를) 이 행사에서 제거할까요?\n(연자 마스터에서는 삭제되지 않습니다.)`, { danger: true, okText: '제거' });
     if (!ok) return;
-    cRef().child('confSpeakers/' + id).remove().catch(e => Toast.error('제거 실패: ' + e.message));
+    cRef().child('confSpeakers/' + id).remove()
+        .then(() => logActivity('participate', 'speaker', `연자 "${m.nameKo || m.nameEn || ''}" 행사 제거`, { confId: CONF_ID, confTitle: confTitleText(), entityId: id }))
+        .catch(e => Toast.error('제거 실패: ' + e.message));
 };

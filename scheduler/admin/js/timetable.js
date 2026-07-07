@@ -7,6 +7,7 @@
 const CONF_ID = new URLSearchParams(location.search).get('id');
 try { if (CONF_ID) localStorage.setItem('asls_lastConfId', CONF_ID); } catch (e) { }
 const confRef = () => database.ref('/adminConferences/' + CONF_ID);
+const ctitle = () => (CONF && CONF.title) || '';   // 변경이력 기록용 행사명
 
 let CONF = null;              // 전체 행사 객체
 let CURRENT_ROOM = null;      // 현재 선택된 룸 id
@@ -221,7 +222,10 @@ window.saveNewRoom = function () {
     const id = uuid();
     confRef().child('rooms/' + id).set({
         name, topic: '', date: newRoomDate, startTime: '09:00', defaultDuration: 10, visible: true, order: orderedRooms().length
-    }).then(() => { CURRENT_ROOM = id; closeRoomModal(); Toast.success('룸이 추가되었습니다.'); })
+    }).then(() => {
+        logActivity('create', 'room', `룸 "${name}" 추가`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
+        CURRENT_ROOM = id; closeRoomModal(); Toast.success('룸이 추가되었습니다.');
+    })
         .catch(e => Toast.error(e.message));
 };
 
@@ -231,7 +235,10 @@ window.deleteRoom = async function (id) {
     const ok = await confirmDialog(`"${r ? r.name : ''}" 룸을 삭제할까요?\n포함된 세션·강의가 모두 삭제됩니다.`, { danger: true, okText: '삭제' });
     if (!ok) return;
     CURRENT_ROOM = null;
-    confRef().child('rooms/' + id).remove().then(() => Toast.success('삭제되었습니다.'));
+    confRef().child('rooms/' + id).remove().then(() => {
+        logActivity('delete', 'room', `룸 "${r ? r.name : ''}" 삭제`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
+        Toast.success('삭제되었습니다.');
+    });
 };
 
 function persistRoomOrder(ids) {
@@ -384,12 +391,18 @@ window.saveSession = function () {
     const { roomId, sessionId } = editingSession;
     if (sessionId) {
         confRef().child(`rooms/${roomId}/sessions/${sessionId}/name`).set(name)
-            .then(() => { Toast.success('저장되었습니다.'); closeSessionModal(); });
+            .then(() => {
+                logActivity('update', 'session', `세션 "${name}" 수정`, { confId: CONF_ID, confTitle: ctitle(), entityId: sessionId });
+                Toast.success('저장되었습니다.'); closeSessionModal();
+            });
     } else {
         const sessions = toOrderedArray(CONF.rooms[roomId].sessions);
         const id = uuid();
         confRef().child(`rooms/${roomId}/sessions/${id}`).set({ name, order: sessions.length })
-            .then(() => { Toast.success('세션이 추가되었습니다.'); closeSessionModal(); });
+            .then(() => {
+                logActivity('create', 'session', `세션 "${name}" 추가`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
+                Toast.success('세션이 추가되었습니다.'); closeSessionModal();
+            });
     }
 };
 window.deleteSession = async function (roomId, sessionId) {
@@ -397,7 +410,10 @@ window.deleteSession = async function (roomId, sessionId) {
     const s = CONF.rooms[roomId].sessions[sessionId];
     const ok = await confirmDialog(`"${s ? s.name : ''}" 세션을 삭제할까요?\n포함된 강의가 모두 삭제됩니다.`, { danger: true, okText: '삭제' });
     if (!ok) return;
-    confRef().child(`rooms/${roomId}/sessions/${sessionId}`).remove().then(() => Toast.success('삭제되었습니다.'));
+    confRef().child(`rooms/${roomId}/sessions/${sessionId}`).remove().then(() => {
+        logActivity('delete', 'session', `세션 "${s ? s.name : ''}" 삭제`, { confId: CONF_ID, confTitle: ctitle(), entityId: sessionId });
+        Toast.success('삭제되었습니다.');
+    });
 };
 function persistSessionOrder(roomId, ids) {
     if (!AdminAuth.requireEdit()) return;
@@ -493,7 +509,10 @@ window.placeLecture = function (poolId) {
         order: toOrderedArray(CONF.rooms[roomId].sessions[sessionId].lectures).length
     };
     confRef().child(`rooms/${roomId}/sessions/${sessionId}/lectures/${uuid()}`).set(data)
-        .then(() => { Toast.success(`"${data.titleKo}" 배치됨`); renderPlaceList(); })
+        .then(() => {
+            logActivity('place', 'lecture', `강의 "${data.titleKo}" 시간표 배치`, { confId: CONF_ID, confTitle: ctitle(), entityId: pool.id });
+            Toast.success(`"${data.titleKo}" 배치됨`); renderPlaceList();
+        })
         .catch(e => Toast.error('배치 실패: ' + e.message));
 };
 
@@ -585,7 +604,10 @@ window.deleteLecture = async function (roomId, sessionId, lecId) {
     const ok = await confirmDialog(`"${lec ? normalizeLecture(lec).titleKo : ''}" 강의를 삭제할까요?`, { danger: true, okText: '삭제' });
     if (!ok) return;
     confRef().child(`rooms/${roomId}/sessions/${sessionId}/lectures/${lecId}`).remove()
-        .then(() => Toast.success('삭제되었습니다.'));
+        .then(() => {
+            logActivity('delete', 'lecture', `시간표 강의 "${lec ? normalizeLecture(lec).titleKo : ''}" 삭제`, { confId: CONF_ID, confTitle: ctitle(), entityId: lec && lec.lectureId ? lec.lectureId : lecId });
+            Toast.success('삭제되었습니다.');
+        });
 };
 
 function persistLectureOrder(roomId, sessionId, ids) {

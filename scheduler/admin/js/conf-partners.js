@@ -72,10 +72,14 @@ setupAutocomplete(
     }
 );
 
+function confTitleText() { return document.getElementById('confName').textContent || ''; }
+
 function addPartner(id) {
     if (!AdminAuth.requireEdit()) return;
     if (CONF_PTN.find(e => e.id === id)) { Toast.info('이미 추가된 파트너사입니다.'); return; }
+    const m = Masters.partner(id) || {};
     cRef().child('confPartners/' + id).set({ order: CONF_PTN.length })
+        .then(() => logActivity('participate', 'partner', `파트너사 "${m.nameKo || m.nameEn || ''}" 행사 추가`, { confId: CONF_ID, confTitle: confTitleText(), entityId: id }))
         .catch(e => Toast.error('추가 실패: ' + e.message));
 }
 window.removePartner = async function (id) {
@@ -83,5 +87,7 @@ window.removePartner = async function (id) {
     const m = Masters.partner(id) || {};
     const ok = await confirmDialog(`"${m.nameKo || m.nameEn || ''}" 을(를) 이 행사에서 제거할까요?\n(파트너사 마스터에서는 삭제되지 않습니다.)`, { danger: true, okText: '제거' });
     if (!ok) return;
-    cRef().child('confPartners/' + id).remove().catch(e => Toast.error('제거 실패: ' + e.message));
+    cRef().child('confPartners/' + id).remove()
+        .then(() => logActivity('participate', 'partner', `파트너사 "${m.nameKo || m.nameEn || ''}" 행사 제거`, { confId: CONF_ID, confTitle: confTitleText(), entityId: id }))
+        .catch(e => Toast.error('제거 실패: ' + e.message));
 };

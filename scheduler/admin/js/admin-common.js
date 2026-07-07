@@ -167,6 +167,53 @@ window.sortOptionsHtml = function (cur, nameLabel) {
 };
 
 /* ------------------------------------------------------------
+   변경이력(감사 로그) — 누가·언제·무엇을 했는지 append-only 기록
+   데이터: /adminActivityLog/<autoKey> = { ts, uid, userName, action, entity, summary, confId?, confTitle?, entityId? }
+   ------------------------------------------------------------ */
+window.logActivity = function (action, entity, summary, extra) {
+    try {
+        const u = (window.AdminAuth && AdminAuth.user) || null;
+        if (!u) return;   // 로그인 상태에서만 기록
+        const entry = {
+            ts: firebase.database.ServerValue.TIMESTAMP,
+            uid: u.uid,
+            userName: u.displayName || u.email || '',
+            action: action || 'update',
+            entity: entity || '',
+            summary: summary || ''
+        };
+        if (extra && typeof extra === 'object') {
+            ['confId', 'confTitle', 'entityId'].forEach(k => { if (extra[k]) entry[k] = extra[k]; });
+        }
+        database.ref('/adminActivityLog').push(entry).catch(() => { });
+    } catch (e) { /* 로깅 실패는 무시 (본 작업에 영향 없음) */ }
+};
+
+/* 정렬 헬퍼 — 이름순/역순/등록순 (목록 페이지 공용) */
+window.sortList = function (arr, sort, nameKey) {
+    nameKey = nameKey || 'nameKo';
+    const a = arr.slice();
+    const byName = (x, y) => (x[nameKey] || '').localeCompare(y[nameKey] || '', 'ko');
+    switch (sort) {
+        case 'nameDesc': return a.sort((x, y) => byName(y, x));
+        case 'oldest': return a.sort((x, y) => (x.order ?? 0) - (y.order ?? 0));
+        case 'newest': return a.sort((x, y) => (y.order ?? 0) - (x.order ?? 0));
+        default: return a.sort(byName);   // nameAsc
+    }
+};
+
+// 정렬 드롭다운 옵션 HTML
+window.sortOptionsHtml = function (cur, nameLabel) {
+    nameLabel = nameLabel || '이름';
+    return [
+        ['nameAsc', nameLabel + '순 (가나다)'],
+        ['nameDesc', nameLabel + '순 (역순)'],
+        ['newest', '최신 등록순'],
+        ['oldest', '오래된 등록순']
+    ].map(([v, l]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`).join('');
+};
+
+/* ------------------------------------------------------------
    룸 시간 자동 계산
    sessions/lectures를 order 순으로 정렬하고 시작·종료 시각을 누적 계산
    반환: [{ id, name, order, _start, _end, _count, _total, lectures:[{...,_start,_end}] }]
@@ -273,6 +320,7 @@ const SIDE_MENU = [
     },
     {
         group: '관리', items: [
+            { key: 'activity', label: '🕘 변경이력', href: 'activity.html' },
             { key: 'users', label: '👥 사용자 관리', href: 'users.html' }
         ]
     }
