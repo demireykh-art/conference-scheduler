@@ -67,6 +67,33 @@ window.compressImage = function (file, maxW = 800, quality = 0.82) {
     });
 };
 
+// 타이핑 검색 자동완성 (공용) — input에 입력 시 listEl에 후보 표시, Enter/클릭 선택
+// getItems(query) → [{label, value}], onPick(value) 호출
+window.setupAutocomplete = function (input, listEl, getItems, onPick) {
+    let items = [], active = -1;
+    const close = () => { listEl.classList.remove('open'); listEl.innerHTML = ''; active = -1; items = []; };
+    const highlight = () => [...listEl.children].forEach((c, i) => c.classList.toggle('active', i === active));
+    const render = () => {
+        items = getItems(input.value.trim()).slice(0, 8);
+        if (!items.length) { listEl.innerHTML = '<div class="ac-empty">일치하는 항목이 없습니다.</div>'; listEl.classList.add('open'); active = -1; return; }
+        active = 0;
+        listEl.innerHTML = items.map((it, i) => `<div class="ac-item ${i === 0 ? 'active' : ''}" data-i="${i}">${it.label}</div>`).join('');
+        listEl.classList.add('open');
+    };
+    const pick = i => { if (items[i]) { onPick(items[i].value); input.value = ''; close(); } };
+    input.addEventListener('focus', render);
+    input.addEventListener('input', render);
+    input.addEventListener('keydown', e => {
+        if (!listEl.classList.contains('open')) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, items.length - 1); highlight(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); highlight(); }
+        else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0) pick(active); }
+        else if (e.key === 'Escape') { close(); }
+    });
+    listEl.addEventListener('mousedown', e => { const it = e.target.closest('.ac-item'); if (!it) return; e.preventDefault(); pick(Number(it.dataset.i)); });
+    input.addEventListener('blur', () => setTimeout(close, 150));
+};
+
 // 연자 원형 아바타 HTML (사진 없으면 이름 첫 글자)
 window.speakerAvatar = function (s, px) {
     px = px || 28;
