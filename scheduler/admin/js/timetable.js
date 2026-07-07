@@ -142,6 +142,13 @@ function renderRoomSettings() {
             <label>기본 강의시간(분)</label>
             <input type="number" min="0" step="5" value="${Number(room.defaultDuration) || 10}" onchange="updateRoom('defaultDuration', this.value)">
         </div>
+        <div class="field" style="min-width:170px">
+            <label>표시 언어 (이 룸 전체)</label>
+            <div class="lang-btns">
+                <button type="button" class="lang-btn ${roomLang(room) === 'ko' ? 'active' : ''}" onclick="updateRoom('lang','ko')">한글</button>
+                <button type="button" class="lang-btn ${roomLang(room) === 'en' ? 'active' : ''}" onclick="updateRoom('lang','en')">영어(EN)</button>
+            </div>
+        </div>
         <label class="check-inline">
             <input type="checkbox" ${room.visible !== false ? 'checked' : ''} onchange="updateRoom('visible', this.checked)">
             사용자 화면 공개
@@ -155,6 +162,19 @@ window.updateRoom = function (field, value) {
     if (!AdminAuth.requireEdit()) { renderRoomSettings(); return; }
     if (field === 'defaultDuration') value = Number(value) || 0;
     confRef().child('rooms/' + CURRENT_ROOM + '/' + field).set(value)
+        .catch(e => Toast.error('저장 실패: ' + e.message));
+};
+
+// 세션 언어: 룸 전체 적용에서 제외(개별설정) 토글
+window.setSessionLangExcluded = function (roomId, sessionId, on) {
+    if (!AdminAuth.requireEdit()) { renderSessions(); return; }
+    confRef().child(`rooms/${roomId}/sessions/${sessionId}/langExcluded`).set(!!on)
+        .catch(e => Toast.error('저장 실패: ' + e.message));
+};
+// 세션 개별 언어 지정 (개별설정일 때만 적용)
+window.setSessionLang = function (roomId, sessionId, lang) {
+    if (!AdminAuth.requireEdit()) return;
+    confRef().child(`rooms/${roomId}/sessions/${sessionId}/lang`).set(lang === 'en' ? 'en' : 'ko')
         .catch(e => Toast.error('저장 실패: ' + e.message));
 };
 
@@ -248,6 +268,19 @@ function persistRoomOrder(ids) {
     confRef().update(updates);
 }
 
+/* ---------- 언어(표시) 헬퍼 ---------- */
+function roomLang(room) { return room && room.lang === 'en' ? 'en' : 'ko'; }
+// 세션 유효 언어: 개별설정(제외) 시 세션 언어, 아니면 룸 언어
+function effectiveLang(room, session) {
+    if (session && session.langExcluded) return session.lang === 'en' ? 'en' : 'ko';
+    return roomLang(room);
+}
+// 언어에 맞는 값 선택 (영어 없으면 한글로 폴백, 반대도)
+function pickLang(lang, ko, en) {
+    ko = ko || ''; en = en || '';
+    return lang === 'en' ? (en || ko) : (ko || en);
+}
+
 /* ---------- 세션 + 강의 ---------- */
 function renderSessions() {
     const box = document.getElementById('sessions');
@@ -270,17 +303,32 @@ function renderSessions() {
 }
 
 function renderSessionBlock(roomId, s) {
+    const room = getRoom(roomId);
+    const lang = effectiveLang(room, s);
     const range = `${formatTime(s._start)} - ${formatTime(s._end)}`;
-    const lectures = s.lectures.map(lec => renderLectureRow(roomId, s.id, lec)).join('');
+    const lectures = s.lectures.map(lec => renderLectureRow(roomId, s.id, lec, lang)).join('');
     const mod = s.moderator;
     let modHtml = '';
     if (mod && (mod.id || mod.nameKo)) {
         const m = (mod.id && Masters.speaker(mod.id)) || mod;
-        const nm = escapeHtml(mod.nameKo || mod.nameEn || '');
-        const aff = mod.affiliationKo ? ` <span class="mod-aff">(${escapeHtml(mod.affiliationKo)})</span>` : '';
+        const nm = escapeHtml(pickLang(lang, mod.nameKo, mod.nameEn));
+        const affv = pickLang(lang, mod.affiliationKo, mod.affiliationEn);
+        const aff = affv ? ` <span class="mod-aff">(${escapeHtml(affv)})</span>` : '';
         const dup = CONFLICT_IDS.has('mod:' + s.id) ? '<span class="dup-badge" title="사회자가 같은 날 다른 곳과 시간 겹침">중복</span>' : '';
         modHtml = `<div class="session-mod"><span class="mod-inline">${speakerAvatar(m, 20)}사회자: ${nm}${aff}</span>${dup}</div>`;
     }
+    // 세션 언어 개별설정 (전체 적용에서 제외)
+    const excluded = !!s.langExcluded;
+    const slang = s.lang === 'en' ? 'en' : 'ko';
+    const langCtrl = `
+        <div class="session-lang">
+            <label class="check-inline" title="이 세션을 룸 전체 언어 적용에서 제외">
+                <input type="checkbox" ${excluded ? 'checked' : ''} onchange="setSessionLangExcluded('${roomId}','${s.id}',this.checked)"> 언어 개별설정
+            </label>
+            ${excluded ? `
+                <button type="button" class="lang-btn sm ${slang === 'ko' ? 'active' : ''}" onclick="setSessionLang('${roomId}','${s.id}','ko')">한글</button>
+                <button type="button" class="lang-btn sm ${slang === 'en' ? 'active' : ''}" onclick="setSessionLang('${roomId}','${s.id}','en')">영어</button>` : ''}
+        </div>`;
     return `
     <div class="session-block" data-session="${s.id}">
         <div class="session-head">
@@ -289,6 +337,7 @@ function renderSessionBlock(roomId, s) {
                 <h3 class="session-title">${escapeHtml(s.name || '(세션)')}</h3>
                 <div class="session-sub">${range} · ${s._count}건 · 총 ${s._total}분</div>
                 ${modHtml}
+                ${langCtrl}
             </div>
             <div class="spacer"></div>
             <button class="btn btn-primary btn-sm" onclick="openPlaceModal('${roomId}','${s.id}')">+ 강의 배치</button>
@@ -301,24 +350,28 @@ function renderSessionBlock(roomId, s) {
     </div>`;
 }
 
-function renderLectureRow(roomId, sessionId, lec) {
+function renderLectureRow(roomId, sessionId, lec, lang) {
+    lang = lang || 'ko';
     const n = normalizeLecture(lec);
     const range = `${formatTime(lec._start)} - ${formatTime(lec._end)}`;
-    const partner = n.partnerKo ? `<span class="partner-badge">${escapeHtml(n.partnerKo)}</span>` : '';
+    const partner = n.partnerKo ? `<span class="partner-badge">${escapeHtml(pickLang(lang, n.partnerKo, n.partnerEn))}</span>` : '';
     const speakers = n.speakers.length
         ? n.speakers.map(s => {
             const m = (s.id && Masters.speaker(s.id)) || s;   // 사진은 마스터에서
-            const nm = escapeHtml(s.nameKo || s.nameEn || '');
-            const aff = s.affiliationKo ? ` <span style="color:var(--text-dim)">(${escapeHtml(s.affiliationKo)})</span>` : '';
+            const nm = escapeHtml(pickLang(lang, s.nameKo, s.nameEn));
+            const affv = pickLang(lang, s.affiliationKo, s.affiliationEn);
+            const aff = affv ? ` <span style="color:var(--text-dim)">(${escapeHtml(affv)})</span>` : '';
             return `<span class="spk-inline">${speakerAvatar(m, 22)}${nm}${aff}</span>`;
         }).join('')
         : '<span style="color:var(--text-dim)">미정</span>';
     let product = '';
     if (n.productKo || n.productEn) {
         const cat = n.productCategory ? ` · ${escapeHtml(n.productCategory)}` : '';
-        product = `<div class="lec-product">제품: ${escapeHtml(n.productKo || n.productEn)}${cat}</div>`;
+        product = `<div class="lec-product">제품: ${escapeHtml(pickLang(lang, n.productKo, n.productEn))}${cat}</div>`;
         if (n.productDesc) product += `<div class="lec-product" style="opacity:.85">└ ${escapeHtml(n.productDesc)}</div>`;
     }
+    const title = escapeHtml(pickLang(lang, n.titleKo, n.titleEn) || '(제목 없음)');
+    const subtitle = lang === 'en' ? n.titleKo : n.titleEn;   // 보조로 반대 언어 표시
     return `
     <div class="lecture-row" data-lec="${lec.id}">
         <span class="grip" title="드래그하여 순서 변경">⋮⋮</span>
@@ -330,8 +383,8 @@ function renderLectureRow(roomId, sessionId, lec) {
                 ${(n.types || []).map(t => `<span class="chip type">${escapeHtml(t)}</span>`).join('')}
                 ${CONFLICT_IDS.has(lec.id) ? '<span class="dup-badge" title="같은 날 동일 연자 시간 겹침(또는 이동 10분 부족)">중복</span>' : ''}
             </div>
-            <div class="lec-title">${escapeHtml(n.titleKo || '(제목 없음)')}</div>
-            ${n.titleEn ? `<div class="lec-subtitle">${escapeHtml(n.titleEn)}</div>` : ''}
+            <div class="lec-title">${title}</div>
+            ${subtitle ? `<div class="lec-subtitle">${escapeHtml(subtitle)}</div>` : ''}
             <div class="lec-speaker">연자: ${speakers}</div>
             ${product}
         </div>

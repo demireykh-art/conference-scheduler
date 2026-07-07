@@ -713,6 +713,17 @@ a { color: inherit; }
 .session-title { font-size: 1.02rem; font-weight: 700; margin: 0; }
 .session-sub { font-size: 0.78rem; color: var(--text-dim); margin-top: 2px; }
 .session-head .spacer { flex: 1; }
+/* 언어(표시) 토글 버튼 */
+.lang-btns { display: inline-flex; gap: 4px; }
+.lang-btn {
+    padding: 6px 12px; border: 1px solid var(--border); background: #fff;
+    border-radius: 7px; font-size: 0.82rem; cursor: pointer; color: var(--text-dim);
+}
+.lang-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
+.lang-btn.sm { padding: 3px 9px; font-size: 0.76rem; border-radius: 6px; }
+.session-lang { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.session-lang .check-inline { font-size: 0.78rem; color: var(--text-dim); }
+
 .session-mod { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
 .mod-inline { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; font-weight: 600; color: var(--text); }
 .mod-inline .spk-avatar { flex-shrink: 0; }
