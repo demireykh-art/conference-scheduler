@@ -7,7 +7,7 @@ const PTN_ROOT = database.ref('/adminPartners');
 let PARTNERS = [];
 let PTN_EDIT_ID = null;
 let PTN_SEARCH = '';
-let BOOTH = { columns: [], grades: [], cells: {} };
+let BOOTH = { columns: DEFAULT_BOOTH_COLUMNS.slice(), grades: DEFAULT_BOOTH_GRADES.slice(), cells: JSON.parse(JSON.stringify(DEFAULT_BOOTH_CELLS)) };
 let PLACED = {};              // { partnerId: { type: 배치수 } } — 마지막에 연 행사 기준
 let PLACED_CONF_NAME = '';
 
@@ -21,15 +21,13 @@ PTN_ROOT.on('value', snap => {
 
 // 부스 등급별 혜택
 database.ref('/adminBoothBenefits').on('value', snap => {
-    const v = snap.val() || {};
-    BOOTH = {
-        columns: v.columns || DEFAULT_BOOTH_COLUMNS.slice(),
-        grades: v.grades || DEFAULT_BOOTH_GRADES.slice(),
-        cells: v.cells || {}
-    };
+    const v = snap.val();
+    if (v && Array.isArray(v.columns) && Array.isArray(v.grades)) {
+        BOOTH = { columns: v.columns, grades: v.grades, cells: v.cells || {} };
+    }
     populateGradeSelect();
     renderPartners();
-});
+}, () => { populateGradeSelect(); renderPartners(); });   // 읽기 실패 시 기본값 유지
 
 // 마지막에 연 행사 기준으로 배치된 강의 수 집계 (파트너 + 강의유형)
 (function subscribePlaced() {
