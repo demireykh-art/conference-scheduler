@@ -348,6 +348,39 @@ a { color: inherit; }
 .data-table tr:last-child td { border-bottom: none; }
 .data-table td.en, .data-table td.dim { color: var(--text-dim); }
 .data-table .row-actions { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
+/* 연자 원형 아바타 */
+.spk-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    background: #eef0f3;
+    color: var(--text-dim);
+    font-size: 0.62rem;
+    font-weight: 600;
+    vertical-align: middle;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+.spk-inline { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; }
+.lec-speaker { line-height: 1.9; }
+
+/* 연자 사진 업로드 미리보기 (원형) */
+.spk-photo-preview {
+    width: 84px; height: 84px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    background: #eef0f3;
+    flex-shrink: 0;
+}
+.spk-photo-preview.spk-photo-empty {
+    display: grid; place-items: center;
+    color: var(--text-dim); font-size: 0.75rem;
+}
+
 .count-pill {
     display: inline-block; min-width: 22px; text-align: center;
     background: #eef4ff; color: var(--primary);

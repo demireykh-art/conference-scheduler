@@ -43,6 +43,38 @@ window.escapeHtml = function (str) {
         .replace(/'/g, '&#39;');
 };
 
+// 이미지 파일 → 가로 maxW로 축소한 JPEG data URL (연자 사진 등)
+window.compressImage = function (file, maxW = 800, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                let w = img.naturalWidth, h = img.naturalHeight;
+                if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+                const c = document.createElement('canvas');
+                c.width = w; c.height = h;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(img, 0, 0, w, h);
+                resolve(c.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = () => reject(new Error('이미지를 읽을 수 없습니다.'));
+            img.src = reader.result;
+        };
+        reader.onerror = () => reject(new Error('파일을 읽을 수 없습니다.'));
+        reader.readAsDataURL(file);
+    });
+};
+
+// 연자 원형 아바타 HTML (사진 없으면 이름 첫 글자)
+window.speakerAvatar = function (s, px) {
+    px = px || 28;
+    if (s && s.photo) return `<img class="spk-avatar" style="width:${px}px;height:${px}px" src="${escapeHtml(s.photo)}" alt="">`;
+    const ch = ((s && (s.nameKo || s.nameEn)) || '?').trim().charAt(0);
+    return `<span class="spk-avatar" style="width:${px}px;height:${px}px">${escapeHtml(ch)}</span>`;
+};
+
 window.uuid = function () {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
     // 폴백
