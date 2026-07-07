@@ -32,18 +32,38 @@ document.getElementById('lecSearch').addEventListener('input', renderPool);
     sel.addEventListener('change', () => { LEC_SORT = sel.value; renderPool(); });
 })();
 
-// 강의 유형 체크박스 렌더 (+ 학회강의: 비스폰)
+// 강의 유형 체크박스 — 행사별 부스 등급 혜택 열 + 학회강의(비스폰)
 const EXTRA_LECTURE_TYPES = ['학회강의'];
-document.getElementById('lecTypeChecks').innerHTML =
-    LECTURE_TYPES.map(t =>
-        `<label class="check-inline"><input type="checkbox" class="lec-type-check" value="${escapeHtml(t)}"> ${escapeHtml(t)}</label>`).join('') +
-    EXTRA_LECTURE_TYPES.map(t =>
-        `<label class="check-inline"><input type="checkbox" class="lec-type-check" value="${escapeHtml(t)}"> ${escapeHtml(t)} <span style="color:var(--text-dim);font-size:0.72rem">(비스폰)</span></label>`).join('');
+let CONF_BOOTH_COLS = null;      // 현재 행사 부스 혜택 열
+let BOOTH_TEMPLATE_COLS = null;  // 전역 템플릿 열 (fallback)
+function currentTypeList() {
+    const cols = (CONF_BOOTH_COLS && CONF_BOOTH_COLS.length) ? CONF_BOOTH_COLS
+        : (BOOTH_TEMPLATE_COLS && BOOTH_TEMPLATE_COLS.length) ? BOOTH_TEMPLATE_COLS
+            : LECTURE_TYPES;
+    return cols.concat(EXTRA_LECTURE_TYPES);
+}
 function selectedTypes() { return [...document.querySelectorAll('#lecTypeChecks .lec-type-check:checked')].map(c => c.value); }
+function renderTypeChecks(includeTypes) {
+    const checked = new Set(selectedTypes());
+    const list = currentTypeList().slice();
+    [...checked, ...(includeTypes || [])].forEach(t => { if (t && !list.includes(t)) list.push(t); });
+    document.getElementById('lecTypeChecks').innerHTML = list.map(t => {
+        const extra = EXTRA_LECTURE_TYPES.includes(t);
+        return `<label class="check-inline"><input type="checkbox" class="lec-type-check" value="${escapeHtml(t)}" ${checked.has(t) ? 'checked' : ''}> ${escapeHtml(t)}${extra ? ' <span style="color:var(--text-dim);font-size:0.72rem">(비스폰)</span>' : ''}</label>`;
+    }).join('');
+}
 function setTypes(arr) {
+    renderTypeChecks(arr);   // 이 강의의 기존 유형까지 포함해 표시
     const set = new Set(arr || []);
     document.querySelectorAll('#lecTypeChecks .lec-type-check').forEach(c => { c.checked = set.has(c.value); });
 }
+// 전역 템플릿 열 로드(fallback) + 초기 렌더
+database.ref('/adminBoothBenefits').once('value').then(s => {
+    const v = s.val();
+    if (v && Array.isArray(v.columns)) BOOTH_TEMPLATE_COLS = v.columns;
+    renderTypeChecks();
+}).catch(() => renderTypeChecks());
+renderTypeChecks();
 
 // 행사 목록 로드 → 셀렉트 (1회 로드; 풀은 별도 구독)
 database.ref('/adminConferences').once('value').then(snap => {
@@ -67,16 +87,24 @@ window.onConfChange = function () {
     subscribeConf();
 };
 
-let _poolSub = null, _roomsSub = null;
+let _poolSub = null, _roomsSub = null, _boothSub = null;
 function subscribeConf() {
     try { if (CONF_ID) localStorage.setItem('asls_lastConfId', CONF_ID); } catch (e) { }
     document.getElementById('poolArea').style.display = '';
     if (_poolSub) _poolSub.off();
     if (_roomsSub) _roomsSub.off();
+    if (_boothSub) _boothSub.off();
     _poolSub = adminConfRef().child('lecturePool');
     _poolSub.on('value', snap => { POOL = toOrderedArray(snap.val()); renderPool(); });
     _roomsSub = adminConfRef().child('rooms');
     _roomsSub.on('value', snap => { CONF_ROOMS = snap.val() || {}; renderPool(); });
+    // 이 행사 부스 등급 혜택 열 → 강의 유형 체크박스에 반영
+    _boothSub = adminConfRef().child('boothBenefits');
+    _boothSub.on('value', snap => {
+        const v = snap.val();
+        CONF_BOOTH_COLS = (v && Array.isArray(v.columns)) ? v.columns : null;
+        renderTypeChecks();
+    });
 }
 
 // 시간표에 배치된 풀 강의 id 집합
@@ -135,6 +163,7 @@ function renderPool() {
             <td>
                 <div class="row-actions">
                     <button class="btn btn-sm" onclick="editLecture('${l.id}')">수정</button>
+                    <button class="btn btn-sm" onclick="openMoveLecModal('${l.id}')">다른 행사로</button>
                     <button class="btn btn-sm btn-danger-ghost" onclick="deleteLecture('${l.id}')">삭제</button>
                 </div>
             </td>
@@ -440,6 +469,52 @@ window.deleteLecture = async function (id) {
             Toast.success('삭제되었습니다.');
         })
         .catch(e => Toast.error('삭제 실패: ' + e.message));
+};
+
+/* ---------- 강의 이동/복제 (다른 행사로) ---------- */
+let MOVE_LEC_ID = null;
+
+window.openMoveLecModal = function (id) {
+    if (!AdminAuth.requireEdit()) return;
+    const l = POOL.find(x => x.id === id);
+    if (!l) return;
+    MOVE_LEC_ID = id;
+    document.getElementById('moveLecTitle').textContent = l.titleKo || l.titleEn || '(제목 없음)';
+    const others = CONFS.filter(c => c.id !== CONF_ID);
+    const sel = document.getElementById('moveLecTarget');
+    sel.innerHTML = others.length
+        ? others.map(c => `<option value="${c.id}">${escapeHtml(c.title || '(제목 없음)')}</option>`).join('')
+        : '<option value="">(이동/복제할 다른 행사가 없습니다)</option>';
+    document.getElementById('moveLecBtns').style.display = others.length ? '' : 'none';
+    document.getElementById('moveLecModal').classList.add('open');
+};
+window.closeMoveLecModal = function () { document.getElementById('moveLecModal').classList.remove('open'); };
+
+window.doMoveLecture = function (mode) {
+    if (!AdminAuth.requireEdit()) return;
+    const target = document.getElementById('moveLecTarget').value;
+    if (!target) { Toast.warning('대상 행사를 선택하세요.'); return; }
+    const l = POOL.find(x => x.id === MOVE_LEC_ID);
+    if (!l) { Toast.error('강의를 찾을 수 없습니다.'); return; }
+    const { id, ...rest } = l;   // 원본 id 제거
+    const tconf = CONFS.find(c => c.id === target) || {};
+    const targetRef = database.ref('/adminConferences/' + target + '/lecturePool');
+    targetRef.once('value').then(snap => {
+        const cnt = snap.numChildren();
+        const newId = uuid();
+        const data = { ...rest, order: cnt, createdAt: firebase.database.ServerValue.TIMESTAMP, updatedAt: firebase.database.ServerValue.TIMESTAMP };
+        return targetRef.child(newId).set(data).then(() => {
+            if (mode === 'move') {
+                adminConfRef().child('lecturePool/' + MOVE_LEC_ID).remove().catch(() => { });
+                logActivity('update', 'lecture', `강의 "${l.titleKo}" → "${tconf.title || ''}" 이동`, { confId: target, confTitle: tconf.title || '', entityId: newId });
+                Toast.success(`"${tconf.title || ''}"(으)로 이동했습니다.`);
+            } else {
+                logActivity('create', 'lecture', `강의 "${l.titleKo}" → "${tconf.title || ''}" 복제`, { confId: target, confTitle: tconf.title || '', entityId: newId });
+                Toast.success(`"${tconf.title || ''}"(으)로 복제했습니다.`);
+            }
+            closeMoveLecModal();
+        });
+    }).catch(e => Toast.error('실패: ' + e.message));
 };
 
 // 배경 클릭으로는 닫지 않음 — 닫기/취소 버튼으로만 닫힘 (입력 보호)

@@ -131,6 +131,24 @@
         </div>
     </div>
 
+    <!-- ================= 강의 이동/복제 모달 ================= -->
+    <div class="modal-overlay" id="moveLecModal">
+        <div class="modal" style="max-width:420px">
+            <h3>강의 이동 / 복제</h3>
+            <div id="moveLecTitle" style="font-size:0.9rem;color:var(--text-dim);margin-bottom:12px"></div>
+            <div class="modal-field">
+                <label>대상 행사</label>
+                <select id="moveLecTarget" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.9rem"></select>
+            </div>
+            <div style="font-size:0.74rem;color:var(--text-dim);margin-top:4px">이동: 원본을 삭제하고 대상 행사로 옮깁니다. 복제: 원본을 남기고 대상 행사에 사본을 만듭니다. (시간표에 이미 배치된 사본은 영향받지 않습니다)</div>
+            <div class="modal-actions" id="moveLecBtns">
+                <button class="btn" onclick="closeMoveLecModal()">취소</button>
+                <button class="btn" onclick="doMoveLecture('copy')">복제(원본 유지)</button>
+                <button class="btn btn-primary" onclick="doMoveLecture('move')">이동</button>
+            </div>
+        </div>
+    </div>
+
     <script src="../js/config.js"></script>
     <script src="js/admin-common.js"></script>
     <script src="js/admin-auth.js"></script>
