@@ -17,6 +17,7 @@ let editingDuration = null;   // { roomId, sessionId, lecId }
 let POOL = [];                // 이 행사의 강의 풀
 let newRoomDate = '';         // 룸 추가 모달에서 선택한 날짜
 let CONFLICT_IDS = new Set(); // 현재 중복(연자 겹침) 강의 id 집합
+let CONFS = [];               // 전체 행사 목록 (전환기용)
 
 const SPEAKER_TRAVEL_MIN = 10; // 다른 룸 이동 시간(분)
 
@@ -25,6 +26,30 @@ document.getElementById('sidebarMount').innerHTML = renderSidebar('timetable');
 Masters.init();   // 연자 이름·사진 표시(중복 알림)용
 // 마스터(연자 사진 등) 로드/변경 시 시간표 다시 그림
 document.addEventListener('masters-change', () => { if (CONF) renderAll(); });
+
+// 행사 목록 로드 → 좌우 전환기 (id 없으면 첫 행사로 이동)
+database.ref('/adminConferences').once('value').then(snap => {
+    CONFS = toOrderedArray(snap.val());
+    if (!CONF_ID && CONFS.length) { location.replace('timetable.html?id=' + CONFS[0].id); return; }
+    renderConfSwitcher();
+});
+
+function renderConfSwitcher() {
+    const el = document.getElementById('confSwitcher');
+    if (!el) return;
+    if (!CONFS.length) { el.innerHTML = ''; return; }
+    const idx = CONFS.findIndex(c => c.id === CONF_ID);
+    const cur = CONFS[idx] || null;
+    const prev = idx > 0 ? CONFS[idx - 1].id : '';
+    const next = (idx >= 0 && idx < CONFS.length - 1) ? CONFS[idx + 1].id : '';
+    const opts = CONFS.map(c => `<option value="${c.id}" ${c.id === CONF_ID ? 'selected' : ''}>${escapeHtml(c.title || '(제목 없음)')}</option>`).join('');
+    el.innerHTML = `
+        <button class="cs-arrow" ${prev ? '' : 'disabled'} onclick="gotoConf('${prev}')" title="이전 행사">‹</button>
+        <select class="cs-select" onchange="gotoConf(this.value)">${opts}</select>
+        <button class="cs-arrow" ${next ? '' : 'disabled'} onclick="gotoConf('${next}')" title="다음 행사">›</button>
+        ${cur && cur.startDate ? `<span class="cs-date">${escapeHtml(fmtDateRange(cur.startDate, cur.endDate))}</span>` : ''}`;
+}
+window.gotoConf = function (id) { if (id && id !== CONF_ID) location.href = 'timetable.html?id=' + id; };
 
 // 배치 모달 분류 필터 + 검색 이벤트
 document.getElementById('placeCatFilter').innerHTML =
@@ -61,8 +86,6 @@ function getRoom(id) { return (CONF && CONF.rooms && CONF.rooms[id]) ? { id, ...
    렌더
    ============================================================ */
 function renderAll() {
-    document.getElementById('confContext').textContent =
-        (CONF.title || '') + (CONF.startDate ? ` · ${fmtDateRange(CONF.startDate, CONF.endDate)}` : '');
 
     const rooms = orderedRooms();
     if (!CURRENT_ROOM || !rooms.find(r => r.id === CURRENT_ROOM)) {

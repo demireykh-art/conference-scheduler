@@ -230,7 +230,7 @@ window.renderSidebar = function (activeKey) {
     // '시간표' 바로가기 → 마지막에 연 행사의 시간표 (없으면 행사 목록)
     let lastConf = '';
     try { lastConf = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { }
-    const timetableHref = lastConf ? `timetable.html?id=${lastConf}` : 'index.html';
+    const timetableHref = lastConf ? `timetable.html?id=${lastConf}` : 'timetable.html';
 
     const links = SIDE_MENU.map(g => {
         // 아직 개발 전(href 없는) 항목은 숨김 — 나중에 href 연결 시 다시 표시됨
