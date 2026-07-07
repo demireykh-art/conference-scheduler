@@ -215,7 +215,7 @@ const BREAK_PRESETS = [
     { ko: '개회식', en: 'Opening Ceremony', dur: 20 },
     { ko: '개회사', en: 'Opening Remarks', dur: 10 },
     { ko: 'Coffee Break', en: 'Coffee Break', dur: 20 },
-    { ko: '점심식사', en: 'Lunch', dur: 60 },
+    { ko: '점심식사', en: 'Lunch Break', dur: 60 },
     { ko: '폐회사', en: 'Closing Remarks', dur: 10 },
     { ko: 'Q&A & Panel Discussion', en: 'Q&A & Panel Discussion', dur: 15, panel: true }
 ];
