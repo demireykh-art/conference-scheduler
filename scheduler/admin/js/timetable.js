@@ -140,10 +140,6 @@ function renderRoomSettings() {
             <label>시작시간</label>
             <input type="time" value="${escapeHtml(room.startTime || '09:00')}" onchange="updateRoom('startTime', this.value)">
         </div>
-        <div class="field">
-            <label>기본 강의시간(분)</label>
-            <input type="number" min="0" step="5" value="${Number(room.defaultDuration) || 10}" onchange="updateRoom('defaultDuration', this.value)">
-        </div>
         <div class="field" style="min-width:170px">
             <label>표시 언어 (이 룸 전체)</label>
             <div class="lang-btns">
@@ -172,7 +168,6 @@ window.duplicateRoom = function () {
         topic: room.topic || '',
         date: '',                         // 새 날짜는 복제 후 지정
         startTime: room.startTime || '09:00',
-        defaultDuration: Number(room.defaultDuration) || 10,
         visible: room.visible !== false,
         kmaSubmit: !!room.kmaSubmit,
         lang: room.lang || 'ko',
@@ -205,7 +200,6 @@ window.duplicateRoom = function () {
 
 window.updateRoom = function (field, value) {
     if (!AdminAuth.requireEdit()) { renderRoomSettings(); return; }
-    if (field === 'defaultDuration') value = Number(value) || 0;
     confRef().child('rooms/' + CURRENT_ROOM + '/' + field).set(value)
         .catch(e => Toast.error('저장 실패: ' + e.message));
 };
@@ -337,7 +331,7 @@ window.saveNewRoom = function () {
     const name = document.getElementById('newRoomName').value.trim() || `룸 ${orderedRooms().length + 1}`;
     const id = uuid();
     confRef().child('rooms/' + id).set({
-        name, topic: '', date: newRoomDate, startTime: '09:00', defaultDuration: 10, visible: true, kmaSubmit: false, order: orderedRooms().length
+        name, topic: '', date: newRoomDate, startTime: '09:00', visible: true, kmaSubmit: false, order: orderedRooms().length
     }).then(() => {
         logActivity('create', 'room', `룸 "${name}" 추가`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
         CURRENT_ROOM = id; closeRoomModal(); Toast.success('룸이 추가되었습니다.');
