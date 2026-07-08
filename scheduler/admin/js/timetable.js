@@ -406,9 +406,10 @@ function renderSessionBlock(roomId, s) {
     const mod = s.moderator;
     let modHtml = '';
     if (mod && (mod.id || mod.nameKo)) {
-        const m = (mod.id && Masters.speaker(mod.id)) || mod;
-        const nm = escapeHtml(pickLang(lang, mod.nameKo, mod.nameEn));
-        const affv = pickLang(lang, mod.affiliationKo, mod.affiliationEn);
+        const master = mod.id ? Masters.speaker(mod.id) : null;
+        const m = master || mod;
+        const nm = escapeHtml(pickLang(lang, (master && master.nameKo) || mod.nameKo, (master && master.nameEn) || mod.nameEn));
+        const affv = pickLang(lang, (master && master.affiliationKo) || mod.affiliationKo, (master && master.affiliationEn) || mod.affiliationEn);
         const aff = affv ? ` <span class="mod-aff">(${escapeHtml(affv)})</span>` : '';
         const dup = CONFLICT_IDS.has('mod:' + s.id) ? '<span class="dup-badge" title="사회자가 같은 날 다른 곳과 시간 겹침">중복</span>' : '';
         modHtml = `<div class="session-mod"><span class="mod-inline">${speakerAvatar(m, 20)}사회자: ${nm}${aff}</span>${dup}</div>`;
@@ -468,7 +469,10 @@ function renderLectureRow(roomId, sessionId, lec, lang) {
     if (lec.isPanel) {
         const t = pickLang(lang, lec.titleKo, lec.titleEn) || 'Q&A & Panel Discussion';
         const parts = panelSpeakersOfSession(roomId, sessionId);
-        const names = parts.map(s => escapeHtml(pickLang(lang, s.nameKo, s.nameEn))).join(', ') || '<span style="color:var(--text-dim)">이 세션에 연자 강의가 없습니다</span>';
+        const names = parts.map(s => {
+            const master = s.id ? Masters.speaker(s.id) : null;
+            return escapeHtml(pickLang(lang, (master && master.nameKo) || s.nameKo, (master && master.nameEn) || s.nameEn));
+        }).join(', ') || '<span style="color:var(--text-dim)">이 세션에 연자 강의가 없습니다</span>';
         const dup = CONFLICT_IDS.has(lec.id) ? '<span class="dup-badge" title="패널 연자 중 일부가 같은 시간 다른 곳과 겹침">중복</span>' : '';
         return `
         <div class="lecture-row panel-row" data-lec="${lec.id}">
@@ -512,12 +516,16 @@ function renderLectureRow(roomId, sessionId, lec, lang) {
         </div>`;
     }
     const n = normalizeLecture(lec);
-    const partner = n.partnerKo ? `<span class="partner-badge">${escapeHtml(pickLang(lang, n.partnerKo, n.partnerEn))}</span>` : '';
+    // 파트너 영문/국문은 마스터(최신)에서 우선 조회 후 사본으로 폴백
+    const pMaster = n.partnerId ? Masters.partner(n.partnerId) : null;
+    const partnerDisp = pickLang(lang, (pMaster && pMaster.nameKo) || n.partnerKo, (pMaster && pMaster.nameEn) || n.partnerEn);
+    const partner = (n.partnerKo || partnerDisp) ? `<span class="partner-badge">${escapeHtml(partnerDisp)}</span>` : '';
     const speakers = n.speakers.length
         ? n.speakers.map(s => {
-            const m = (s.id && Masters.speaker(s.id)) || s;   // 사진은 마스터에서
-            const nm = escapeHtml(pickLang(lang, s.nameKo, s.nameEn));
-            const affv = pickLang(lang, s.affiliationKo, s.affiliationEn);
+            const master = s.id ? Masters.speaker(s.id) : null;   // 이름·소속·사진 최신값
+            const m = master || s;
+            const nm = escapeHtml(pickLang(lang, (master && master.nameKo) || s.nameKo, (master && master.nameEn) || s.nameEn));
+            const affv = pickLang(lang, (master && master.affiliationKo) || s.affiliationKo, (master && master.affiliationEn) || s.affiliationEn);
             const aff = affv ? ` <span style="color:var(--text-dim)">(${escapeHtml(affv)})</span>` : '';
             return `<span class="spk-inline">${speakerAvatar(m, 22)}${nm}${aff}</span>`;
         }).join('')
@@ -528,8 +536,12 @@ function renderLectureRow(roomId, sessionId, lec, lang) {
         product = `<div class="lec-product">제품: ${escapeHtml(pickLang(lang, n.productKo, n.productEn))}${cat}</div>`;
         if (n.productDesc) product += `<div class="lec-product" style="opacity:.85">└ ${escapeHtml(n.productDesc)}</div>`;
     }
-    const title = escapeHtml(pickLang(lang, n.titleKo, n.titleEn) || '(제목 없음)');
-    const subtitle = lang === 'en' ? n.titleKo : n.titleEn;   // 보조로 반대 언어 표시
+    // 제목도 강의 풀(최신)에서 우선 조회 후 사본으로 폴백
+    const pool = lec.lectureId ? POOL.find(p => p.id === lec.lectureId) : null;
+    const titleKo = (pool && pool.titleKo) || n.titleKo;
+    const titleEn = (pool && pool.titleEn) || n.titleEn;
+    const title = escapeHtml(pickLang(lang, titleKo, titleEn) || '(제목 없음)');
+    const subtitle = lang === 'en' ? titleKo : titleEn;   // 보조로 반대 언어 표시
     return `
     <div class="lecture-row" data-lec="${lec.id}">
         <span class="grip" title="드래그하여 순서 변경">⋮⋮</span>
