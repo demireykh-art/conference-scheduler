@@ -19,7 +19,7 @@
                     <h1 class="main-title">ASLS Week 관리 (진행상황 보드)</h1>
                 </div>
                 <div style="display:flex;gap:8px">
-                    <button class="btn btn-success" onclick="exportAWExcel()">📊 엑셀 다운로드</button>
+                    <button class="btn btn-success" onclick="awExport()">📊 엑셀 다운로드</button>
                 </div>
             </div>
             <div class="main-body">
@@ -33,20 +33,43 @@
                     <select id="awConfSelect" onchange="onAWConfChange()" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.9rem"></select>
                 </div>
 
-                <div class="toolbar-row" style="margin-bottom:12px">
-                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                        <input type="text" id="awSearch" placeholder="🔍 업체명 검색" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.86rem;width:220px">
-                        <label class="check-inline"><input type="checkbox" id="awOnlyData" onchange="renderAW()"> 입력된 곳만 보기</label>
-                        <span style="color:var(--text-dim);font-size:0.84rem"><span id="awCount">0</span>개사 · 기록 <span id="awFilledCount">0</span></span>
+                <div class="aw-viewtabs">
+                    <button class="aw-viewtab active" id="awTabBoard" onclick="awSwitchView('board')">📋 진행상황 보드</button>
+                    <button class="aw-viewtab" id="awTabGrid" onclick="awSwitchView('grid')">🗓 이사 일정 그리드</button>
+                </div>
+
+                <!-- 진행상황 보드 -->
+                <div id="awBoardView">
+                    <div class="toolbar-row" style="margin-bottom:12px">
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                            <input type="text" id="awSearch" placeholder="🔍 업체명 검색" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.86rem;width:220px">
+                            <label class="check-inline"><input type="checkbox" id="awOnlyData" onchange="renderAW()"> 입력된 곳만 보기</label>
+                            <span style="color:var(--text-dim);font-size:0.84rem"><span id="awCount">0</span>개사 · 기록 <span id="awFilledCount">0</span></span>
+                        </div>
+                        <div style="display:flex;gap:8px">
+                            <input type="text" id="awNewName" placeholder="새 파트너사 이름(국문)" style="padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;width:180px">
+                            <button class="btn btn-primary btn-sm" onclick="awAddPartner()">+ 파트너사 추가</button>
+                        </div>
                     </div>
-                    <div style="display:flex;gap:8px">
-                        <input type="text" id="awNewName" placeholder="새 파트너사 이름(국문)" style="padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;width:180px">
-                        <button class="btn btn-primary btn-sm" onclick="awAddPartner()">+ 파트너사 추가</button>
+
+                    <div class="card table-card" style="overflow-x:auto">
+                        <table class="data-table aw-table" id="awTable"></table>
                     </div>
                 </div>
 
-                <div class="card table-card" style="overflow-x:auto">
-                    <table class="data-table aw-table" id="awTable"></table>
+                <!-- 이사 일정 그리드 -->
+                <div id="awGridView" style="display:none">
+                    <div class="info-banner" style="margin-top:0">
+                        <div class="info-ico">i</div>
+                        <div class="info-title">이사(행)와 날짜/시간(열)로 일정을 배치합니다. 머리글·셀을 클릭해 바로 수정하면 자동 저장됩니다. 행·열 추가/삭제가 가능합니다.</div>
+                    </div>
+                    <div class="card table-card" style="overflow-x:auto;padding-bottom:14px">
+                        <table class="awg-table" id="awGridTable"></table>
+                        <div style="display:flex;gap:10px;margin-top:12px">
+                            <button class="awg-addbtn" onclick="awgAddRow()">+ 이사(행) 추가</button>
+                            <button class="awg-addbtn" onclick="awgAddCol()">+ 날짜/시간(열) 추가</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
