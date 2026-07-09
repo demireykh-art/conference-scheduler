@@ -74,6 +74,7 @@ database.ref('/adminConferences').once('value').then(snap => {
         document.getElementById('poolArea').style.display = 'none';
         return;
     }
+    if (!CONF_ID) { try { CONF_ID = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { } }  // 마지막 보던 행사
     if (!CONF_ID || !CONFS.find(c => c.id === CONF_ID)) CONF_ID = CONFS[0].id;
     sel.innerHTML = CONFS.map(c => `<option value="${c.id}" ${c.id === CONF_ID ? 'selected' : ''}>${escapeHtml(c.title || '(제목 없음)')}</option>`).join('');
     subscribeConf();

@@ -31,7 +31,11 @@ document.addEventListener('masters-change', () => { if (CONF) renderAll(); });
 // 행사 목록 로드 → 좌우 전환기 (id 없으면 첫 행사로 이동)
 database.ref('/adminConferences').once('value').then(snap => {
     CONFS = toOrderedArray(snap.val());
-    if (!CONF_ID && CONFS.length) { location.replace('timetable.html?id=' + CONFS[0].id); return; }
+    if (!CONF_ID && CONFS.length) {
+        let last = ''; try { last = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { }  // 마지막 보던 행사
+        const target = CONFS.find(c => c.id === last) ? last : CONFS[0].id;
+        location.replace('timetable.html?id=' + target); return;
+    }
     renderConfSwitcher();
 });
 

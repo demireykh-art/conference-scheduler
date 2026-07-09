@@ -3,8 +3,8 @@
 // 캐시 버전: 날짜 기반 자동 관리 (YYYYMMDD-N 형식)
 // 파일을 수정할 때 BUILD_DATE 또는 BUILD_NUM을 올리면 캐시 자동 갱신
 // ============================================
-const BUILD_DATE = '20250409';  // 오늘 날짜로 갱신
-const BUILD_NUM  = 1;               // 같은 날 여러 번 배포 시 증가
+const BUILD_DATE = '20260709';  // 오늘 날짜로 갱신
+const BUILD_NUM  = 2;               // 같은 날 여러 번 배포 시 증가
 const CACHE_VERSION = `scheduler-${BUILD_DATE}-${BUILD_NUM}`;
 const OFFLINE_URL   = '/conference-scheduler/scheduler/offline.html';
 
@@ -81,8 +81,13 @@ self.addEventListener('fetch', e => {
   // GET 요청만 캐싱 처리
   if (e.request.method !== 'GET') return;
 
+  // 앱 파일(/scheduler/ 하위)은 브라우저 HTTP 캐시를 우회해 항상 최신을 받음
+  // → 강제 새로고침(Ctrl+Shift+R) 없이도 배포 즉시 반영
+  const isAppAsset = url.indexOf('/conference-scheduler/scheduler/') !== -1;
+  const netReq = isAppAsset ? new Request(url, { cache: 'reload' }) : e.request;
+
   e.respondWith(
-    fetch(e.request)
+    fetch(netReq)
       .then(networkRes => {
         // 정상 응답이면 캐시 갱신 후 반환
         if (networkRes && networkRes.status === 200) {
