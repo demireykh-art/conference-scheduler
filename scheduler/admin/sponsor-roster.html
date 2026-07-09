@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스폰서 강의 점검 · ASLS 행사 관리</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <div id="sidebarMount"></div>
+        <main class="main">
+            <div class="main-topbar">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+                    <h1 class="main-title">스폰서 강의 점검 (부스 등급별)</h1>
+                </div>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-success" onclick="exportRosterExcel()">📊 엑셀 다운로드</button>
+                </div>
+            </div>
+            <div class="main-body">
+                <div class="info-banner">
+                    <div class="info-ico">i</div>
+                    <div class="info-title">부스 등급별로 파트너사의 <b>배정 강의 수(등급 혜택)</b> 대비 <b>등록·배치</b> 현황을 모아 봅니다. 부족하면 빨간색으로 표시되어 누락을 바로 확인할 수 있습니다.</div>
+                </div>
+
+                <div class="field" style="max-width:420px;margin-bottom:14px">
+                    <label>행사 선택</label>
+                    <select id="rosterConfSelect" onchange="onRosterConfChange()" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.9rem"></select>
+                </div>
+
+                <div id="rosterSummary" class="roster-summary"></div>
+
+                <div class="toolbar-row" style="margin:8px 0 14px">
+                    <label class="check-inline"><input type="checkbox" id="rosterOnlyShort" onchange="renderRoster()"> ⚠️ 부족(누락 위험)만 보기</label>
+                </div>
+
+                <div id="rosterBody"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- SheetJS (엑셀 내보내기) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="../js/config.js"></script>
+    <script src="js/admin-common.js"></script>
+    <script src="js/version.js"></script>
+    <script src="js/admin-auth.js"></script>
+    <script src="js/masters.js"></script>
+    <script src="js/sponsor-roster.js"></script>
+</body>
+</html>
