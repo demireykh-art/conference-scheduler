@@ -643,6 +643,19 @@ a { color: inherit; }
     background: #e6f7ee; border-radius: 5px; padding: 1px 6px;
 }
 
+/* ASLS Week 진행상황 보드 */
+.aw-table { min-width: 1200px; }
+.aw-table th { white-space: nowrap; font-size: 0.76rem; }
+.aw-table td { padding: 4px 6px; }
+.aw-table .aw-name { font-weight: 700; white-space: nowrap; position: sticky; left: 0; background: #fff; z-index: 1; }
+.aw-table tr.aw-filled .aw-name { background: #f7faff; }
+.aw-cell {
+    width: 100%; min-width: 90px; padding: 6px 7px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 0.82rem; background: #fff;
+}
+.aw-cell.aw-input:focus { border-color: var(--primary); outline: none; }
+.aw-select { cursor: pointer; font-weight: 600; }
+
 /* 담당자(연락처) 입력 행 */
 .contact-item { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
 .contact-item input {
