@@ -7,9 +7,13 @@
 let CONFS = [];
 let CONF_ID = new URLSearchParams(location.search).get('id') || '';
 let AW = {};          // { partnerId: {fields} }
+let GRID = { rows: {}, cols: {}, cells: {} };   // 이사 일정 그리드
+let VIEW = 'board';
 let awSub = null;
+let gridSub = null;
 
 const awRef = () => database.ref('/adminConferences/' + CONF_ID + '/aslsWeek');
+const gridRef = () => database.ref('/adminConferences/' + CONF_ID + '/aslsWeekSchedule');
 
 const STATUS_OPTIONS = ['', '확정', '진행중', '확인중', '미정', '보류', '취소', '어려움', '불가'];
 const JOIN_OPTIONS = ['', 'O', 'X', '미정'];
@@ -48,10 +52,22 @@ window.onAWConfChange = function () {
     subscribeAW();
 };
 
+window.awSwitchView = function (v) {
+    VIEW = v;
+    document.getElementById('awBoardView').style.display = v === 'board' ? '' : 'none';
+    document.getElementById('awGridView').style.display = v === 'grid' ? '' : 'none';
+    document.getElementById('awTabBoard').classList.toggle('active', v === 'board');
+    document.getElementById('awTabGrid').classList.toggle('active', v === 'grid');
+    if (v === 'grid') renderGrid();
+};
+
 function subscribeAW() {
     if (awSub) awSub.off();
     awSub = awRef();
     awSub.on('value', snap => { AW = snap.val() || {}; renderAW(); });
+    if (gridSub) gridSub.off();
+    gridSub = gridRef();
+    gridSub.on('value', snap => { GRID = snap.val() || { rows: {}, cols: {}, cells: {} }; if (VIEW === 'grid') renderGrid(); });
 }
 
 function rowOf(pid) { return AW[pid] || {}; }
@@ -132,7 +148,87 @@ window.awAddPartner = function () {
         .catch(e => Toast.error('추가 실패: ' + e.message));
 };
 
+/* ---------- 이사 일정 그리드 ---------- */
+function gridRows() { return Object.entries(GRID.rows || {}).sort((a, b) => (a[1].order || 0) - (b[1].order || 0)); }
+function gridCols() { return Object.entries(GRID.cols || {}).sort((a, b) => (a[1].order || 0) - (b[1].order || 0)); }
+function gridCell(rid, cid) { return ((GRID.cells || {})[rid] || {})[cid] || ''; }
+
+function renderGrid() {
+    if (!CONF_ID) return;
+    const rows = gridRows(), cols = gridCols();
+    const el = document.getElementById('awGridTable');
+
+    if (!rows.length && !cols.length) {
+        el.innerHTML = `<tbody><tr><td style="text-align:center;color:var(--text-dim);padding:30px 12px">
+            아직 일정이 없습니다. 아래에서 <b>이사(행)</b>와 <b>날짜/시간(열)</b>을 추가하세요.</td></tr></tbody>`;
+        return;
+    }
+
+    const head = `<thead><tr>
+        <th class="awg-corner">이사 \\ 일정</th>
+        ${cols.map(([cid, c]) => `<th class="awg-colhead"><div class="awg-hd-wrap">
+            <input class="awg-hdinput" value="${escapeHtml(c.name || '')}" placeholder="날짜/시간"
+                onchange="awgRenameCol('${cid}',this.value)">
+            <button class="awg-del" title="열 삭제" onclick="awgDelCol('${cid}')">✕</button>
+        </div></th>`).join('')}
+    </tr></thead>`;
+
+    const body = `<tbody>${rows.map(([rid, r]) => `<tr>
+        <th class="awg-rowhead"><div class="awg-hd-wrap">
+            <input class="awg-hdinput" value="${escapeHtml(r.name || '')}" placeholder="이사명"
+                onchange="awgRenameRow('${rid}',this.value)">
+            <button class="awg-del" title="행 삭제" onclick="awgDelRow('${rid}')">✕</button>
+        </div></th>
+        ${cols.map(([cid]) => `<td><input class="awg-cellinput" value="${escapeHtml(gridCell(rid, cid))}"
+            onchange="awgSetCell('${rid}','${cid}',this.value)"></td>`).join('')}
+    </tr>`).join('')}</tbody>`;
+
+    el.innerHTML = head + body;
+}
+
+window.awgAddRow = function () {
+    if (!AdminAuth.requireEdit()) return;
+    const id = uuid();
+    gridRef().child('rows').child(id).set({ name: '', order: Object.keys(GRID.rows || {}).length })
+        .catch(e => Toast.error('추가 실패: ' + e.message));
+};
+window.awgAddCol = function () {
+    if (!AdminAuth.requireEdit()) return;
+    const id = uuid();
+    gridRef().child('cols').child(id).set({ name: '', order: Object.keys(GRID.cols || {}).length })
+        .catch(e => Toast.error('추가 실패: ' + e.message));
+};
+window.awgRenameRow = function (id, v) {
+    if (!AdminAuth.requireEdit()) { renderGrid(); return; }
+    gridRef().child('rows').child(id).child('name').set((v || '').trim()).catch(e => Toast.error('저장 실패: ' + e.message));
+};
+window.awgRenameCol = function (id, v) {
+    if (!AdminAuth.requireEdit()) { renderGrid(); return; }
+    gridRef().child('cols').child(id).child('name').set((v || '').trim()).catch(e => Toast.error('저장 실패: ' + e.message));
+};
+window.awgSetCell = function (rid, cid, v) {
+    if (!AdminAuth.requireEdit()) { renderGrid(); return; }
+    v = (v || '').trim();
+    gridRef().child('cells').child(rid).child(cid).set(v || null).catch(e => Toast.error('저장 실패: ' + e.message));
+};
+window.awgDelRow = function (id) {
+    if (!AdminAuth.requireEdit()) return;
+    if (!confirm('이 이사(행)와 관련 일정을 삭제할까요?')) return;
+    gridRef().update({ ['rows/' + id]: null, ['cells/' + id]: null }).catch(e => Toast.error('삭제 실패: ' + e.message));
+};
+window.awgDelCol = function (id) {
+    if (!AdminAuth.requireEdit()) return;
+    if (!confirm('이 날짜/시간(열)과 관련 일정을 삭제할까요?')) return;
+    const upd = { ['cols/' + id]: null };
+    Object.keys(GRID.cells || {}).forEach(rid => { if ((GRID.cells[rid] || {})[id] !== undefined) upd['cells/' + rid + '/' + id] = null; });
+    gridRef().update(upd).catch(e => Toast.error('삭제 실패: ' + e.message));
+};
+
 /* ---------- 엑셀 ---------- */
+window.awExport = function () {
+    if (VIEW === 'grid') exportGridExcel(); else exportAWExcel();
+};
+
 window.exportAWExcel = function () {
     if (typeof XLSX === 'undefined') { Toast.error('엑셀 모듈 로드 실패'); return; }
     const header = ['업체명', ...FIELDS.map(f => f.label)];
@@ -149,3 +245,16 @@ window.exportAWExcel = function () {
     const title = (CONFS.find(c => c.id === CONF_ID) || {}).title || '행사';
     XLSX.writeFile(wb, `ASLSWeek_${title}.xlsx`);
 };
+
+function exportGridExcel() {
+    if (typeof XLSX === 'undefined') { Toast.error('엑셀 모듈 로드 실패'); return; }
+    const rows = gridRows(), cols = gridCols();
+    const header = ['이사 \\ 일정', ...cols.map(([, c]) => c.name || '')];
+    const aoa = [header];
+    rows.forEach(([rid, r]) => aoa.push([r.name || '', ...cols.map(([cid]) => gridCell(rid, cid))]));
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '이사 일정');
+    const title = (CONFS.find(c => c.id === CONF_ID) || {}).title || '행사';
+    XLSX.writeFile(wb, `ASLSWeek_이사일정_${title}.xlsx`);
+}
