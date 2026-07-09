@@ -643,6 +643,14 @@ a { color: inherit; }
     background: #e6f7ee; border-radius: 5px; padding: 1px 6px;
 }
 
+/* 강의 목록 — 배치된 룸 위치 표시 */
+.place-rooms { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-bottom: 2px; }
+.room-chip {
+    font-size: 0.72rem; font-weight: 600; color: var(--primary);
+    background: var(--primary-soft, #eef2ff); border-radius: 6px; padding: 2px 7px;
+    white-space: nowrap;
+}
+
 /* 룸 설정 바 */
 .room-settings {
     display: flex;

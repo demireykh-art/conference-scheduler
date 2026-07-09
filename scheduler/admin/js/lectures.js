@@ -121,9 +121,25 @@ function placedLectureIds() {
     return ids;
 }
 
+// 강의 id → 배치된 룸 목록 [{ room, session, date }]
+function placedRoomsMap() {
+    const map = {};
+    if (!CONF_ROOMS) return map;
+    Object.values(CONF_ROOMS).forEach(room => {
+        Object.values(room.sessions || {}).forEach(session => {
+            Object.values(session.lectures || {}).forEach(lec => {
+                if (!lec.lectureId) return;
+                const list = (map[lec.lectureId] = map[lec.lectureId] || []);
+                list.push({ room: room.name || '(룸)', session: session.name || '', date: room.date || '' });
+            });
+        });
+    });
+    return map;
+}
+
 /* ---------- 목록 렌더 ---------- */
 function renderPool() {
-    const placed = placedLectureIds();
+    const placedMap = placedRoomsMap();
     const q = document.getElementById('lecSearch').value.trim().toLowerCase();
     const cat = document.getElementById('catFilter').value;
 
@@ -137,7 +153,7 @@ function renderPool() {
     });
 
     document.getElementById('lecCount').textContent = POOL.length;
-    document.getElementById('unplacedCount').textContent = POOL.filter(l => !placed.has(l.id)).length;
+    document.getElementById('unplacedCount').textContent = POOL.filter(l => !placedMap[l.id]).length;
 
     const body = document.getElementById('poolBody');
     if (!list.length) {
@@ -151,7 +167,11 @@ function renderPool() {
         const types = (l.types || []).map(t => `<span class="chip type">${escapeHtml(t)}</span>`).join('');
         const spk = (l.speakers || []).map(s => escapeHtml(s.nameKo || s.nameEn)).join(', ') || '<span class="dim">-</span>';
         const pp = [l.partnerKo, l.productKo].filter(Boolean).map(escapeHtml).join(' · ') || '<span class="dim">-</span>';
-        const isPlaced = placed.has(l.id);
+        const spots = placedMap[l.id] || [];
+        const placeCell = spots.length
+            ? `<div class="place-rooms">${spots.map(s => `<span class="room-chip" title="${escapeHtml(s.session)}${s.date ? ' · ' + escapeHtml(s.date) : ''}">📍 ${escapeHtml(s.room)}</span>`).join('')}</div>
+               <span class="badge badge-ended" style="margin-top:4px">배치됨</span>`
+            : '<span class="badge badge-upcoming">미배치</span>';
         return `
         <tr>
             <td><b>${escapeHtml(l.titleKo || '(제목 없음)')}</b>${l.titleEn ? `<div class="dim" style="font-size:0.8rem">${escapeHtml(l.titleEn)}</div>` : ''}</td>
@@ -159,7 +179,7 @@ function renderPool() {
             <td>${spk}</td>
             <td class="dim" style="font-size:0.82rem">${pp}</td>
             <td style="text-align:center">${l.duration || 0}분</td>
-            <td style="text-align:center">${isPlaced ? '<span class="badge badge-ended">배치됨</span>' : '<span class="badge badge-upcoming">미배치</span>'}</td>
+            <td style="text-align:center">${placeCell}</td>
             <td>
                 <div class="row-actions">
                     <button class="btn btn-sm" onclick="editLecture('${l.id}')">수정</button>
