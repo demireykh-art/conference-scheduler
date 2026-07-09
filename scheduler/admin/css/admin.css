@@ -643,6 +643,15 @@ a { color: inherit; }
     background: #e6f7ee; border-radius: 5px; padding: 1px 6px;
 }
 
+/* 담당자(연락처) 입력 행 */
+.contact-item { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+.contact-item input {
+    padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: 0.86rem;
+}
+.contact-item .ct-name { width: 130px; flex-shrink: 0; }
+.contact-item .ct-phone { width: 150px; flex-shrink: 0; }
+.contact-item .ct-email { flex: 1; min-width: 120px; }
+
 /* 스폰서 강의 점검 (부스 등급별) */
 .roster-summary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
 .rs-tile {
@@ -670,6 +679,7 @@ a { color: inherit; }
 .rc-stat .txt-danger { color: var(--danger); }
 .rc-warn { color: var(--danger); font-weight: 700; margin-left: 8px; }
 .rc-ok { color: var(--success); font-weight: 700; margin-left: 8px; }
+.rc-contacts { font-size: 0.82rem; color: var(--text-dim); margin-top: 6px; }
 .rc-types { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
 .type-need { font-size: 0.74rem; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: #eef0f3; color: var(--text-dim); }
 .type-need.short { background: #fdecea; color: var(--danger); }

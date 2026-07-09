@@ -50,6 +50,7 @@
                                 <th>파트너사 (영문)</th>
                                 <th>제품</th>
                                 <th style="width:150px">등급 (이 행사)</th>
+                                <th style="width:160px">담당자 (이 행사)</th>
                                 <th>등급 혜택 (미배치/배치)</th>
                                 <th style="text-align:right">관리</th>
                             </tr>
@@ -83,6 +84,20 @@
             <div class="modal-actions">
                 <button class="btn" onclick="closePartnerModal()">취소</button>
                 <button class="btn btn-primary" onclick="savePartner()">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 담당자(연락처) 모달 -->
+    <div class="modal-overlay" id="contactModal">
+        <div class="modal wide">
+            <h3 id="contactModalTitle">담당자</h3>
+            <div id="contactConfLabel" style="font-size:0.82rem;color:var(--text-dim);margin-bottom:10px"></div>
+            <div id="contactRows"></div>
+            <button type="button" class="btn btn-sm" onclick="addContactRow()" style="margin-top:6px">+ 담당자 추가</button>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeContactModal()">취소</button>
+                <button class="btn btn-primary" onclick="saveContacts()">저장</button>
             </div>
         </div>
     </div>
