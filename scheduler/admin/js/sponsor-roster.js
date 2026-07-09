@@ -59,6 +59,10 @@ function partnerName(pid) {
     const m = Masters.partner(pid);
     return (m && (m.nameKo || m.nameEn)) || '(삭제된 파트너사)';
 }
+function contactsOf(pid) { const c = (CONF.partnerContacts || {})[pid]; return Array.isArray(c) ? c : []; }
+function contactText(pid) {
+    return contactsOf(pid).map(c => [c.name, c.phone, c.email].filter(Boolean).join(' · ')).join(' / ');
+}
 
 // 부스표: 등급 → 숫자 배정 (총합 + 유형별)
 function entitledOf(grade) {
@@ -192,6 +196,7 @@ function renderPartnerCard(p, placements) {
                 ${isShort ? `<span class="rc-warn">⚠️ 부족 ${p.short}</span>` : (p.ent.total > 0 ? '<span class="rc-ok">✔ 충족</span>' : '')}
             </div>
         </div>
+        ${contactsOf(p.pid).length ? `<div class="rc-contacts">👤 담당자: ${escapeHtml(contactText(p.pid))}</div>` : ''}
         ${typeLines ? `<div class="rc-types">${typeLines}</div>` : ''}
         <table class="data-table rc-table">
             <thead><tr><th>제목</th><th>연자</th><th>유형</th><th>제품</th><th style="text-align:center">시간</th><th>배치</th></tr></thead>
@@ -209,7 +214,7 @@ window.exportRosterExcel = function () {
     const partnerIds = new Set(Object.keys(confPartners()));
     P.forEach(l => { if (l.partnerId) partnerIds.add(l.partnerId); });
 
-    const rows = [['부스등급', '파트너사', '배정', '등록', '배치', '제품', '제목', '연자', '유형', '시간(분)', '배치위치']];
+    const rows = [['부스등급', '파트너사', '담당자', '배정', '등록', '배치', '제품', '제목', '연자', '유형', '시간(분)', '배치위치']];
     const gradeIndex = g => { const i = b.grades.indexOf(g); return i < 0 ? 999 : i; };
     [...partnerIds]
         .sort((a, c) => gradeIndex(gradeOf(a)) - gradeIndex(gradeOf(c)) || partnerName(a).localeCompare(partnerName(c), 'ko'))
@@ -217,14 +222,15 @@ window.exportRosterExcel = function () {
             const grade = gradeOf(pid) || '(미지정)';
             const ent = entitledOf(grade).total;
             const lects = P.filter(l => l.partnerId === pid);
+            const ct = contactText(pid);
             if (!lects.length) {
-                rows.push([grade, partnerName(pid), ent, 0, 0, '', '(등록된 강의 없음)', '', '', '', '']);
+                rows.push([grade, partnerName(pid), ct, ent, 0, 0, '', '(등록된 강의 없음)', '', '', '', '']);
                 return;
             }
             lects.forEach(l => {
                 const spk = (l.speakers || []).map(s => s.nameKo || s.nameEn || '').filter(Boolean).join(', ');
                 const place = (placements[l.id] || []).map(s => `${s.room}${s.date ? '(' + s.date + ')' : ''}`).join(', ');
-                rows.push([grade, partnerName(pid), ent, lects.length, lects.filter(x => placements[x.id]).length,
+                rows.push([grade, partnerName(pid), ct, ent, lects.length, lects.filter(x => placements[x.id]).length,
                     l.productKo || l.productEn || '', l.titleKo || l.titleEn || '', spk, (l.types || []).join('/'), l.duration || 0, place]);
             });
         });
