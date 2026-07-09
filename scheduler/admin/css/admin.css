@@ -643,6 +643,41 @@ a { color: inherit; }
     background: #e6f7ee; border-radius: 5px; padding: 1px 6px;
 }
 
+/* 스폰서 강의 점검 (부스 등급별) */
+.roster-summary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+.rs-tile {
+    flex: 1; min-width: 120px; background: #fff; border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px; text-align: center;
+}
+.rs-tile .rs-n { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+.rs-tile .rs-l { font-size: 0.76rem; color: var(--text-dim); margin-top: 3px; }
+.rs-tile.warn { background: #fdecea; border-color: #f3b4ae; }
+.rs-tile.warn .rs-n { color: var(--danger); }
+.rs-tile.ok .rs-n { color: var(--success); }
+.roster-group { margin-bottom: 22px; }
+.roster-group-head { display: flex; align-items: center; gap: 10px; margin: 6px 0 8px; }
+.grade-badge.lg { font-size: 0.9rem; padding: 4px 12px; }
+.rg-count { font-size: 0.84rem; color: var(--text-dim); }
+.rg-short { color: var(--danger); font-weight: 700; }
+.roster-card {
+    background: #fff; border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 10px;
+}
+.roster-card.is-short { border-color: #f3b4ae; background: #fff8f7; }
+.rc-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rc-name { font-size: 1rem; }
+.rc-stat { font-size: 0.85rem; color: var(--text-dim); }
+.rc-stat .txt-danger { color: var(--danger); }
+.rc-warn { color: var(--danger); font-weight: 700; margin-left: 8px; }
+.rc-ok { color: var(--success); font-weight: 700; margin-left: 8px; }
+.rc-types { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.type-need { font-size: 0.74rem; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: #eef0f3; color: var(--text-dim); }
+.type-need.short { background: #fdecea; color: var(--danger); }
+.type-need.ok { background: #e6f7ee; color: var(--success); }
+.rc-table { margin-top: 8px; }
+.rc-table th { font-size: 0.76rem; }
+.rc-table td { font-size: 0.84rem; vertical-align: top; }
+
 /* 강의 목록 — 배치된 룸 위치 표시 */
 .place-rooms { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-bottom: 2px; }
 .room-chip {
