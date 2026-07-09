@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASLS Week 관리 · ASLS 행사 관리</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <div id="sidebarMount"></div>
+        <main class="main">
+            <div class="main-topbar">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+                    <h1 class="main-title">ASLS Week 관리 (진행상황 보드)</h1>
+                </div>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-success" onclick="exportAWExcel()">📊 엑셀 다운로드</button>
+                </div>
+            </div>
+            <div class="main-body">
+                <div class="info-banner">
+                    <div class="info-ico">i</div>
+                    <div class="info-title">파트너사별 ASLS Week 진행상황을 행사별로 기록합니다. 셀을 바로 수정하면 자동 저장됩니다. (담당이사·참여·외국인 인원·진행상황·자체행사·클리닉투어·희망제품)</div>
+                </div>
+
+                <div class="field" style="max-width:420px;margin-bottom:12px">
+                    <label>행사 선택</label>
+                    <select id="awConfSelect" onchange="onAWConfChange()" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.9rem"></select>
+                </div>
+
+                <div class="toolbar-row" style="margin-bottom:12px">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                        <input type="text" id="awSearch" placeholder="🔍 업체명 검색" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.86rem;width:220px">
+                        <label class="check-inline"><input type="checkbox" id="awOnlyData" onchange="renderAW()"> 입력된 곳만 보기</label>
+                        <span style="color:var(--text-dim);font-size:0.84rem"><span id="awCount">0</span>개사 · 기록 <span id="awFilledCount">0</span></span>
+                    </div>
+                    <div style="display:flex;gap:8px">
+                        <input type="text" id="awNewName" placeholder="새 파트너사 이름(국문)" style="padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;width:180px">
+                        <button class="btn btn-primary btn-sm" onclick="awAddPartner()">+ 파트너사 추가</button>
+                    </div>
+                </div>
+
+                <div class="card table-card" style="overflow-x:auto">
+                    <table class="data-table aw-table" id="awTable"></table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- SheetJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="../js/config.js"></script>
+    <script src="js/admin-common.js"></script>
+    <script src="js/version.js"></script>
+    <script src="js/admin-auth.js"></script>
+    <script src="js/masters.js"></script>
+    <script src="js/asls-week.js"></script>
+</body>
+</html>
