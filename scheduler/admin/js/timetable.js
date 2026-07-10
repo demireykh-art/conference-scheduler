@@ -624,27 +624,42 @@ function renderModChosen() {
     el.innerHTML = `<span class="chip">${speakerAvatar(m, 20)} ${escapeHtml(moderatorDraft.nameKo || moderatorDraft.nameEn)}${aff}<span class="x" onclick="clearModerator()">×</span></span>`;
 }
 
-// 사회자 검색 자동완성 (연자 마스터에서 검색 + 새로 등록)
+// ASLS 관계자(임원·엠베서더)만 사회자로 지정 가능
+function isAslsStaff(s) { return !!(s && (s.roleExec || s.roleAmb)); }
+function aslsRoleText(s) {
+    const r = [];
+    if (s.roleExec) r.push('ASLS 임원');
+    if (s.roleAmb) r.push('엠베서더');
+    return r.join('·');
+}
+
+// 사회자 검색 자동완성 (ASLS 관계자만 검색 + 새로 등록)
 setupAutocomplete(
     document.getElementById('modInput'),
     document.getElementById('modAc'),
     q => {
         const ql = q.toLowerCase();
-        const items = Masters.speakers
+        const staff = Masters.speakers.filter(isAslsStaff);
+        const items = staff
             .filter(s => [s.nameKo, s.nameEn, s.affiliationKo, s.affiliationEn].join(' ').toLowerCase().includes(ql))
-            .map(s => ({ label: `${escapeHtml(s.nameKo || '')} <span class="sub">${escapeHtml(s.nameEn || '')}${s.affiliationKo ? ' · ' + escapeHtml(s.affiliationKo) : ''}</span>`, value: { type: 'existing', s } }));
-        const exact = Masters.speakers.some(s => (s.nameKo || '').toLowerCase() === ql);
-        if (q && !exact) items.push({ label: `➕ "<b>${escapeHtml(q)}</b>" 새 연자로 등록`, value: { type: 'new', name: q } });
+            .map(s => ({ label: `${escapeHtml(s.nameKo || '')} <span class="sub">${aslsRoleText(s)}${s.affiliationKo ? ' · ' + escapeHtml(s.affiliationKo) : ''}</span>`, value: { type: 'existing', s } }));
+        if (!items.length) {
+            items.push({ label: q
+                ? `ASLS 관계자 중 "<b>${escapeHtml(q)}</b>" 검색 결과가 없습니다. ➕ 새 ASLS 관계자로 등록`
+                : 'ASLS 관계자(임원·엠베서더)만 사회자로 지정할 수 있습니다. 연자 관리에서 먼저 지정하세요.',
+                value: q ? { type: 'new', name: q } : { type: 'none' } });
+        }
         return items;
     },
     async val => {
+        if (val.type === 'none') return;
         if (val.type === 'existing') { setModerator(val.s); return; }
         const name = (val.name || '').trim(); if (!name) return;
-        const ok = await confirmDialog(`"${name}" 님이 목록에 없습니다.\n새 연자로 등록하고 사회자로 지정할까요? (연자 관리에도 추가됨)`, { okText: '등록' });
+        const ok = await confirmDialog(`"${name}" 님이 ASLS 관계자 목록에 없습니다.\n새 연자로 등록하고 ASLS 임원으로 지정하여 사회자로 넣을까요? (연자 관리에도 추가됨 · 임원/엠베서더 구분은 연자 관리에서 변경 가능)`, { okText: '등록' });
         if (!ok) return;
         const id = uuid();
-        database.ref('/adminSpeakers/' + id).set({ nameKo: name, nameEn: '', affiliationKo: '', affiliationEn: '', order: Masters.speakers.length, createdAt: firebase.database.ServerValue.TIMESTAMP })
-            .then(() => { setModerator({ id, nameKo: name }); Toast.success(`"${name}" 등록`); })
+        database.ref('/adminSpeakers/' + id).set({ nameKo: name, nameEn: '', affiliationKo: '', affiliationEn: '', roleExec: true, roleAmb: false, order: Masters.speakers.length, createdAt: firebase.database.ServerValue.TIMESTAMP })
+            .then(() => { setModerator({ id, nameKo: name }); Toast.success(`"${name}" ASLS 임원으로 등록`); })
             .catch(e => Toast.error('등록 실패: ' + e.message));
     }
 );

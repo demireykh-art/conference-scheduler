@@ -40,6 +40,7 @@
                                 <th>연자 (영문)</th>
                                 <th>소속 (국문)</th>
                                 <th>소속 (영문)</th>
+                                <th>ASLS</th>
                                 <th style="text-align:right">관리</th>
                             </tr>
                         </thead>
@@ -86,6 +87,14 @@
                     <label>소속 (영문)</label>
                     <input type="text" id="spkAffEn" placeholder="예: OO Clinic">
                 </div>
+            </div>
+            <div class="modal-field">
+                <label>ASLS 관계자 구분</label>
+                <div style="display:flex;gap:18px;align-items:center;padding:4px 0">
+                    <label class="check-inline"><input type="checkbox" id="spkRoleExec"> ASLS 임원</label>
+                    <label class="check-inline"><input type="checkbox" id="spkRoleAmb"> ASLS 엠베서더</label>
+                </div>
+                <div style="font-size:0.72rem;color:var(--text-dim)">사회자(Moderator)는 ASLS 관계자(임원·엠베서더)만 지정할 수 있습니다.</div>
             </div>
             <div class="modal-field">
                 <label>CV / 약력</label>

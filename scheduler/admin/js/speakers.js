@@ -30,6 +30,15 @@ document.getElementById('spkSearch').addEventListener('input', e => {
     sel.addEventListener('change', () => { SPK_SORT = sel.value; renderSpeakers(); });
 })();
 
+// ASLS 관계자 여부 및 배지
+window.isAslsStaff = function (s) { return !!(s && (s.roleExec || s.roleAmb)); };
+function aslsBadges(s) {
+    let h = '';
+    if (s.roleExec) h += '<span class="asls-badge asls-exec">ASLS 임원</span>';
+    if (s.roleAmb) h += '<span class="asls-badge asls-amb">엠베서더</span>';
+    return h;
+}
+
 function renderSpeakers() {
     document.getElementById('spkCount').textContent = SPEAKERS.length;
     const q = SPK_SEARCH;
@@ -41,7 +50,7 @@ function renderSpeakers() {
 
     const body = document.getElementById('spkBody');
     if (!list.length) {
-        body.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:40px">
+        body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:40px">
             ${SPEAKERS.length ? '검색 결과가 없습니다.' : '등록된 연자가 없습니다. <b>+ 연자 등록</b>으로 추가하세요.'}</td></tr>`;
         return;
     }
@@ -51,6 +60,7 @@ function renderSpeakers() {
             <td class="en">${escapeHtml(s.nameEn || '-')}</td>
             <td>${escapeHtml(s.affiliationKo || '-')}</td>
             <td class="en">${escapeHtml(s.affiliationEn || '-')}</td>
+            <td>${aslsBadges(s) || '<span style="color:var(--text-dim)">-</span>'}</td>
             <td>
                 <div class="row-actions">
                     <button class="btn btn-sm" onclick="editSpeaker('${s.id}')">수정</button>
@@ -65,6 +75,8 @@ window.openSpeakerModal = function () {
     SPK_EDIT_ID = null;
     document.getElementById('spkModalTitle').textContent = '연자 등록';
     ['spkNameKo', 'spkNameEn', 'spkAffKo', 'spkAffEn', 'spkCv'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('spkRoleExec').checked = false;
+    document.getElementById('spkRoleAmb').checked = false;
     spkPhotoData = '';
     document.getElementById('spkPhotoFile').value = '';
     refreshSpkPhotoPreview();
@@ -83,6 +95,8 @@ window.editSpeaker = function (id) {
     document.getElementById('spkAffKo').value = s.affiliationKo || '';
     document.getElementById('spkAffEn').value = s.affiliationEn || '';
     document.getElementById('spkCv').value = s.cv || '';
+    document.getElementById('spkRoleExec').checked = !!s.roleExec;
+    document.getElementById('spkRoleAmb').checked = !!s.roleAmb;
     spkPhotoData = s.photo || '';
     document.getElementById('spkPhotoFile').value = '';
     refreshSpkPhotoPreview();
@@ -108,6 +122,8 @@ window.saveSpeaker = function () {
         affiliationKo: affKo,
         affiliationEn: document.getElementById('spkAffEn').value.trim(),
         cv: document.getElementById('spkCv').value.trim(),
+        roleExec: document.getElementById('spkRoleExec').checked,
+        roleAmb: document.getElementById('spkRoleAmb').checked,
         photo: spkPhotoData || '',
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     };
