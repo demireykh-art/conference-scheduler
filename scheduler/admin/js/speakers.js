@@ -31,10 +31,11 @@ document.getElementById('spkSearch').addEventListener('input', e => {
 })();
 
 // ASLS 관계자 여부 및 배지
-window.isAslsStaff = function (s) { return !!(s && (s.roleExec || s.roleAmb)); };
+window.isAslsStaff = function (s) { return !!(s && (s.roleExec || s.roleAdvisor || s.roleAmb)); };
 function aslsBadges(s) {
     let h = '';
     if (s.roleExec) h += '<span class="asls-badge asls-exec">ASLS 임원</span>';
+    if (s.roleAdvisor) h += '<span class="asls-badge asls-advisor">ASLS 고문</span>';
     if (s.roleAmb) h += '<span class="asls-badge asls-amb">엠베서더</span>';
     return h;
 }
@@ -76,6 +77,7 @@ window.openSpeakerModal = function () {
     document.getElementById('spkModalTitle').textContent = '연자 등록';
     ['spkNameKo', 'spkNameEn', 'spkAffKo', 'spkAffEn', 'spkCv'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('spkRoleExec').checked = false;
+    document.getElementById('spkRoleAdvisor').checked = false;
     document.getElementById('spkRoleAmb').checked = false;
     spkPhotoData = '';
     document.getElementById('spkPhotoFile').value = '';
@@ -96,6 +98,7 @@ window.editSpeaker = function (id) {
     document.getElementById('spkAffEn').value = s.affiliationEn || '';
     document.getElementById('spkCv').value = s.cv || '';
     document.getElementById('spkRoleExec').checked = !!s.roleExec;
+    document.getElementById('spkRoleAdvisor').checked = !!s.roleAdvisor;
     document.getElementById('spkRoleAmb').checked = !!s.roleAmb;
     spkPhotoData = s.photo || '';
     document.getElementById('spkPhotoFile').value = '';
@@ -123,6 +126,7 @@ window.saveSpeaker = function () {
         affiliationEn: document.getElementById('spkAffEn').value.trim(),
         cv: document.getElementById('spkCv').value.trim(),
         roleExec: document.getElementById('spkRoleExec').checked,
+        roleAdvisor: document.getElementById('spkRoleAdvisor').checked,
         roleAmb: document.getElementById('spkRoleAmb').checked,
         photo: spkPhotoData || '',
         updatedAt: firebase.database.ServerValue.TIMESTAMP

@@ -662,6 +662,7 @@ a { color: inherit; }
     border-radius: 10px; margin-right: 4px; white-space: nowrap;
 }
 .asls-exec { background: #eaf2ff; color: #2563c9; }
+.asls-advisor { background: #eafaf0; color: #12885a; }
 .asls-amb { background: #fbeefe; color: #a23bbf; }
 
 /* ASLS Week 뷰 전환(탭) */
