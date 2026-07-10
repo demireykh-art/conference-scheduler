@@ -22,7 +22,7 @@ const FIELDS = [
     { key: 'join', label: '참여', type: 'join' },
     { key: 'foreign', label: '참석 외국인 인원' },
     { key: 'status', label: '진행상황', type: 'status' },
-    { key: 'ownDate', label: '자체행사 날짜' },
+    { key: 'ownDate', label: '자체행사 날짜', type: 'date' },
     { key: 'ownDirector', label: '자체행사 참석이사' },
     { key: 'payment', label: '결제' },
     { key: 'clinicTour', label: '클리닉투어' },
@@ -125,6 +125,13 @@ function cellHtml(pid, f, val) {
         return `<select class="aw-cell aw-select" onchange="awSet('${pid}','join',this.value)">
             ${JOIN_OPTIONS.map(o => `<option value="${o}" ${o === val ? 'selected' : ''}>${o || '-'}</option>`).join('')}
         </select>`;
+    }
+    if (f.type === 'date') {
+        // ISO(YYYY-MM-DD)면 달력 입력, 과거 자유 텍스트가 남아있으면 텍스트로 표시(데이터 보존)
+        if (!val || /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+            return `<input type="date" class="aw-cell aw-input" value="${escapeHtml(val)}" onchange="awSet('${pid}','${f.key}',this.value)">`;
+        }
+        return `<input class="aw-cell aw-input" value="${escapeHtml(val)}" title="달력으로 다시 선택하면 날짜 형식으로 저장됩니다" onchange="awSet('${pid}','${f.key}',this.value)">`;
     }
     return `<input class="aw-cell aw-input" value="${escapeHtml(val)}" onchange="awSet('${pid}','${f.key}',this.value)">`;
 }
