@@ -625,10 +625,11 @@ function renderModChosen() {
 }
 
 // ASLS 관계자(임원·엠베서더)만 사회자로 지정 가능
-function isAslsStaff(s) { return !!(s && (s.roleExec || s.roleAmb)); }
+function isAslsStaff(s) { return !!(s && (s.roleExec || s.roleAdvisor || s.roleAmb)); }
 function aslsRoleText(s) {
     const r = [];
     if (s.roleExec) r.push('ASLS 임원');
+    if (s.roleAdvisor) r.push('ASLS 고문');
     if (s.roleAmb) r.push('엠베서더');
     return r.join('·');
 }
