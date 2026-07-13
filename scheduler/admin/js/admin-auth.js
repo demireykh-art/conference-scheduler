@@ -50,6 +50,11 @@ window.signOutAdmin = function () {
     auth.signOut().then(() => Toast.info('로그아웃되었습니다.'));
 };
 
+// 이메일 → Firebase 키 안전 문자열 (사전승인 조회용)
+window.emailKey = function (email) {
+    return (email || '').trim().toLowerCase().replace(/[.#$/\[\]]/g, ',');
+};
+
 function registerOrCheckUser(user) {
     const ref = database.ref(`/users/${user.uid}`);
     ref.once('value').then(snap => {
@@ -59,17 +64,28 @@ function registerOrCheckUser(user) {
                 displayName: user.displayName,
                 photoURL: user.photoURL
             });
-        } else {
-            const isSuper = user.email === AppConfig.SUPER_ADMIN_EMAIL;
-            ref.set({
-                email: user.email,
-                displayName: user.displayName,
-                photoURL: user.photoURL,
-                role: isSuper ? 'admin' : 'pending',
-                createdAt: firebase.database.ServerValue.TIMESTAMP,
-                lastLogin: firebase.database.ServerValue.TIMESTAMP
-            });
+            return;
         }
+        const base = {
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            createdAt: firebase.database.ServerValue.TIMESTAMP,
+            lastLogin: firebase.database.ServerValue.TIMESTAMP
+        };
+        if (user.email === AppConfig.SUPER_ADMIN_EMAIL) {
+            ref.set({ ...base, role: 'admin' });
+            return;
+        }
+        // 사전 승인(preApproved) 확인 — 있으면 그 역할로 바로 승인
+        const pRef = database.ref('/preApproved/' + emailKey(user.email));
+        pRef.once('value').then(ps => {
+            const pv = ps.val();
+            const role = (pv && (pv.role === 'admin' || pv.role === 'editor')) ? pv.role : 'pending';
+            ref.set({ ...base, role }).then(() => {
+                if (role !== 'pending') pRef.remove().catch(() => { });   // 사용됨 → 정리
+            });
+        }).catch(() => { ref.set({ ...base, role: 'pending' }); });   // 조회 불가 시 승인대기
     }).catch(() => {/* 규칙상 읽기 불가 시 무시 */ });
 }
 
