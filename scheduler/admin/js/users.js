@@ -9,6 +9,8 @@ document.getElementById('sidebarMount').innerHTML = renderSidebar('users');
 let USERS = [];
 let USER_SEARCH = '';
 let usersSub = null;
+let PRE = [];
+let preSub = null;
 
 document.getElementById('userSearch').addEventListener('input', e => {
     USER_SEARCH = e.target.value.trim().toLowerCase();
@@ -21,7 +23,10 @@ const ROLE_BADGE = { admin: 'role-admin', editor: 'role-editor', pending: 'role-
 function gate() {
     const notice = document.getElementById('usersNotice');
     const area = document.getElementById('usersArea');
-    const stop = () => { if (usersSub) { usersSub.off(); usersSub = null; } };
+    const stop = () => {
+        if (usersSub) { usersSub.off(); usersSub = null; }
+        if (preSub) { preSub.off(); preSub = null; }
+    };
 
     if (!AdminAuth.user) {
         notice.innerHTML = '이 페이지는 로그인이 필요합니다. <button class="btn btn-sm btn-primary" style="margin-left:8px" onclick="openLoginGate()">로그인</button>';
@@ -46,6 +51,13 @@ function gate() {
             notice.textContent = '사용자 목록을 불러올 수 없습니다: ' + err.message;
             notice.style.display = ''; area.style.display = 'none';
         });
+    }
+    if (!preSub) {
+        preSub = database.ref('/preApproved');
+        preSub.on('value', snap => {
+            PRE = Object.entries(snap.val() || {}).map(([key, v]) => ({ key, ...v }));
+            renderPre();
+        }, () => { PRE = []; renderPre(); });
     }
 }
 document.addEventListener('admin-auth-change', gate);
@@ -118,6 +130,56 @@ window.setRole = function (uid, role) {
             Toast.success(`역할이 "${ROLE_LABEL[role] || role}"(으)로 변경되었습니다.`);
         })
         .catch(e => Toast.error('변경 실패: ' + e.message));
+};
+
+/* ---------- 사용자 추가(사전 승인) ---------- */
+function renderPre() {
+    const el = document.getElementById('preList');
+    if (!el) return;
+    if (!PRE.length) { el.innerHTML = ''; return; }
+    const label = { editor: '편집자', admin: '관리자' };
+    el.innerHTML = `<div style="font-size:0.78rem;color:var(--text-dim);margin-bottom:6px">대기 중인 사전 승인 (첫 로그인 시 자동 적용)</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+        ${PRE.slice().sort((a, b) => (a.email || '').localeCompare(b.email || '')).map(p => `
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 11px;background:#f7f8fa;border:1px solid var(--border);border-radius:8px">
+                <span class="badge ${p.role === 'admin' ? 'role-admin' : 'role-editor'}">${label[p.role] || p.role}</span>
+                <b style="font-size:0.86rem">${escapeHtml(p.email || '')}</b>
+                <span style="margin-left:auto"><button class="btn btn-sm btn-danger-ghost" onclick="cancelPreApproval('${p.key}')">취소</button></span>
+            </div>`).join('')}
+        </div>`;
+}
+
+window.addPreApproval = function () {
+    if (!AdminAuth.isAdmin()) { Toast.error('권한이 없습니다.'); return; }
+    const emailIn = document.getElementById('preEmail');
+    const email = (emailIn.value || '').trim().toLowerCase();
+    const role = document.getElementById('preRole').value;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { Toast.warning('올바른 이메일을 입력하세요.'); return; }
+    const existing = USERS.find(u => (u.email || '').toLowerCase() === email);
+    if (existing) {
+        Toast.info('이미 가입된 사용자입니다. 아래 목록에서 역할을 바꾸세요.');
+        return;
+    }
+    const key = emailKey(email);
+    database.ref('/preApproved/' + key).set({
+        email, role,
+        by: AdminAuth.user ? (AdminAuth.user.email || '') : '',
+        createdAt: firebase.database.ServerValue.TIMESTAMP
+    }).then(() => {
+        emailIn.value = '';
+        logActivity('create', 'user', `사용자 사전 승인 추가: ${email} (${role === 'admin' ? '관리자' : '편집자'})`, { entityId: key });
+        Toast.success(`"${email}" 사전 승인 등록됨 · 첫 로그인 시 자동 적용`);
+    }).catch(e => Toast.error('추가 실패: ' + e.message));
+};
+
+window.cancelPreApproval = async function (key) {
+    if (!AdminAuth.isAdmin()) { Toast.error('권한이 없습니다.'); return; }
+    const p = PRE.find(x => x.key === key);
+    const ok = await confirmDialog(`"${p ? p.email : ''}" 사전 승인을 취소할까요?`, { danger: true, okText: '취소' });
+    if (!ok) return;
+    database.ref('/preApproved/' + key).remove()
+        .then(() => Toast.success('사전 승인이 취소되었습니다.'))
+        .catch(e => Toast.error('취소 실패: ' + e.message));
 };
 
 window.deleteUser = async function (uid) {
