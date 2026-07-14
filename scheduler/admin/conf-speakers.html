@@ -27,7 +27,7 @@
 
                 <div class="info-banner" style="margin-top:12px">
                     <div class="info-ico">i</div>
-                    <div class="info-title">이 행사에 참여하는 연자/사회자를 선택하세요. 이름을 입력하면 등록된 연자에서 바로 찾아 추가할 수 있고, 없으면 새로 등록됩니다.</div>
+                    <div class="info-title">이 행사에 참여하는 연자/사회자를 선택하세요. 이름을 입력하면 등록된 연자에서 바로 찾아 추가할 수 있고, 없으면 <b>연자 관리와 동일한 등록창</b>이 열려 새로 등록됩니다(사진·영문명·소속·ASLS 역할). 등록된 연자는 모든 행사에서 공용으로 사용됩니다.</div>
                 </div>
 
                 <div class="ac-wrap" style="max-width:460px;margin-bottom:6px">
@@ -40,6 +40,63 @@
                 <div id="peopleList" class="people-list"></div>
             </div>
         </main>
+    </div>
+
+    <!-- 새 연자 등록 모달 (연자 관리와 동일) -->
+    <div class="modal-overlay" id="spkModal">
+        <div class="modal">
+            <h3 id="spkModalTitle">새 연자 등록</h3>
+            <div class="modal-field">
+                <label>사진</label>
+                <div style="display:flex;gap:14px;align-items:center">
+                    <img id="spkPhotoPreview" class="spk-photo-preview" style="display:none" alt="사진">
+                    <div id="spkPhotoEmpty" class="spk-photo-preview spk-photo-empty">사진</div>
+                    <div style="display:flex;flex-direction:column;gap:6px">
+                        <input type="file" id="spkPhotoFile" accept="image/*" style="display:none">
+                        <button type="button" class="btn btn-sm" onclick="document.getElementById('spkPhotoFile').click()">🖼️ 사진 선택</button>
+                        <button type="button" class="btn btn-sm btn-danger-ghost" id="spkPhotoClear" onclick="clearSpkPhoto()" style="display:none">✕ 제거</button>
+                        <div style="font-size:0.72rem;color:var(--text-dim)">원형으로 표시됩니다 (자동 축소).</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-grid2">
+                <div class="modal-field">
+                    <label>연자 이름 (국문) *</label>
+                    <input type="text" id="spkNameKo" placeholder="예: 홍길동">
+                </div>
+                <div class="modal-field">
+                    <label>연자 이름 (영문)</label>
+                    <input type="text" id="spkNameEn" placeholder="예: Gil-dong Hong">
+                </div>
+            </div>
+            <div class="modal-grid2">
+                <div class="modal-field">
+                    <label>소속 (국문)</label>
+                    <input type="text" id="spkAffKo" placeholder="예: OO의원">
+                </div>
+                <div class="modal-field">
+                    <label>소속 (영문)</label>
+                    <input type="text" id="spkAffEn" placeholder="예: OO Clinic">
+                </div>
+            </div>
+            <div class="modal-field">
+                <label>ASLS 관계자 구분</label>
+                <div style="display:flex;gap:18px;align-items:center;padding:4px 0">
+                    <label class="check-inline"><input type="checkbox" id="spkRoleExec"> ASLS 임원</label>
+                    <label class="check-inline"><input type="checkbox" id="spkRoleAdvisor"> ASLS 고문</label>
+                    <label class="check-inline"><input type="checkbox" id="spkRoleAmb"> ASLS 엠베서더</label>
+                </div>
+                <div style="font-size:0.72rem;color:var(--text-dim)">사회자(Moderator)는 ASLS 관계자(임원·고문·엠베서더)만 지정할 수 있습니다.</div>
+            </div>
+            <div class="modal-field">
+                <label>CV / 약력</label>
+                <textarea id="spkCv" rows="4" placeholder="학력·경력·주요 이력 등"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeSpeakerModal()">취소</button>
+                <button class="btn btn-primary" onclick="saveNewSpeaker()">등록 후 이 행사에 추가</button>
+            </div>
+        </div>
     </div>
 
     <script src="../js/config.js"></script>
