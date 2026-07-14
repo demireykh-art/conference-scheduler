@@ -62,6 +62,7 @@ document.getElementById('placeCatFilter').innerHTML =
 document.getElementById('placeSearch').addEventListener('input', renderPlaceList);
 document.getElementById('placeCatFilter').addEventListener('change', renderPlaceList);
 document.getElementById('placeHidePlaced').addEventListener('change', renderPlaceList);
+document.getElementById('ttSearch').addEventListener('input', runTtSearch);
 
 if (!CONF_ID) {
     document.getElementById('sessions').innerHTML =
@@ -76,12 +77,129 @@ if (!CONF_ID) {
         }
         renderAll();
         if (document.getElementById('placeModal').classList.contains('open')) renderPlaceList();
+        if (ttQuery()) runTtSearch();
     });
     confRef().child('lecturePool').on('value', snap => {
         POOL = toOrderedArray(snap.val());
         if (document.getElementById('placeModal').classList.contains('open')) renderPlaceList();
+        if (ttQuery()) runTtSearch();
     });
 }
+
+/* ============================================================
+   시간표 강의 검색 (제목·연자·회사) — 하이라이트/필터 + 다른 룸·미배치 안내
+   ============================================================ */
+function ttQuery() {
+    const el = document.getElementById('ttSearch');
+    return el ? el.value.trim().toLowerCase() : '';
+}
+
+function lecSearchText(lec) {
+    const pool = lec.lectureId ? POOL.find(p => p.id === lec.lectureId) : null;
+    const parts = [lec.titleKo, lec.titleEn, lec.partnerKo, lec.partnerEn, lec.productKo, lec.productEn, lec.name,
+        pool && pool.titleKo, pool && pool.titleEn, pool && pool.partnerKo, pool && pool.partnerEn];
+    (lec.speakers || []).forEach(s => parts.push(s.nameKo, s.nameEn, s.affiliationKo, s.affiliationEn));
+    if (pool) (pool.speakers || []).forEach(s => parts.push(s.nameKo, s.nameEn));
+    if (lec.moderator) parts.push(lec.moderator.nameKo, lec.moderator.nameEn);
+    return parts.filter(Boolean).join(' ').toLowerCase();
+}
+function poolSearchText(p) {
+    const parts = [p.titleKo, p.titleEn, p.partnerKo, p.partnerEn, p.productKo, p.productEn];
+    (p.speakers || []).forEach(s => parts.push(s.nameKo, s.nameEn, s.affiliationKo, s.affiliationEn));
+    return parts.filter(Boolean).join(' ').toLowerCase();
+}
+
+// 배치된 강의(모든 룸) 목록 수집
+function collectPlacedLectures() {
+    const out = [];
+    (orderedRooms() || []).forEach(room => {
+        Object.entries((CONF.rooms[room.id] || {}).sessions || {}).forEach(([sid, sess]) => {
+            Object.entries(sess.lectures || {}).forEach(([lid, lec]) => {
+                if (lec.isBreak) return;
+                out.push({
+                    roomId: room.id, roomName: room.name || '룸', date: room.date || '',
+                    sessionId: sid, sessionName: sess.name || '', lecId: lid,
+                    title: lec.titleKo || lec.titleEn || (lec.isPanel ? 'Q&A & Panel' : '(제목 없음)'),
+                    text: lecSearchText(lec)
+                });
+            });
+        });
+    });
+    return out;
+}
+
+function runTtSearch() {
+    const q = ttQuery();
+    const infoEl = document.getElementById('ttSearchInfo');
+    const resEl = document.getElementById('ttSearchResults');
+    const clearBtn = document.getElementById('ttSearchClear');
+    if (clearBtn) clearBtn.style.display = q ? '' : 'none';
+
+    if (!q || !CONF) { infoEl.textContent = ''; resEl.innerHTML = ''; applyTtHighlight(''); return; }
+
+    const placed = collectPlacedLectures().filter(x => x.text.includes(q));
+    const placedPoolIds = new Set();
+    Object.values(CONF.rooms || {}).forEach(room =>
+        Object.values(room.sessions || {}).forEach(sess =>
+            Object.values(sess.lectures || {}).forEach(lec => { if (lec.lectureId) placedPoolIds.add(lec.lectureId); })));
+    const unplaced = POOL.filter(p => !placedPoolIds.has(p.id) && poolSearchText(p).includes(q));
+
+    const here = placed.filter(x => x.roomId === CURRENT_ROOM).length;
+    infoEl.innerHTML = `총 <b>${placed.length}</b>건 매칭 · 이 룸 ${here} · 미배치 <b>${unplaced.length}</b>건`;
+
+    let html = '';
+    if (placed.length) {
+        html += `<div class="ttsr-group"><span class="ttsr-label">배치됨</span>${placed.map(x =>
+            `<button class="ttsr-chip ${x.roomId === CURRENT_ROOM ? 'here' : ''}" onclick="ttGoto('${x.roomId}','${x.lecId}')" title="${escapeHtml(x.roomName)}${x.date ? ' · ' + escapeHtml(x.date) : ''} · ${escapeHtml(x.sessionName)}">
+                ${escapeHtml(x.title)} <span class="ttsr-loc">${escapeHtml(x.roomName)}${x.date ? '·' + escapeHtml(x.date) : ''}</span>
+            </button>`).join('')}</div>`;
+    }
+    if (unplaced.length) {
+        html += `<div class="ttsr-group"><span class="ttsr-label warn">미배치</span>${unplaced.map(p =>
+            `<span class="ttsr-chip unplaced" title="아직 시간표에 배치되지 않은 강의">${escapeHtml(p.titleKo || p.titleEn || '(제목 없음)')}${p.partnerKo ? ` <span class="ttsr-loc">${escapeHtml(p.partnerKo)}</span>` : ''}</span>`).join('')}</div>`;
+    }
+    if (!placed.length && !unplaced.length) html = `<div class="ttsr-empty">일치하는 강의가 없습니다.</div>`;
+    resEl.innerHTML = html;
+
+    applyTtHighlight(q);
+}
+
+// 현재 보이는 룸의 강의 행에 하이라이트/흐리게 적용
+function applyTtHighlight(q) {
+    const rows = document.querySelectorAll('#sessions .lecture-row');
+    rows.forEach(row => {
+        row.classList.remove('lec-hit', 'lec-dim');
+        if (!q) return;
+        const lid = row.getAttribute('data-lec');
+        const room = getRoom(CURRENT_ROOM);
+        let lec = null;
+        (room ? Object.values(room.sessions || {}) : []).some(s => {
+            if (s.lectures && s.lectures[lid]) { lec = s.lectures[lid]; return true; }
+            return false;
+        });
+        if (!lec) return;
+        if (lecSearchText(lec).includes(q)) row.classList.add('lec-hit');
+        else row.classList.add('lec-dim');
+    });
+}
+
+window.ttGoto = function (roomId, lecId) {
+    if (roomId !== CURRENT_ROOM) selectRoom(roomId);
+    setTimeout(() => {
+        const row = document.querySelector(`#sessions .lecture-row[data-lec="${lecId}"]`);
+        if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            row.classList.add('lec-flash');
+            setTimeout(() => row.classList.remove('lec-flash'), 1600);
+        }
+    }, roomId !== CURRENT_ROOM ? 60 : 0);
+};
+
+window.clearTtSearch = function () {
+    const el = document.getElementById('ttSearch');
+    if (el) el.value = '';
+    runTtSearch();
+};
 
 /* ---------- 룸 정렬 헬퍼 ---------- */
 function orderedRooms() { return toOrderedArray(CONF && CONF.rooms); }
@@ -394,6 +512,9 @@ function renderSessions() {
     enableSort(box, '.session-block', 'data-session', ids => persistSessionOrder(room.id, ids), 'session');
     // 강의 드래그 (세션 내 순서변경 + 세션 간 이동 모두 지원)
     enableLectureDrag(room.id);
+
+    // 검색 하이라이트 재적용 (재렌더 후에도 유지)
+    if (typeof ttQuery === 'function' && ttQuery()) applyTtHighlight(ttQuery());
 }
 
 function renderSessionBlock(roomId, s) {

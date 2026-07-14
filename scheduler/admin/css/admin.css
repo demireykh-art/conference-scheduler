@@ -656,6 +656,37 @@ a { color: inherit; }
 .aw-cell.aw-input:focus { border-color: var(--primary); outline: none; }
 .aw-select { cursor: pointer; font-weight: 600; }
 
+/* 시간표 강의 검색 */
+.tt-search-bar { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; flex-wrap: wrap; }
+.tt-search-bar #ttSearch {
+    padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.88rem; width: 340px; max-width: 100%;
+}
+.tt-search-bar #ttSearch:focus { border-color: var(--primary); outline: none; }
+.tt-search-info { color: var(--text-dim); font-size: 0.82rem; }
+.tt-search-results { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.tt-search-results:empty { display: none; }
+.ttsr-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ttsr-label { font-size: 0.74rem; font-weight: 700; color: var(--text-dim); flex-shrink: 0; }
+.ttsr-label.warn { color: #b26a00; }
+.ttsr-chip {
+    display: inline-flex; align-items: center; gap: 6px; max-width: 360px;
+    border: 1px solid var(--border); background: #fff; border-radius: 999px;
+    padding: 4px 11px; font-size: 0.8rem; color: var(--text); cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ttsr-chip:hover { background: #f0f5ff; border-color: var(--primary); }
+.ttsr-chip.here { border-color: var(--primary); background: #eef4ff; }
+.ttsr-chip.unplaced { cursor: default; background: #fff8ef; border-color: #f0d3a0; color: #8a5a00; }
+.ttsr-chip.unplaced:hover { background: #fff8ef; }
+.ttsr-loc { font-size: 0.72rem; color: var(--text-dim); }
+.ttsr-empty { color: var(--text-dim); font-size: 0.84rem; padding: 4px 2px; }
+
+/* 검색 하이라이트/흐리게 */
+.lecture-row.lec-hit { background: #fff9e6; box-shadow: inset 3px 0 0 #f1b100; }
+.lecture-row.lec-dim { opacity: 0.4; }
+@keyframes lecFlash { 0%, 100% { background: transparent; } 30% { background: #fff2c4; } }
+.lecture-row.lec-flash { animation: lecFlash 1.5s ease; }
+
 /* 파트너사 참가/신청전 셀 */
 .join-cell { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .pre-btn {

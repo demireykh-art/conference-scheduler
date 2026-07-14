@@ -36,6 +36,14 @@
             <div class="main-body">
                 <a href="index.html" style="font-size:0.85rem;color:var(--primary);text-decoration:none">‹ 행사 목록으로</a>
 
+                <!-- 강의 검색 (제목·연자·회사) -->
+                <div class="tt-search-bar">
+                    <input type="text" id="ttSearch" placeholder="🔍 제목·연자·회사 검색 (전체 룸/날짜)" autocomplete="off">
+                    <button type="button" id="ttSearchClear" class="btn btn-sm" style="display:none" onclick="clearTtSearch()">✕ 지우기</button>
+                    <span id="ttSearchInfo" class="tt-search-info"></span>
+                </div>
+                <div id="ttSearchResults" class="tt-search-results"></div>
+
                 <!-- 룸 탭 -->
                 <div class="room-tabs" id="roomTabs"></div>
 
