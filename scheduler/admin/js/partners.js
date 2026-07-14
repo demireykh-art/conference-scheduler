@@ -161,6 +161,18 @@ document.getElementById('ptnSearch').addEventListener('input', e => {
     sel.addEventListener('change', () => { PTN_SORT = sel.value; renderPartners(); });
 })();
 
+// 참가 현황별 보기 필터 — 마지막 선택 유지 (localStorage)
+(function initStatusFilter() {
+    const sel = document.getElementById('ptnStatusFilter');
+    if (!sel) return;
+    try { sel.value = localStorage.getItem('asls_ptnStatusFilter') || ''; } catch (e) { }
+})();
+window.onPtnStatusChange = function () {
+    const sel = document.getElementById('ptnStatusFilter');
+    try { localStorage.setItem('asls_ptnStatusFilter', sel ? sel.value : ''); } catch (e) { }
+    renderPartners();
+};
+
 // 선택 행사 참가여부 토글 (참가 체크 시 '신청전'은 자동 해제)
 window.toggleParticipation = function (id, on) {
     if (!AdminAuth.requireEdit()) { renderPartners(); return; }
@@ -266,7 +278,6 @@ function renderPartners() {
     if (preCountEl) preCountEl.textContent = PRE_PARTNERS.size;
 
     const q = PTN_SEARCH;
-    const onlyPart = document.getElementById('ptnOnlyParticipating');
     const statusSel = document.getElementById('ptnStatusFilter');
     const statusMode = statusSel ? statusSel.value : '';
     const hasConf = !!PLACED_CONF_ID;
@@ -275,10 +286,10 @@ function renderPartners() {
         ? PARTNERS.filter(p => [p.nameKo, p.nameEn].some(v => (v || '').toLowerCase().includes(q))
             || partnerProducts(p).some(pr => [pr.nameKo, pr.nameEn].some(v => (v || '').toLowerCase().includes(q))))
         : PARTNERS.slice();
-    // 상태 필터(신청전/미참가)가 우선, 없으면 '참가사만 보기' 체크 적용
-    if (statusMode === 'pre') list = list.filter(p => PRE_PARTNERS.has(p.id));
+    // 참가 현황별 보기: 전체 / 본행사 참가 / 신청전 / 미참가
+    if (statusMode === 'joined') list = list.filter(p => CONF_PARTNERS.has(p.id));
+    else if (statusMode === 'pre') list = list.filter(p => PRE_PARTNERS.has(p.id));
     else if (statusMode === 'none') list = list.filter(p => !CONF_PARTNERS.has(p.id) && !PRE_PARTNERS.has(p.id));
-    else if (onlyPart && onlyPart.checked) list = list.filter(p => CONF_PARTNERS.has(p.id));
     list = sortList(list, PTN_SORT, 'nameKo');
 
     const body = document.getElementById('ptnBody');
@@ -310,9 +321,9 @@ function renderPartners() {
         <tr class="${joined ? 'row-joined' : isPre ? 'row-pre' : ''}">
             <td>
                 <div class="join-cell">
-                    <input type="checkbox" class="join-check" ${joined ? 'checked' : ''} ${hasConf ? '' : 'disabled'}
-                        title="${hasConf ? '이 행사 참가여부' : '먼저 행사를 선택하세요'}"
-                        onchange="toggleParticipation('${p.id}', this.checked)">
+                    <button class="join-btn ${joined ? 'active' : ''}" ${hasConf ? '' : 'disabled'}
+                        title="${hasConf ? '이 행사 참가 (클릭하여 토글)' : '먼저 행사를 선택하세요'}"
+                        onclick="toggleParticipation('${p.id}', ${joined ? 'false' : 'true'})">참가</button>
                     <button class="pre-btn ${isPre ? 'active' : ''}" ${hasConf ? '' : 'disabled'}
                         title="참가를 망설이는 회사 — 신청전으로 표시(참가 자동 해제)"
                         onclick="togglePreApply('${p.id}')">신청전</button>

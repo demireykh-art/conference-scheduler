@@ -557,7 +557,7 @@ function renderSessionBlock(roomId, s) {
             </div>
             <div class="spacer"></div>
             <button class="btn btn-primary btn-sm" onclick="openPlaceModal('${roomId}','${s.id}')">+ 강의 배치</button>
-            <button class="btn btn-sm" onclick="openBreakModal('${roomId}','${s.id}')">+ 개회/브레이크</button>
+            <button class="btn btn-sm" onclick="openBreakModal('${roomId}','${s.id}')">+ 개폐회/점심/브레이크</button>
             <button class="txt-btn" onclick="editSession('${roomId}','${s.id}')">수정</button>
             <button class="txt-btn danger" onclick="deleteSession('${roomId}','${s.id}')">삭제</button>
         </div>
