@@ -66,14 +66,96 @@ setupAutocomplete(
         if (!AdminAuth.requireEdit()) return;
         if (val.type === 'existing') { addPerson(val.s.id); return; }
         const name = (val.name || '').trim(); if (!name) return;
-        const ok = await confirmDialog(`"${name}" 연자가 목록에 없습니다.\n새 연자로 등록하고 이 행사에 추가할까요? (연자 관리에도 추가됨)`, { okText: '등록' });
-        if (!ok) return;
-        const id = uuid();
-        database.ref('/adminSpeakers/' + id).set({ nameKo: name, nameEn: '', affiliationKo: '', affiliationEn: '', order: Masters.speakers.length, createdAt: firebase.database.ServerValue.TIMESTAMP })
-            .then(() => { addPerson(id); Toast.success(`"${name}" 등록 후 추가했습니다.`); })
-            .catch(e => Toast.error('등록 실패: ' + e.message));
+        // 신규 연자 → 연자 관리와 동일한 전체 등록창을 연다 (사진·영문명·소속·ASLS 역할)
+        openNewSpeakerModal(name);
     }
 );
+
+/* ============================================================
+   새 연자 등록 모달 (연자 관리 speakers.js와 동일한 필드 → 마스터에 저장 후 이 행사에 추가)
+   ============================================================ */
+let spkPhotoData = '';
+
+window.openNewSpeakerModal = function (name) {
+    if (!AdminAuth.requireEdit()) return;
+    document.getElementById('spkNameKo').value = name || '';
+    ['spkNameEn', 'spkAffKo', 'spkAffEn', 'spkCv'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('spkRoleExec').checked = false;
+    document.getElementById('spkRoleAdvisor').checked = false;
+    document.getElementById('spkRoleAmb').checked = false;
+    spkPhotoData = '';
+    document.getElementById('spkPhotoFile').value = '';
+    refreshSpkPhotoPreview();
+    document.getElementById('spkModal').classList.add('open');
+    setTimeout(() => document.getElementById('spkNameKo').focus(), 50);
+    // 검색창 비우기
+    const inp = document.getElementById('spkInput'); if (inp) inp.value = '';
+};
+
+window.closeSpeakerModal = function () { document.getElementById('spkModal').classList.remove('open'); };
+
+window.saveNewSpeaker = function () {
+    if (!AdminAuth.requireEdit()) return;
+    const nameKo = document.getElementById('spkNameKo').value.trim();
+    if (!nameKo) { Toast.warning('연자 이름(국문)을 입력하세요.'); return; }
+    const affKo = document.getElementById('spkAffKo').value.trim();
+    // 마스터 중복 체크 (이름+소속국문) → 있으면 그 연자를 이 행사에 추가
+    const dup = Masters.speakers.find(s => (s.nameKo || '').trim() === nameKo && (s.affiliationKo || '').trim() === affKo);
+    if (dup) {
+        Toast.info('이미 등록된 연자입니다. 이 행사에 추가합니다.');
+        closeSpeakerModal(); addPerson(dup.id); return;
+    }
+    const id = uuid();
+    const data = {
+        nameKo,
+        nameEn: document.getElementById('spkNameEn').value.trim(),
+        affiliationKo: affKo,
+        affiliationEn: document.getElementById('spkAffEn').value.trim(),
+        cv: document.getElementById('spkCv').value.trim(),
+        roleExec: document.getElementById('spkRoleExec').checked,
+        roleAdvisor: document.getElementById('spkRoleAdvisor').checked,
+        roleAmb: document.getElementById('spkRoleAmb').checked,
+        photo: spkPhotoData || '',
+        order: Masters.speakers.length,
+        createdAt: firebase.database.ServerValue.TIMESTAMP,
+        updatedAt: firebase.database.ServerValue.TIMESTAMP
+    };
+    database.ref('/adminSpeakers/' + id).set(data)
+        .then(() => {
+            logActivity('create', 'speaker', `연자 "${nameKo}" 등록`, { entityId: id });
+            closeSpeakerModal();
+            addPerson(id);
+            Toast.success(`"${nameKo}" 연자 관리에 등록 후 이 행사에 추가했습니다.`);
+        })
+        .catch(e => Toast.error('등록 실패: ' + e.message));
+};
+
+/* 사진 업로드/미리보기 (speakers.js와 동일) */
+function refreshSpkPhotoPreview() {
+    const img = document.getElementById('spkPhotoPreview');
+    const empty = document.getElementById('spkPhotoEmpty');
+    const clr = document.getElementById('spkPhotoClear');
+    if (spkPhotoData) {
+        img.src = spkPhotoData; img.style.display = ''; empty.style.display = 'none'; clr.style.display = '';
+    } else {
+        img.removeAttribute('src'); img.style.display = 'none'; empty.style.display = ''; clr.style.display = 'none';
+    }
+}
+window.clearSpkPhoto = function () {
+    spkPhotoData = '';
+    document.getElementById('spkPhotoFile').value = '';
+    refreshSpkPhotoPreview();
+};
+document.getElementById('spkPhotoFile').addEventListener('change', async e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { Toast.warning('이미지 파일만 업로드할 수 있습니다.'); e.target.value = ''; return; }
+    try {
+        spkPhotoData = await compressImage(file, 400, 0.82);
+        refreshSpkPhotoPreview();
+    } catch (err) { Toast.error('이미지 처리 실패: ' + err.message); }
+    e.target.value = '';
+});
 
 function confTitleText() { return document.getElementById('confName').textContent || ''; }
 
