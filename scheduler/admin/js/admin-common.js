@@ -298,6 +298,7 @@ const SIDE_MENU = [
             { key: 'partners', label: '행사별 참여사 관리', href: 'partners.html' },
             { key: 'booth', label: '부스 등급별 혜택', href: 'booth-benefits.html' },
             { key: 'sponsor', label: '스폰서 강의 점검', href: 'sponsor-roster.html' },
+            { key: 'poster', label: '연자 포스터 생성', href: 'poster.html' },
             { key: 'aslsweek', label: 'ASLS Week 관리', href: 'asls-week.html' },
             { key: 'registrants', label: '등록자 관리' },
             { key: 'foreign', label: '외국인 등록자 관리' },
