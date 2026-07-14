@@ -94,8 +94,8 @@
             </div>
 
             <div class="modal-field">
-                <label>강의 유형</label>
-                <div id="lecTypeChecks" class="type-checks"></div>
+                <label>강의유형 (정규/일반/요일/시간/스폰)</label>
+                <select id="lecTypeSelect" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.9rem"></select>
             </div>
 
             <div class="modal-field">
@@ -120,13 +120,46 @@
                 </div>
                 <div class="modal-field">
                     <label>제품 (선택)</label>
-                    <select id="lecProductSelect"></select>
+                    <div style="display:flex;gap:6px;align-items:center">
+                        <select id="lecProductSelect" style="flex:1"></select>
+                        <button type="button" class="btn btn-sm" onclick="openNewProductModal()" title="이 파트너사에 새 제품 추가">+ 새 제품</button>
+                    </div>
                 </div>
             </div>
 
             <div class="modal-actions">
                 <button class="btn" onclick="closeLectureModal()">취소</button>
                 <button class="btn btn-primary" onclick="saveLecture()">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 새 제품 등록 팝업 (파트너사 관리 제품 입력과 동일 양식 → /adminPartners 연동) -->
+    <div class="modal-overlay" id="lecProdModal">
+        <div class="modal" style="max-width:460px">
+            <h3>새 제품 등록</h3>
+            <div id="lecProdPartnerName" style="font-size:0.85rem;color:var(--text-dim);margin-bottom:10px"></div>
+            <div class="modal-grid2">
+                <div class="modal-field">
+                    <label>제품명 (국문)</label>
+                    <input type="text" id="lpNameKo" placeholder="예: 스킨부스터">
+                </div>
+                <div class="modal-field">
+                    <label>제품명 (영문)</label>
+                    <input type="text" id="lpNameEn" placeholder="예: Skin Booster">
+                </div>
+            </div>
+            <div class="modal-field">
+                <label>제품 분류</label>
+                <select id="lpCat"></select>
+            </div>
+            <div class="modal-field">
+                <label>제품 설명</label>
+                <input type="text" id="lpDesc" placeholder="제품 설명 (수동 입력)">
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeNewProductModal()">취소</button>
+                <button class="btn btn-primary" onclick="saveNewProduct()">등록 후 선택</button>
             </div>
         </div>
     </div>
