@@ -16,7 +16,7 @@
             <div class="main-topbar">
                 <div style="display:flex;align-items:center;gap:10px">
                     <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
-                    <h1 class="main-title">파트너사 관리</h1>
+                    <h1 class="main-title">행사별 참여사 관리</h1>
                 </div>
             </div>
             <div class="main-body">
@@ -36,14 +36,14 @@
                     <span class="cpb-label">행사 선택</span>
                     <select id="placedConfSelect" onchange="changePlacedConf(this.value)"
                         style="padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:0.86rem;max-width:300px"></select>
-                    <label class="check-inline" style="margin-left:6px">
-                        <input type="checkbox" id="ptnOnlyParticipating" onchange="renderPartners()"> 참가사만 보기
+                    <label class="check-inline" style="margin-left:6px;gap:6px">참가 현황별 보기
+                        <select id="ptnStatusFilter" onchange="onPtnStatusChange()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.83rem">
+                            <option value="">전체</option>
+                            <option value="joined">본행사 참가</option>
+                            <option value="pre">신청전</option>
+                            <option value="none">미참가</option>
+                        </select>
                     </label>
-                    <select id="ptnStatusFilter" onchange="renderPartners()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.83rem">
-                        <option value="">상태 전체</option>
-                        <option value="pre">신청전 회사</option>
-                        <option value="none">미참가 회사</option>
-                    </select>
                     <span style="color:var(--text-dim);font-size:0.82rem">참가 <b id="ptnPartCount">0</b> · 신청전 <b id="ptnPreCount">0</b>개사</span>
                 </div>
                 <div class="card table-card">

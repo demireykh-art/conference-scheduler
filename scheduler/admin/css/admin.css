@@ -688,13 +688,22 @@ a { color: inherit; }
 .lecture-row.lec-flash { animation: lecFlash 1.5s ease; }
 
 /* 파트너사 참가/신청전 셀 */
-.join-cell { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.join-cell { display: flex; align-items: center; justify-content: center; gap: 6px; }
+/* 참가 버튼: 비활성=연한 회색, 활성=파란색 */
+.join-btn {
+    border: 1px solid var(--border); background: #eef0f3; color: #8a93a0;
+    border-radius: 999px; padding: 4px 13px; font-size: 0.76rem; font-weight: 700; white-space: nowrap;
+}
+.join-btn:hover:not(:disabled) { background: #e3ecff; border-color: var(--primary); color: var(--primary); }
+.join-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.join-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* 신청전 버튼: 비활성=연한 회색, 활성=주황색 */
 .pre-btn {
-    border: 1px solid var(--border); background: #fff; color: var(--text-dim);
-    border-radius: 999px; padding: 3px 10px; font-size: 0.74rem; font-weight: 600; white-space: nowrap;
+    border: 1px solid var(--border); background: #eef0f3; color: #8a93a0;
+    border-radius: 999px; padding: 4px 11px; font-size: 0.74rem; font-weight: 700; white-space: nowrap;
 }
 .pre-btn:hover:not(:disabled) { background: #fff7ea; border-color: #f0c98a; color: #b26a00; }
-.pre-btn.active { background: #fff2d9; border-color: #e6a23c; color: #b26a00; }
+.pre-btn.active { background: #f6a623; border-color: #e0940c; color: #fff; }
 .pre-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 tr.row-pre { background: #fffaf0; }
 
