@@ -42,20 +42,30 @@ function currentTypeList() {
             : LECTURE_TYPES;
     return cols.concat(EXTRA_LECTURE_TYPES);
 }
-function selectedTypes() { return [...document.querySelectorAll('#lecTypeChecks .lec-type-check:checked')].map(c => c.value); }
+// 강의 유형: 단일 선택 드롭다운 (저장은 기존 호환 위해 types[] 배열 0~1개)
+function selectedTypes() {
+    const sel = document.getElementById('lecTypeSelect');
+    const v = sel ? sel.value : '';
+    return v ? [v] : [];
+}
 function renderTypeChecks(includeTypes) {
-    const checked = new Set(selectedTypes());
+    const sel = document.getElementById('lecTypeSelect');
+    if (!sel) return;
+    const cur = sel.value || ((includeTypes && includeTypes[0]) || '');
     const list = currentTypeList().slice();
-    [...checked, ...(includeTypes || [])].forEach(t => { if (t && !list.includes(t)) list.push(t); });
-    document.getElementById('lecTypeChecks').innerHTML = list.map(t => {
+    (includeTypes || []).forEach(t => { if (t && !list.includes(t)) list.push(t); });
+    if (cur && !list.includes(cur)) list.push(cur);
+    sel.innerHTML = '<option value="">(유형 없음)</option>' + list.map(t => {
         const extra = EXTRA_LECTURE_TYPES.includes(t);
-        return `<label class="check-inline"><input type="checkbox" class="lec-type-check" value="${escapeHtml(t)}" ${checked.has(t) ? 'checked' : ''}> ${escapeHtml(t)}${extra ? ' <span style="color:var(--text-dim);font-size:0.72rem">(비스폰)</span>' : ''}</label>`;
+        return `<option value="${escapeHtml(t)}" ${t === cur ? 'selected' : ''}>${escapeHtml(t)}${extra ? ' (비스폰)' : ''}</option>`;
     }).join('');
+    sel.value = cur;
 }
 function setTypes(arr) {
-    renderTypeChecks(arr);   // 이 강의의 기존 유형까지 포함해 표시
-    const set = new Set(arr || []);
-    document.querySelectorAll('#lecTypeChecks .lec-type-check').forEach(c => { c.checked = set.has(c.value); });
+    const first = (arr && arr[0]) || '';
+    renderTypeChecks(first ? [first] : []);
+    const sel = document.getElementById('lecTypeSelect');
+    if (sel) sel.value = first;
 }
 // 전역 템플릿 열 로드(fallback) + 초기 렌더
 database.ref('/adminBoothBenefits').once('value').then(s => {
@@ -298,13 +308,61 @@ setupAutocomplete(
     }
 );
 
+let LEC_PRODUCTS = [];   // 현재 파트너사 제품 배열 (선택 인덱스 기준)
 function loadProducts(partner) {
     const products = (partner && Array.isArray(partner.products)) ? partner.products : [];
+    LEC_PRODUCTS = products;
     const sel = document.getElementById('lecProductSelect');
     sel.innerHTML = '<option value="">-- 제품 선택 --</option>' +
         products.map((pr, i) => `<option value="${i}">${escapeHtml(pr.nameKo || pr.nameEn || '')}</option>`).join('');
     sel.disabled = !products.length;
 }
+
+/* ---------- 새 제품 등록 (파트너사 관리 제품 입력과 동일 양식 → /adminPartners 연동) ---------- */
+window.openNewProductModal = function () {
+    if (!AdminAuth.requireEdit()) return;
+    if (!partnerDraft || !partnerDraft.id) { Toast.warning('먼저 파트너사를 선택하세요. 제품은 파트너사에 소속됩니다.'); return; }
+    document.getElementById('lecProdPartnerName').textContent = `파트너사: ${partnerDraft.nameKo || partnerDraft.nameEn || ''}`;
+    document.getElementById('lpNameKo').value = '';
+    document.getElementById('lpNameEn').value = '';
+    document.getElementById('lpCat').innerHTML = productCategoryOptions('');
+    document.getElementById('lpDesc').value = '';
+    document.getElementById('lecProdModal').classList.add('open');
+    setTimeout(() => document.getElementById('lpNameKo').focus(), 50);
+};
+window.closeNewProductModal = function () { document.getElementById('lecProdModal').classList.remove('open'); };
+window.saveNewProduct = function () {
+    if (!AdminAuth.requireEdit()) return;
+    const pid = partnerDraft && partnerDraft.id;
+    if (!pid) { Toast.warning('파트너사를 먼저 선택하세요.'); return; }
+    const nameKo = document.getElementById('lpNameKo').value.trim();
+    const nameEn = document.getElementById('lpNameEn').value.trim();
+    if (!nameKo && !nameEn) { Toast.warning('제품명을 입력하세요.'); return; }
+    const prod = {
+        nameKo, nameEn,
+        category: document.getElementById('lpCat').value || '',
+        description: document.getElementById('lpDesc').value.trim()
+    };
+    const ref = database.ref('/adminPartners/' + pid + '/products');
+    ref.once('value').then(s => {
+        const cur = s.val();
+        const arr = Array.isArray(cur) ? cur.slice() : (cur ? Object.values(cur) : []);
+        arr.push(prod);
+        const newIdx = arr.length - 1;
+        return ref.set(arr).then(() => newIdx);
+    }).then(newIdx => {
+        logActivity('update', 'partner', `파트너사 제품 "${nameKo || nameEn}" 추가`, { entityId: pid });
+        // 방금 저장한 배열 기준으로 제품 목록 즉시 갱신 + 새 제품 선택 (Masters 갱신 지연 무관)
+        return database.ref('/adminPartners/' + pid).once('value').then(ps => {
+            loadProducts(ps.val() || {});
+            const sel = document.getElementById('lecProductSelect');
+            sel.value = String(newIdx);
+        });
+    }).then(() => {
+        closeNewProductModal();
+        Toast.success(`제품 "${nameKo || nameEn}" 추가 후 선택했습니다. (파트너사 관리에도 반영)`);
+    }).catch(e => Toast.error('제품 추가 실패: ' + e.message));
+};
 function renderPartnerChosen() {
     document.getElementById('lecPartnerChosen').innerHTML = partnerDraft
         ? `<span class="chip">${escapeHtml(partnerDraft.nameKo || partnerDraft.nameEn)}<span class="x" onclick="clearPartner()">×</span></span>` : '';
@@ -401,7 +459,8 @@ function buildLectureData() {
     let productKo = '', productEn = '', productCategory = '', productDesc = '';
     if (partner) {
         const idx = document.getElementById('lecProductSelect').value;
-        const products = Array.isArray(partner.products) ? partner.products : [];
+        // 화면에 표시된 제품 목록(LEC_PRODUCTS) 기준 — 방금 추가한 제품도 즉시 반영됨
+        const products = (LEC_PRODUCTS && LEC_PRODUCTS.length) ? LEC_PRODUCTS : (Array.isArray(partner.products) ? partner.products : []);
         if (idx !== '' && products[Number(idx)]) {
             const pr = products[Number(idx)];
             productKo = pr.nameKo || ''; productEn = pr.nameEn || '';
