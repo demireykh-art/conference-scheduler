@@ -687,6 +687,43 @@ a { color: inherit; }
 @keyframes lecFlash { 0%, 100% { background: transparent; } 30% { background: #fff2c4; } }
 .lecture-row.lec-flash { animation: lecFlash 1.5s ease; }
 
+/* 연자 포스터 생성기 */
+.poster-layout { display: grid; grid-template-columns: minmax(360px, 400px) 1fr; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .poster-layout { grid-template-columns: 1fr; } }
+.poster-editor, .poster-result { padding: 16px; }
+.pe-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.pe-head .btn label { cursor: pointer; }
+.pe-stage-wrap { display: flex; justify-content: center; }
+.pe-stage {
+    position: relative; background: #f1f3f5; border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; min-height: 120px; min-width: 200px; user-select: none; touch-action: none;
+}
+.pe-empty { padding: 40px 20px; text-align: center; color: var(--text-dim); font-size: 0.9rem; }
+.pe-empty span { font-size: 0.76rem; }
+.pe-tpl-img { display: block; width: 100%; height: 100%; position: absolute; inset: 0; pointer-events: none; }
+.pe-handle { position: absolute; cursor: move; box-sizing: border-box; }
+.pe-text { white-space: nowrap; line-height: 1; transform: translate(-50%, -50%); text-shadow: 0 0 2px rgba(255,255,255,.35); padding: 2px; }
+.pe-text.sel { outline: 1.5px dashed var(--primary); outline-offset: 2px; background: rgba(47,111,237,.08); }
+.pe-photo {
+    border: 2px dashed #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.12); color: #fff; font-size: 0.7rem; font-weight: 700;
+}
+.pe-photo.sel { outline: 2px dashed var(--primary); outline-offset: 2px; }
+.pe-ctrls { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+.pe-ctrl-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.pe-ctrl-label { font-size: 0.78rem; color: var(--text-dim); font-weight: 600; }
+.pe-ctrls select, .pe-ctrls input[type=text] { padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px; font-size: 0.83rem; }
+.pe-ctrls input[type=color] { width: 34px; height: 28px; border: 1px solid var(--border); border-radius: 6px; padding: 0; background: none; }
+.pe-ctrls input[type=range] { flex: 1; min-width: 90px; }
+
+.poster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.poster-card { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
+.poster-thumb { width: 100%; display: block; background: #f1f3f5; }
+.poster-cap { padding: 6px 8px; font-size: 0.82rem; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.poster-nophoto { font-size: 0.68rem; color: #c0392b; background: #fdecea; border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+.poster-acts { display: flex; gap: 6px; padding: 0 8px 8px; }
+.poster-acts .btn { flex: 1; justify-content: center; }
+
 /* 파트너사 참가/신청전 셀 */
 .join-cell { display: flex; align-items: center; justify-content: center; gap: 6px; }
 /* 참가 버튼: 비활성=연한 회색, 활성=파란색 */
