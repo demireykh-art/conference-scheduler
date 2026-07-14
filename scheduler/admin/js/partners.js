@@ -13,6 +13,7 @@ let CONF_BOOTH = null;       // 선택한 행사의 부스 혜택 표
 let PLACED = {};              // { partnerId: { type: 배치수 } } — 선택한 행사 기준
 let PLACED_CONF_NAME = '';
 let CONF_PARTNERS = new Set(); // 선택한 행사에 참가하는 파트너사 id
+let PRE_PARTNERS = new Set();  // 선택한 행사에 '신청전(참가 망설임)' 파트너사 id
 let CONF_PARTNER_MAP = {};     // { partnerId: { order, grade } } — 행사별 등급
 let CONF_CONTACTS = {};        // { partnerId: [{name,phone,email}] } — 행사별 담당자
 let PTN_SORT = 'nameAsc';
@@ -87,6 +88,7 @@ function subscribePlacedConf() {
         PLACED_CONF_NAME = conf.title || '';
         CONF_PARTNER_MAP = conf.confPartners || {};
         CONF_PARTNERS = new Set(Object.keys(CONF_PARTNER_MAP));
+        PRE_PARTNERS = new Set(Object.keys(conf.prePartners || {}));
         CONF_CONTACTS = conf.partnerContacts || {};   // 행사별 담당자 연락처
         CONF_BOOTH = (conf.boothBenefits && Array.isArray(conf.boothBenefits.columns) && Array.isArray(conf.boothBenefits.grades)) ? conf.boothBenefits : null;
         applyBooth();
@@ -159,18 +161,45 @@ document.getElementById('ptnSearch').addEventListener('input', e => {
     sel.addEventListener('change', () => { PTN_SORT = sel.value; renderPartners(); });
 })();
 
-// 선택 행사 참가여부 토글
+// 선택 행사 참가여부 토글 (참가 체크 시 '신청전'은 자동 해제)
 window.toggleParticipation = function (id, on) {
     if (!AdminAuth.requireEdit()) { renderPartners(); return; }
     if (!PLACED_CONF_ID) { Toast.warning('먼저 행사를 선택하세요.'); renderPartners(); return; }
-    const ref = database.ref('/adminConferences/' + PLACED_CONF_ID + '/confPartners/' + id);
-    // update: 기존 등급을 유지하면서 참가만 토글
-    const op = on ? ref.update({ order: CONF_PARTNERS.size }) : ref.remove();
+    const base = '/adminConferences/' + PLACED_CONF_ID;
+    const updates = {};
+    if (on) {
+        updates['confPartners/' + id] = { order: CONF_PARTNERS.size, grade: (CONF_PARTNER_MAP[id] && CONF_PARTNER_MAP[id].grade) || '' };
+        updates['prePartners/' + id] = null;   // 참가 → 신청전 해제
+    } else {
+        updates['confPartners/' + id] = null;
+    }
     const p = PARTNERS.find(x => x.id === id);
-    op.then(() => logActivity('participate', 'partner',
-        `파트너사 "${p ? p.nameKo : ''}" ${on ? '참가 추가' : '참가 해제'}`,
-        { confId: PLACED_CONF_ID, confTitle: PLACED_CONF_NAME, entityId: id }))
+    database.ref(base).update(updates)
+        .then(() => logActivity('participate', 'partner',
+            `파트너사 "${p ? p.nameKo : ''}" ${on ? '참가 추가' : '참가 해제'}`,
+            { confId: PLACED_CONF_ID, confTitle: PLACED_CONF_NAME, entityId: id }))
         .catch(e => Toast.error('참가 설정 실패: ' + e.message));
+};
+
+// 선택 행사 '신청전' 토글 (신청전 지정 시 참가는 자동 해제, 다시 누르면 미참가)
+window.togglePreApply = function (id) {
+    if (!AdminAuth.requireEdit()) { renderPartners(); return; }
+    if (!PLACED_CONF_ID) { Toast.warning('먼저 행사를 선택하세요.'); renderPartners(); return; }
+    const base = '/adminConferences/' + PLACED_CONF_ID;
+    const on = !PRE_PARTNERS.has(id);   // 현재 신청전이 아니면 → 신청전으로
+    const updates = {};
+    if (on) {
+        updates['prePartners/' + id] = true;
+        updates['confPartners/' + id] = null;   // 신청전 → 참가 해제
+    } else {
+        updates['prePartners/' + id] = null;     // 신청전 해제 → 미참가
+    }
+    const p = PARTNERS.find(x => x.id === id);
+    database.ref(base).update(updates)
+        .then(() => logActivity('participate', 'partner',
+            `파트너사 "${p ? p.nameKo : ''}" ${on ? '신청전 지정' : '신청전 해제'}`,
+            { confId: PLACED_CONF_ID, confTitle: PLACED_CONF_NAME, entityId: id }))
+        .catch(e => Toast.error('신청전 설정 실패: ' + e.message));
 };
 
 // 선택 행사 기준 파트너 등급 저장 (행사별)
@@ -233,16 +262,23 @@ function renderPartners() {
     document.getElementById('ptnCount').textContent = PARTNERS.length;
     const partCountEl = document.getElementById('ptnPartCount');
     if (partCountEl) partCountEl.textContent = CONF_PARTNERS.size;
+    const preCountEl = document.getElementById('ptnPreCount');
+    if (preCountEl) preCountEl.textContent = PRE_PARTNERS.size;
 
     const q = PTN_SEARCH;
     const onlyPart = document.getElementById('ptnOnlyParticipating');
+    const statusSel = document.getElementById('ptnStatusFilter');
+    const statusMode = statusSel ? statusSel.value : '';
     const hasConf = !!PLACED_CONF_ID;
 
     let list = q
         ? PARTNERS.filter(p => [p.nameKo, p.nameEn].some(v => (v || '').toLowerCase().includes(q))
             || partnerProducts(p).some(pr => [pr.nameKo, pr.nameEn].some(v => (v || '').toLowerCase().includes(q))))
         : PARTNERS.slice();
-    if (onlyPart && onlyPart.checked) list = list.filter(p => CONF_PARTNERS.has(p.id));
+    // 상태 필터(신청전/미참가)가 우선, 없으면 '참가사만 보기' 체크 적용
+    if (statusMode === 'pre') list = list.filter(p => PRE_PARTNERS.has(p.id));
+    else if (statusMode === 'none') list = list.filter(p => !CONF_PARTNERS.has(p.id) && !PRE_PARTNERS.has(p.id));
+    else if (onlyPart && onlyPart.checked) list = list.filter(p => CONF_PARTNERS.has(p.id));
     list = sortList(list, PTN_SORT, 'nameKo');
 
     const body = document.getElementById('ptnBody');
@@ -258,6 +294,7 @@ function renderPartners() {
             : '<span class="dim">-</span>';
         const tags = benefitTags(p);
         const joined = CONF_PARTNERS.has(p.id);
+        const isPre = PRE_PARTNERS.has(p.id);
         const grade = confGradeOf(p);
         const contacts = contactsOf(p.id);
         const contactCell = hasConf
@@ -270,11 +307,16 @@ function renderPartners() {
                </select>`
             : (grade ? `<span class="grade-badge" style="opacity:.5" title="참가 후 이 행사 등급을 지정하세요">${escapeHtml(grade)}</span>` : '<span class="dim">-</span>');
         return `
-        <tr class="${joined ? 'row-joined' : ''}">
-            <td style="text-align:center">
-                <input type="checkbox" class="join-check" ${joined ? 'checked' : ''} ${hasConf ? '' : 'disabled'}
-                    title="${hasConf ? '이 행사 참가여부' : '먼저 행사를 선택하세요'}"
-                    onchange="toggleParticipation('${p.id}', this.checked)">
+        <tr class="${joined ? 'row-joined' : isPre ? 'row-pre' : ''}">
+            <td>
+                <div class="join-cell">
+                    <input type="checkbox" class="join-check" ${joined ? 'checked' : ''} ${hasConf ? '' : 'disabled'}
+                        title="${hasConf ? '이 행사 참가여부' : '먼저 행사를 선택하세요'}"
+                        onchange="toggleParticipation('${p.id}', this.checked)">
+                    <button class="pre-btn ${isPre ? 'active' : ''}" ${hasConf ? '' : 'disabled'}
+                        title="참가를 망설이는 회사 — 신청전으로 표시(참가 자동 해제)"
+                        onclick="togglePreApply('${p.id}')">신청전</button>
+                </div>
             </td>
             <td><b>${escapeHtml(p.nameKo || '')}</b></td>
             <td class="en">${escapeHtml(p.nameEn || '-')}</td>

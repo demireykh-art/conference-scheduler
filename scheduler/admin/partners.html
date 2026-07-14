@@ -39,13 +39,18 @@
                     <label class="check-inline" style="margin-left:6px">
                         <input type="checkbox" id="ptnOnlyParticipating" onchange="renderPartners()"> 참가사만 보기
                     </label>
-                    <span style="color:var(--text-dim);font-size:0.82rem">이 행사 참가 <b id="ptnPartCount">0</b>개사</span>
+                    <select id="ptnStatusFilter" onchange="renderPartners()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.83rem">
+                        <option value="">상태 전체</option>
+                        <option value="pre">신청전 회사</option>
+                        <option value="none">미참가 회사</option>
+                    </select>
+                    <span style="color:var(--text-dim);font-size:0.82rem">참가 <b id="ptnPartCount">0</b> · 신청전 <b id="ptnPreCount">0</b>개사</span>
                 </div>
                 <div class="card table-card">
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th style="width:64px;text-align:center">참가</th>
+                                <th style="width:120px;text-align:center">참가 / 신청전</th>
                                 <th>파트너사 (국문)</th>
                                 <th>파트너사 (영문)</th>
                                 <th>제품</th>

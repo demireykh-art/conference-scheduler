@@ -656,6 +656,17 @@ a { color: inherit; }
 .aw-cell.aw-input:focus { border-color: var(--primary); outline: none; }
 .aw-select { cursor: pointer; font-weight: 600; }
 
+/* 파트너사 참가/신청전 셀 */
+.join-cell { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.pre-btn {
+    border: 1px solid var(--border); background: #fff; color: var(--text-dim);
+    border-radius: 999px; padding: 3px 10px; font-size: 0.74rem; font-weight: 600; white-space: nowrap;
+}
+.pre-btn:hover:not(:disabled) { background: #fff7ea; border-color: #f0c98a; color: #b26a00; }
+.pre-btn.active { background: #fff2d9; border-color: #e6a23c; color: #b26a00; }
+.pre-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+tr.row-pre { background: #fffaf0; }
+
 /* ASLS 관계자 배지 (연자 관리) */
 .asls-badge {
     display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 2px 7px;
