@@ -12,11 +12,78 @@ let spkPhotoData = '';   // 업로드한 사진 data URL
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('speakers');
 
+let SPK_LOADED = false, SPK_SYNCED = false;
+
 SPK_ROOT.on('value', snap => {
     SPEAKERS = toOrderedArray(snap.val())
         .sort((a, b) => (a.nameKo || '').localeCompare(b.nameKo || '', 'ko'));
+    SPK_LOADED = true;
     renderSpeakers();
+    maybeSyncFromLectures();
 });
+if (window.AdminAuth && AdminAuth.onReady) AdminAuth.onReady(maybeSyncFromLectures);
+
+/* ------------------------------------------------------------
+   강의목록/사회자에 있는 사람을 연자 마스터에 자동 반영
+   (마스터에 id·이름으로 없는 사람만 1회 추가)
+   ------------------------------------------------------------ */
+function normSpkName(s) { return (s || '').trim().toLowerCase(); }
+
+function maybeSyncFromLectures() {
+    if (SPK_SYNCED || !SPK_LOADED) return;
+    if (!(window.AdminAuth && AdminAuth.canEdit && AdminAuth.canEdit())) return;  // 편집 권한자만
+    SPK_SYNCED = true;
+    syncSpeakersFromLectures();
+}
+
+function syncSpeakersFromLectures() {
+    database.ref('/adminConferences').once('value').then(snap => {
+        const confs = snap.val() || {};
+        const byId = new Set(SPEAKERS.map(s => s.id));
+        const byName = new Set();
+        SPEAKERS.forEach(s => { [s.nameKo, s.nameEn].forEach(n => { const v = normSpkName(n); if (v) byName.add(v); }); });
+
+        const seen = new Set();
+        const toAdd = [];
+        const consider = sp => {
+            if (!sp) return;
+            const nk = normSpkName(sp.nameKo), ne = normSpkName(sp.nameEn);
+            if (!nk && !ne) return;
+            if (sp.id && byId.has(sp.id)) return;
+            if ((nk && byName.has(nk)) || (ne && byName.has(ne))) return;
+            const key = nk || ne;
+            if (seen.has(key)) return;
+            seen.add(key);
+            toAdd.push({
+                nameKo: sp.nameKo || '', nameEn: sp.nameEn || '',
+                affiliationKo: sp.affiliationKo || '', affiliationEn: sp.affiliationEn || ''
+            });
+        };
+
+        Object.values(confs).forEach(conf => {
+            // 강의 풀 연자
+            Object.values(conf.lecturePool || {}).forEach(lec =>
+                (lec.speakers || []).forEach(consider));
+            // 세션 사회자
+            Object.values(conf.rooms || {}).forEach(room =>
+                Object.values(room.sessions || {}).forEach(sess => consider(sess.moderator)));
+        });
+
+        if (!toAdd.length) return;
+        const updates = {};
+        let order = SPEAKERS.length;
+        toAdd.forEach(s => {
+            updates[uuid()] = {
+                ...s, order: order++, fromLecture: true,
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            };
+        });
+        SPK_ROOT.update(updates).then(() => {
+            logActivity('create', 'speaker', `강의목록/사회자에서 연자 ${toAdd.length}명 자동 반영`, {});
+            Toast.success(`강의목록에서 연자 ${toAdd.length}명을 자동으로 추가했습니다.`);
+        }).catch(() => { SPK_SYNCED = false; /* 실패 시 다음 기회에 재시도 */ });
+    }).catch(() => { SPK_SYNCED = false; });
+}
 
 document.getElementById('spkSearch').addEventListener('input', e => {
     SPK_SEARCH = e.target.value.trim().toLowerCase();
