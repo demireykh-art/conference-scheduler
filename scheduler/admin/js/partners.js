@@ -34,10 +34,18 @@ database.ref('/adminBoothBenefits').once('value').then(s => {
 }).catch(() => { populateGradeSelect(); renderPartners(); });
 
 // 현재 선택 행사의 부스 표 → BOOTH 반영 (없으면 템플릿 → 기본값)
+// 등급(grades)이 비어 있으면 등급 드롭다운이 텅 비게 되므로, 비어 있으면 다음 소스로 폴백한다.
 function applyBooth() {
-    const src = CONF_BOOTH || BOOTH_TEMPLATE;
-    if (src && Array.isArray(src.columns) && Array.isArray(src.grades)) {
-        BOOTH = { columns: src.columns, grades: src.grades, cells: src.cells || {} };
+    const hasGrades = s => s && Array.isArray(s.grades) && s.grades.length > 0;
+    const src = hasGrades(CONF_BOOTH) ? CONF_BOOTH
+        : hasGrades(BOOTH_TEMPLATE) ? BOOTH_TEMPLATE
+            : null;
+    if (src) {
+        BOOTH = {
+            columns: (Array.isArray(src.columns) && src.columns.length) ? src.columns : DEFAULT_BOOTH_COLUMNS.slice(),
+            grades: src.grades,
+            cells: src.cells || {}
+        };
     } else {
         BOOTH = { columns: DEFAULT_BOOTH_COLUMNS.slice(), grades: DEFAULT_BOOTH_GRADES.slice(), cells: JSON.parse(JSON.stringify(DEFAULT_BOOTH_CELLS)) };
     }
