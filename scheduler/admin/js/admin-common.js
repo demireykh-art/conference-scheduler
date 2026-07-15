@@ -323,6 +323,7 @@ const SIDE_MENU = [
     },
     {
         group: '관리', items: [
+            { key: 'cvinbox', label: '📥 CV 제출함', href: 'cv-inbox.html' },
             { key: 'activity', label: '🕘 변경이력', href: 'activity.html' },
             { key: 'users', label: '👥 사용자 관리', href: 'users.html' }
         ]
