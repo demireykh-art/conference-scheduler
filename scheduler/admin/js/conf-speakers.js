@@ -21,6 +21,10 @@ if (!CONF_ID) {
 
 document.addEventListener('masters-change', render);
 
+// 검색: 아래 참여 목록도 필터 (등록된 연자에서 추가하는 자동완성과 별개로, 이미 추가된 목록을 걸러줌)
+let SPK_Q = '';
+document.getElementById('spkInput').addEventListener('input', e => { SPK_Q = e.target.value.trim().toLowerCase(); render(); });
+
 function render() {
     document.getElementById('spkCount').textContent = CONF_SPK.length;
     const box = document.getElementById('peopleList');
@@ -28,7 +32,18 @@ function render() {
         box.innerHTML = `<div class="card empty-state">아직 추가된 연자/사회자가 없습니다.<br>위 검색창에 이름을 입력해 추가하세요.</div>`;
         return;
     }
-    box.innerHTML = CONF_SPK.map(e => {
+    let list = CONF_SPK;
+    if (SPK_Q) {
+        list = CONF_SPK.filter(e => {
+            const m = Masters.speaker(e.id) || {};
+            return [m.nameKo, m.nameEn, m.affiliationKo, m.affiliationEn].some(v => (v || '').toLowerCase().includes(SPK_Q));
+        });
+    }
+    if (!list.length) {
+        box.innerHTML = `<div class="card empty-state">"${escapeHtml(SPK_Q)}" 참여 목록 검색 결과가 없습니다.<br>등록된 연자면 목록에서 선택해 추가하세요.</div>`;
+        return;
+    }
+    box.innerHTML = list.map(e => {
         const m = Masters.speaker(e.id) || {};
         const name = m.nameKo || m.nameEn || '(삭제된 연자)';
         const aff = m.affiliationKo || '';
@@ -52,11 +67,20 @@ function render() {
 
 const ORG_NAME = '대한미용성형레이저의학회(ASLS)';
 
+// (행사,연자) → 짧은 결정적 토큰. /cvTokens/<t> = {c,s} 매핑 저장 후 짧은 링크 반환.
+function shortToken(id) {
+    const key = CONF_ID + '|' + id;
+    let h = 0x811c9dc5;
+    for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return (h >>> 0).toString(36);
+}
 function cvLink(id) {
-    const link = new URL('cv-submit.html', location.href);
-    link.searchParams.set('c', CONF_ID);
-    link.searchParams.set('s', id);
-    return link.href;
+    const t = shortToken(id);
+    database.ref('/cvTokens/' + t).set({ c: CONF_ID, s: id }).catch(() => { });   // 매핑 저장(멱등)
+    // 저장소 루트의 짧은 진입 페이지로 연결: .../conference-scheduler/cv.html?t=<t>
+    const base = new URL('../../cv.html', location.href);
+    base.searchParams.set('t', t);
+    return base.href;
 }
 
 /* 스팸에 안 걸리도록 자연스럽고 전문적인 안내문 (한 개의 링크, 명확한 발신 주체, 서명 포함) */
