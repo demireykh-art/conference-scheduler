@@ -43,30 +43,49 @@ function render() {
                 <option value="연자" ${(e.role || '연자') === '연자' ? 'selected' : ''}>연자</option>
                 <option value="사회자" ${e.role === '사회자' ? 'selected' : ''}>사회자</option>
             </select>
-            <button class="btn btn-sm" title="${m.email ? 'CV 요청 메일(Gmail 작성창)' : '이메일이 없습니다 — 연자 정보에 이메일을 추가하세요'}" onclick="requestCV('${e.id}')">✉ CV 요청</button>
+            <button class="btn btn-sm" title="${m.email ? 'CV 요청 메일(Gmail 작성창 열기)' : '이메일이 없습니다 — 연자 정보에 이메일을 추가하세요'}" onclick="requestCV('${e.id}')">✉ CV 요청</button>
+            <button class="btn btn-sm" title="제출 링크 복사(원하는 메신저·메일에 붙여넣기)" onclick="copyCVLink('${e.id}')">🔗 링크 복사</button>
             <button class="btn btn-sm btn-danger-ghost" onclick="removePerson('${e.id}')">제거</button>
         </div>`;
     }).join('');
 }
 
-/* CV 요청 메일 — Gmail 작성창을 열어 초대문구 + CV 제출 링크를 채워준다 */
-window.requestCV = function (id) {
-    const m = Masters.speaker(id) || {};
-    const title = confTitleText();
+const ORG_NAME = '대한미용성형레이저의학회(ASLS)';
+
+function cvLink(id) {
     const link = new URL('cv-submit.html', location.href);
     link.searchParams.set('c', CONF_ID);
     link.searchParams.set('s', id);
+    return link.href;
+}
+
+/* 스팸에 안 걸리도록 자연스럽고 전문적인 안내문 (한 개의 링크, 명확한 발신 주체, 서명 포함) */
+function cvEmailParts(id) {
+    const m = Masters.speaker(id) || {};
+    const title = confTitleText();
     const name = m.nameKo || m.nameEn || '';
-    const subject = `[${title}] 연자 정보(CV)·사진 제출 요청`;
+    const subject = `${title} 연자 정보(CV) 및 사진 등록 안내`;
     const body =
-`안녕하세요${name ? ' ' + name + ' 님' : ''},
+`안녕하세요, ${name ? name + ' 선생님' : '선생님'}.
 
-${title} 연자로 모시게 되어 감사합니다.
-아래 링크에서 성함·소속·약력(CV)과 사진을 입력·제출해 주세요. 제출하시면 학회 시스템에 자동 반영됩니다.
+${ORG_NAME} 사무국입니다.
+${title} 연자로 모시게 되어 진심으로 감사드립니다.
 
-▶ 제출 링크: ${link.href}
+행사 준비를 위해 성함과 소속, 약력(CV), 프로필 사진을 아래 페이지에서 등록해 주시면 감사하겠습니다. 등록해 주신 내용은 학회 프로그램에 반영됩니다.
 
-감사합니다.`;
+등록 페이지
+${cvLink(id)}
+
+궁금하신 점은 본 메일로 회신 주시면 안내드리겠습니다.
+늘 감사드립니다.
+
+${ORG_NAME} 사무국 드림`;
+    return { m, subject, body };
+}
+
+/* CV 요청 메일 — Gmail 작성창을 열어 안내문 + CV 등록 링크를 채워준다 */
+window.requestCV = function (id) {
+    const { m, subject, body } = cvEmailParts(id);
     const gmail = 'https://mail.google.com/mail/?view=cm&fs=1'
         + '&to=' + encodeURIComponent(m.email || '')
         + '&su=' + encodeURIComponent(subject)
@@ -74,6 +93,22 @@ ${title} 연자로 모시게 되어 감사합니다.
     window.open(gmail, '_blank');
     if (!m.email) Toast.info('이 연자의 이메일이 없습니다. Gmail 작성창에서 수신인을 직접 입력하거나, 연자 정보에 이메일을 등록하세요.');
 };
+
+/* 제출 링크만 클립보드로 복사 — 카톡·문자·다른 메일에 붙여넣기 용 */
+window.copyCVLink = function (id) {
+    const url = cvLink(id);
+    const done = () => Toast.success('제출 링크를 복사했습니다. 원하는 곳에 붙여넣으세요.');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(done).catch(() => fallbackCopy(url, done));
+    } else { fallbackCopy(url, done); }
+};
+function fallbackCopy(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { Toast.info('복사 실패 — 링크: ' + text); }
+    ta.remove();
+}
 
 /* 자동완성 (마스터에서 검색 + 새 연자 등록) */
 setupAutocomplete(
