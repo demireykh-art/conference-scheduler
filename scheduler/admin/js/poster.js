@@ -43,7 +43,7 @@ function loadConf() {
         CONF_RAW = snap.val() || {};
         const p = CONF_RAW.poster;
         if (p && p.template && p.w && p.h) {
-            POSTER = { template: p.template, w: p.w, h: p.h, slots: p.slots || defaultSlots(p.w, p.h) };
+            POSTER = { template: p.template, w: p.w, h: p.h, slots: Object.assign(defaultSlots(p.w, p.h), p.slots || {}) };
         } else {
             POSTER = null;
         }
@@ -75,7 +75,8 @@ function defaultSlots(w, h) {
         label: { text: "I'M SPEAKING AT", x: w * 0.5, y: h * 0.58, fontPx: h * 0.026, color: C, font: F, weight: '700' },
         event: { text: '', x: w * 0.5, y: h * 0.635, fontPx: h * 0.055, color: C, font: F, weight: '700' },
         photo: { x: w * 0.39, y: h * 0.68, size: w * 0.22, ring: true, ringColor: '#ffffff' },
-        name: { text: '', x: w * 0.5, y: h * 0.93, fontPx: h * 0.038, color: C, font: F, weight: '700' }
+        name: { text: '', x: w * 0.5, y: h * 0.925, fontPx: h * 0.038, color: C, font: F, weight: '700' },
+        nameEn: { text: '', x: w * 0.5, y: h * 0.965, fontPx: h * 0.026, color: C, font: F, weight: '400' }
     };
 }
 
@@ -84,10 +85,15 @@ function sampleName() {
     const list = collectSpeakers();
     return (list[0] && (list[0].nameKo || list[0].nameEn)) || 'Dr. 홍길동';
 }
+function sampleNameEn() {
+    const list = collectSpeakers();
+    return (list[0] && list[0].nameEn) || 'Dr. Gil-dong Hong';
+}
 function slotText(key) {
     if (key === 'label') return POSTER.slots.label.text || "I'M SPEAKING AT";
     if (key === 'event') return POSTER.slots.event.text || confTitle();
     if (key === 'name') return sampleName();
+    if (key === 'nameEn') return sampleNameEn();
     return '';
 }
 
@@ -108,8 +114,9 @@ function renderStage() {
         `<div class="pe-handle pe-text" id="pe-h-label"></div>` +
         `<div class="pe-handle pe-text" id="pe-h-event"></div>` +
         `<div class="pe-handle pe-text" id="pe-h-name"></div>` +
+        `<div class="pe-handle pe-text" id="pe-h-nameEn"></div>` +
         `<div class="pe-handle pe-photo" id="pe-h-photo"><span>사진</span></div>`;
-    ['label', 'event', 'name', 'photo'].forEach(k => {
+    ['label', 'event', 'name', 'nameEn', 'photo'].forEach(k => {
         const el = document.getElementById('pe-h-' + k);
         styleHandle(k);
         makeDraggable(el, k);
@@ -160,7 +167,7 @@ window.posSelectFromDropdown = function () { selectElement(document.getElementBy
 function selectElement(key) {
     SELECTED = key;
     document.getElementById('posSel').value = key;
-    ['label', 'event', 'name', 'photo'].forEach(k => { const el = document.getElementById('pe-h-' + k); if (el) el.classList.toggle('sel', k === key); });
+    ['label', 'event', 'name', 'nameEn', 'photo'].forEach(k => { const el = document.getElementById('pe-h-' + k); if (el) el.classList.toggle('sel', k === key); });
     const isText = key !== 'photo';
     document.getElementById('posTextCtrls').style.display = isText ? '' : 'none';
     document.getElementById('posPhotoCtrls').style.display = isText ? 'none' : '';
@@ -268,6 +275,7 @@ async function drawPoster(canvas, spk) {
     drawText(ctx, POSTER.slots.label, POSTER.slots.label.text || "I'M SPEAKING AT");
     drawText(ctx, POSTER.slots.event, POSTER.slots.event.text || confTitle());
     drawText(ctx, POSTER.slots.name, spk.nameKo || spk.nameEn);
+    if (POSTER.slots.nameEn) drawText(ctx, POSTER.slots.nameEn, spk.nameEn || '');
 }
 
 /* ---------- 생성 ---------- */

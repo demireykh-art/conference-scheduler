@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" href="assets/asls-logo.svg">
     <title>연자 포스터 생성 · ASLS 행사 관리</title>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -55,7 +56,8 @@
                                 <select id="posSel" onchange="posSelectFromDropdown()">
                                     <option value="label">문구 (I'M SPEAKING AT)</option>
                                     <option value="event">행사 이름</option>
-                                    <option value="name">연자 이름</option>
+                                    <option value="name">연자 이름 (국문)</option>
+                                    <option value="nameEn">연자 이름 (영문)</option>
                                     <option value="photo">연자 사진(원형)</option>
                                 </select>
                             </div>
