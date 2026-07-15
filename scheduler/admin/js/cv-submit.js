@@ -5,8 +5,9 @@
  */
 (function () {
     const params = new URLSearchParams(location.search);
-    const CONF_ID = params.get('c') || '';
-    const SPK_ID = params.get('s') || '';
+    let CONF_ID = params.get('c') || '';
+    let SPK_ID = params.get('s') || '';
+    const TOKEN = params.get('t') || '';
     let photoData = '';
 
     const $ = id => document.getElementById(id);
@@ -91,6 +92,16 @@
             .catch(e => { $('cvSubmitBtn').disabled = false; setMsg('제출 실패: ' + e.message, 'cv-err'); });
     };
 
-    if (window.database) init();
-    else setTimeout(() => { if (window.database) init(); else $('cvSub').innerHTML = '<span class="cv-err">연결 초기화에 실패했습니다. 새로고침해 주세요.</span>'; }, 800);
+    function start() {
+        // 짧은 토큰(t)이면 매핑을 조회해 c/s 복원
+        if (TOKEN && (!CONF_ID || !SPK_ID)) {
+            database.ref('/cvTokens/' + TOKEN).once('value').then(snap => {
+                const v = snap.val();
+                if (v) { CONF_ID = v.c || CONF_ID; SPK_ID = v.s || SPK_ID; }
+                init();
+            }).catch(() => init());
+        } else { init(); }
+    }
+    if (window.database) start();
+    else setTimeout(() => { if (window.database) start(); else $('cvSub').innerHTML = '<span class="cv-err">연결 초기화에 실패했습니다. 새로고침해 주세요.</span>'; }, 800);
 })();

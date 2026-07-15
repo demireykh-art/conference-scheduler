@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASLS 연자 정보 · CV 제출</title>
+    <link rel="icon" type="image/svg+xml" href="scheduler/admin/assets/asls-logo.svg">
+    <meta property="og:title" content="ASLS 연자 정보 · CV 제출">
+    <meta property="og:description" content="연자 성함·소속·약력(CV)과 사진을 등록하는 페이지입니다.">
+    <meta property="og:image" content="https://demireykh-art.github.io/conference-scheduler/scheduler/admin/assets/asls-logo.svg">
+    <meta name="theme-color" content="#6E2B7B">
+    <script>
+        // 짧은 링크(cv.html?t=…) → 실제 제출 폼으로 쿼리 그대로 전달
+        location.replace('scheduler/admin/cv-submit.html' + location.search);
+    </script>
+</head>
+<body style="font-family:sans-serif;padding:40px;text-align:center;color:#555">
+    이동 중입니다… 자동으로 넘어가지 않으면
+    <a id="go" href="scheduler/admin/cv-submit.html">여기</a>를 눌러주세요.
+    <script>document.getElementById('go').search = location.search;</script>
+</body>
+</html>
