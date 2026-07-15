@@ -43,10 +43,37 @@ function render() {
                 <option value="연자" ${(e.role || '연자') === '연자' ? 'selected' : ''}>연자</option>
                 <option value="사회자" ${e.role === '사회자' ? 'selected' : ''}>사회자</option>
             </select>
+            <button class="btn btn-sm" title="${m.email ? 'CV 요청 메일(Gmail 작성창)' : '이메일이 없습니다 — 연자 정보에 이메일을 추가하세요'}" onclick="requestCV('${e.id}')">✉ CV 요청</button>
             <button class="btn btn-sm btn-danger-ghost" onclick="removePerson('${e.id}')">제거</button>
         </div>`;
     }).join('');
 }
+
+/* CV 요청 메일 — Gmail 작성창을 열어 초대문구 + CV 제출 링크를 채워준다 */
+window.requestCV = function (id) {
+    const m = Masters.speaker(id) || {};
+    const title = confTitleText();
+    const link = new URL('cv-submit.html', location.href);
+    link.searchParams.set('c', CONF_ID);
+    link.searchParams.set('s', id);
+    const name = m.nameKo || m.nameEn || '';
+    const subject = `[${title}] 연자 정보(CV)·사진 제출 요청`;
+    const body =
+`안녕하세요${name ? ' ' + name + ' 님' : ''},
+
+${title} 연자로 모시게 되어 감사합니다.
+아래 링크에서 성함·소속·약력(CV)과 사진을 입력·제출해 주세요. 제출하시면 학회 시스템에 자동 반영됩니다.
+
+▶ 제출 링크: ${link.href}
+
+감사합니다.`;
+    const gmail = 'https://mail.google.com/mail/?view=cm&fs=1'
+        + '&to=' + encodeURIComponent(m.email || '')
+        + '&su=' + encodeURIComponent(subject)
+        + '&body=' + encodeURIComponent(body);
+    window.open(gmail, '_blank');
+    if (!m.email) Toast.info('이 연자의 이메일이 없습니다. Gmail 작성창에서 수신인을 직접 입력하거나, 연자 정보에 이메일을 등록하세요.');
+};
 
 /* 자동완성 (마스터에서 검색 + 새 연자 등록) */
 setupAutocomplete(
@@ -79,7 +106,7 @@ let spkPhotoData = '';
 window.openNewSpeakerModal = function (name) {
     if (!AdminAuth.requireEdit()) return;
     document.getElementById('spkNameKo').value = name || '';
-    ['spkNameEn', 'spkAffKo', 'spkAffEn', 'spkCv'].forEach(id => document.getElementById(id).value = '');
+    ['spkNameEn', 'spkAffKo', 'spkAffEn', 'spkCv', 'spkEmail'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('spkRoleExec').checked = false;
     document.getElementById('spkRoleAdvisor').checked = false;
     document.getElementById('spkRoleAmb').checked = false;
@@ -112,6 +139,7 @@ window.saveNewSpeaker = function () {
         affiliationKo: affKo,
         affiliationEn: document.getElementById('spkAffEn').value.trim(),
         cv: document.getElementById('spkCv').value.trim(),
+        email: document.getElementById('spkEmail').value.trim(),
         roleExec: document.getElementById('spkRoleExec').checked,
         roleAdvisor: document.getElementById('spkRoleAdvisor').checked,
         roleAmb: document.getElementById('spkRoleAmb').checked,

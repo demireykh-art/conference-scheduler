@@ -687,6 +687,20 @@ a { color: inherit; }
 @keyframes lecFlash { 0%, 100% { background: transparent; } 30% { background: #fff2c4; } }
 .lecture-row.lec-flash { animation: lecFlash 1.5s ease; }
 
+/* CV 제출함 */
+.cvinbox-list { display: flex; flex-direction: column; gap: 12px; }
+.cvi-card { display: flex; gap: 14px; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow-sm); }
+.cvi-photo { width: 68px; height: 68px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border); }
+.cvi-noimg { display: grid; place-items: center; background: #eef0f3; color: var(--text-dim); font-size: 0.68rem; }
+.cvi-main { flex: 1; min-width: 0; }
+.cvi-head { font-size: 0.98rem; }
+.cvi-en { color: var(--text-dim); font-size: 0.85rem; }
+.cvi-meta { color: var(--text-dim); font-size: 0.78rem; font-weight: 400; }
+.cvi-line { font-size: 0.85rem; color: var(--text); margin-top: 3px; }
+.cvi-target { color: var(--text-dim); }
+.cvi-cv { font-size: 0.82rem; color: var(--text-dim); background: #f7f8fa; border-radius: 8px; padding: 8px 10px; margin-top: 6px; white-space: pre-wrap; max-height: 120px; overflow: auto; }
+.cvi-acts { display: flex; gap: 8px; margin-top: 10px; }
+
 /* 연자 포스터 생성기 */
 .poster-layout { display: grid; grid-template-columns: minmax(360px, 400px) 1fr; gap: 16px; align-items: start; }
 @media (max-width: 900px) { .poster-layout { grid-template-columns: 1fr; } }
