@@ -94,9 +94,15 @@ window.requestCV = function (id) {
     if (!m.email) Toast.info('이 연자의 이메일이 없습니다. Gmail 작성창에서 수신인을 직접 입력하거나, 연자 정보에 이메일을 등록하세요.');
 };
 
+<<<<<<< HEAD
 /* 제출 링크만 클립보드로 복사 — 카톡·문자·다른 메일에 붙여넣기 용 (라벨 + 링크) */
 window.copyCVLink = function (id) {
     const url = 'ASLS 연자 정보 · CV 제출\n' + cvLink(id);
+=======
+/* 제출 링크만 클립보드로 복사 — 카톡·문자·다른 메일에 붙여넣기 용 */
+window.copyCVLink = function (id) {
+    const url = cvLink(id);
+>>>>>>> origin/main
     const done = () => Toast.success('제출 링크를 복사했습니다. 원하는 곳에 붙여넣으세요.');
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(done).catch(() => fallbackCopy(url, done));
