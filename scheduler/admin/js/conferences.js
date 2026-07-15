@@ -165,7 +165,7 @@ window.openConferenceModal = function () {
     document.getElementById('cfEnd').value = '';
     document.getElementById('cfLocation').value = '';
     setPosterFromValue('');
-    document.getElementById('cfPublic').checked = true;
+    const _pubNew = document.getElementById('cfPublic'); if (_pubNew) _pubNew.checked = true;
     document.getElementById('confModal').classList.add('open');
 };
 
@@ -181,7 +181,7 @@ window.editConference = function (id) {
     document.getElementById('cfEnd').value = c.endDate || '';
     document.getElementById('cfLocation').value = c.location || '';
     setPosterFromValue(c.posterUrl || '');
-    document.getElementById('cfPublic').checked = c.visibility !== 'private';
+    const _pubEdit = document.getElementById('cfPublic'); if (_pubEdit) _pubEdit.checked = c.visibility !== 'private';
     document.getElementById('confModal').classList.add('open');
 };
 
@@ -203,7 +203,7 @@ window.saveConference = function () {
         endDate: document.getElementById('cfEnd').value || startDate,
         location: document.getElementById('cfLocation').value.trim(),
         posterUrl: getPosterValue(),
-        visibility: document.getElementById('cfPublic').checked ? 'public' : 'private',
+        visibility: (document.getElementById('cfPublic') || { checked: true }).checked ? 'public' : 'private',
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     };
 
