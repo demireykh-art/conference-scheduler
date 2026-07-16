@@ -68,16 +68,94 @@ function schedRow(kind, x) {
     </div>`;
 }
 function scheduleHtml(id) {
+    const m = Masters.speaker(id) || {};
     const { lectures, sessionsMod } = personSchedule(id);
     const lec = applyFilterSort(lectures, ['title', 'session']);
     const mod = applyFilterSort(sessionsMod, ['session']);
+    const shareBtn = (navigator.canShare) ? `<button class="btn btn-sm" onclick="shareSchedule('${id}')">📤 공유</button>` : '';
     return `<div class="sch-panel">
-        <div class="sch-sec"><div class="sch-sec-h">강의 <span>${lec.length}</span></div>
-            ${lec.length ? lec.map(x => schedRow('lec', x)).join('') : '<div class="sch-empty">해당 없음</div>'}</div>
-        <div class="sch-sec"><div class="sch-sec-h">사회/좌장 <span>${mod.length}</span></div>
-            ${mod.length ? mod.map(x => schedRow('mod', x)).join('') : '<div class="sch-empty">해당 없음</div>'}</div>
+        <div class="sch-toolbar">
+            <span class="sch-tb-label">이 일정 전송</span>
+            <button class="btn btn-sm btn-primary" title="${m.email ? '이 일정을 메일로 보내기(Gmail 작성창)' : '이메일이 없습니다 — Gmail 작성창에서 수신인 직접 입력'}" onclick="mailSchedule('${id}')">📧 일정 메일 보내기</button>
+            <button class="btn btn-sm" title="이 일정 내용을 복사(카톡·문자에 붙여넣기)" onclick="copySchedule('${id}')">📋 일정 복사(카톡)</button>
+            ${shareBtn}
+        </div>
+        <div class="sch-grid">
+            <div class="sch-sec"><div class="sch-sec-h">강의 <span>${lec.length}</span></div>
+                ${lec.length ? lec.map(x => schedRow('lec', x)).join('') : '<div class="sch-empty">해당 없음</div>'}</div>
+            <div class="sch-sec"><div class="sch-sec-h">사회/좌장 <span>${mod.length}</span></div>
+                ${mod.length ? mod.map(x => schedRow('mod', x)).join('') : '<div class="sch-empty">해당 없음</div>'}</div>
+        </div>
     </div>`;
 }
+
+/* ---------- 일정 텍스트 & 전송(메일/카톡/공유) ---------- */
+function scheduleText(id) {
+    const m = Masters.speaker(id) || {};
+    const name = (m.nameKo || '') + (m.nameEn ? ` (${m.nameEn})` : '');
+    const { lectures, sessionsMod } = personSchedule(id);
+    const lec = applyFilterSort(lectures, ['title', 'session']);
+    const mod = applyFilterSort(sessionsMod, ['session']);
+    const line = x => `- ${x.title || x.session}${x.room ? ' | 📍' + x.room : ''}${x.date ? ' | ' + dowDate(x.date) : ''}${x.start != null ? ' ' + formatTime(x.start) + '-' + formatTime(x.end) : ''}`;
+    let t = `[${confTitleText()}] 일정 안내 — ${name}\n`;
+    t += `\n■ 강의 (${lec.length})\n` + (lec.length ? lec.map(line).join('\n') : '- 없음');
+    t += `\n\n■ 사회/좌장 (${mod.length})\n` + (mod.length ? mod.map(line).join('\n') : '- 없음');
+    return t;
+}
+window.mailSchedule = function (id) {
+    const m = Masters.speaker(id) || {};
+    const name = m.nameKo || m.nameEn || '';
+    const subject = `${confTitleText()} 강의/사회 일정 안내`;
+    const body =
+`안녕하세요, ${name ? name + ' 선생님' : '선생님'}.
+
+${ORG_NAME} 사무국입니다.
+${confTitleText()} 관련 선생님의 강의/사회 일정을 안내드립니다.
+
+${scheduleText(id)}
+
+변경이 필요하시면 본 메일로 회신 주시기 바랍니다.
+감사합니다.
+
+${ORG_NAME} 사무국 드림`;
+    const gmail = 'https://mail.google.com/mail/?view=cm&fs=1'
+        + '&to=' + encodeURIComponent(m.email || '')
+        + '&su=' + encodeURIComponent(subject)
+        + '&body=' + encodeURIComponent(body);
+    window.open(gmail, '_blank');
+    if (!m.email) Toast.info('이 연자의 이메일이 없습니다. Gmail 작성창에서 수신인을 직접 입력하세요.');
+};
+window.copySchedule = function (id) {
+    const done = () => Toast.success('일정을 복사했습니다. 카톡·문자에 붙여넣으세요.');
+    const text = scheduleText(id);
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    else fallbackCopy(text, done);
+};
+window.shareSchedule = async function (id) {
+    try {
+        if (navigator.share) await navigator.share({ title: confTitleText() + ' 일정', text: scheduleText(id) });
+        else copySchedule(id);
+    } catch (e) { if (e && e.name !== 'AbortError') Toast.error('공유 실패: ' + e.message); }
+};
+
+/* ---------- 일괄 전송 (현재 필터 기준) ---------- */
+function currentPeople() {
+    // 전체 참여자 대상 (각자의 일정 내용은 상단 일정필터 날짜·검색이 반영됨)
+    return CONF_SPK.slice();
+}
+window.bulkMailSchedule = function () {
+    const people = currentPeople().map(e => ({ e, m: Masters.speaker(e.id) || {} })).filter(x => x.m.email);
+    if (!people.length) { Toast.warning('이메일이 등록된 참여자가 없습니다. 연자 정보에 이메일을 먼저 등록하세요.'); return; }
+    if (!confirm(`이메일이 있는 ${people.length}명에게 각각 Gmail 작성창을 엽니다.\n(팝업 차단 시 브라우저에서 허용해 주세요.)\n계속할까요?`)) return;
+    people.forEach((x, i) => setTimeout(() => mailSchedule(x.e.id), i * 400));
+    Toast.success(`${people.length}명 Gmail 작성창을 엽니다.`);
+};
+window.bulkCopySchedule = function () {
+    const blocks = currentPeople().map(e => scheduleText(e.id)).join('\n\n────────────\n\n');
+    const done = () => Toast.success(`${CONF_SPK.length}명 일정을 복사했습니다.`);
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(blocks).then(done).catch(() => fallbackCopy(blocks, done));
+    else fallbackCopy(blocks, done);
+};
 
 function populateDateFilter() {
     const sel = document.getElementById('csvDate');
@@ -134,10 +212,12 @@ function render() {
                 <div class="p-name">${escapeHtml(name)}</div>
                 ${aff ? `<div class="p-aff">${escapeHtml(aff)}</div>` : ''}
             </div>
-            <button class="btn btn-sm ${open ? 'btn-dark' : ''}" title="이 연자의 강의·사회 일정 보기" onclick="toggleSchedule('${e.id}')">📋 강의/사회 목록 <span class="sch-count">${sch.lectures.length}/${sch.sessionsMod.length}</span> ${open ? '▲' : '▾'}</button>
-            <button class="btn btn-sm" title="${m.email ? 'CV 요청 메일(Gmail 작성창 열기)' : '이메일이 없습니다 — 연자 정보에 이메일을 추가하세요'}" onclick="requestCV('${e.id}')">✉ CV 요청</button>
-            <button class="btn btn-sm" title="제출 링크 복사(원하는 메신저·메일에 붙여넣기)" onclick="copyCVLink('${e.id}')">🔗 링크 복사</button>
-            <button class="btn btn-sm btn-danger-ghost" onclick="removePerson('${e.id}')">제거</button>
+            <button class="btn btn-sm ${open ? 'btn-dark' : ''}" title="이 연자의 강의·사회 일정 보기·전송" onclick="toggleSchedule('${e.id}')">📋 강의/사회 목록 <span class="sch-count">${sch.lectures.length}/${sch.sessionsMod.length}</span> ${open ? '▲' : '▾'}</button>
+            <div class="cv-group">
+                <button class="btn btn-sm" title="${m.email ? 'CV 등록 요청 메일(Gmail 작성창)' : '이메일이 없습니다 — 연자 정보에 이메일을 추가하세요'}" onclick="requestCV('${e.id}')">✉️ CV요청 메일보내기</button>
+                <button class="btn btn-sm" title="CV 등록 링크 복사(카톡·문자 등에 붙여넣기)" onclick="copyCVLink('${e.id}')">🔗 CV요청 링크복사</button>
+                <button class="btn btn-sm btn-danger-ghost" onclick="removePerson('${e.id}')">제거</button>
+            </div>
         </div>
         ${open ? scheduleHtml(e.id) : ''}`;
     }).join('');
