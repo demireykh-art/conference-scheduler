@@ -8,6 +8,7 @@ const CONF_ID = new URLSearchParams(location.search).get('id');
 const cRef = () => database.ref('/adminConferences/' + CONF_ID);
 let CONF_SPK = [];   // [{id, role, order}]
 let CONF_ROOMS = {}; // 일정(강의/사회) 계산용
+let CONF_POOL = {};  // 강의 풀(배치·미배치 모두 포함)
 let EXPANDED = new Set();          // 펼쳐진 사람 id
 let FILTER_DATE = '', FILTER_Q = '', FILTER_SORT = 'time';
 
@@ -21,6 +22,7 @@ if (!CONF_ID) {
     cRef().child('title').once('value').then(s => { document.getElementById('confName').textContent = s.val() || ''; });
     cRef().child('confSpeakers').on('value', snap => { CONF_SPK = toOrderedArray(snap.val()); render(); });
     cRef().child('rooms').on('value', snap => { CONF_ROOMS = snap.val() || {}; populateDateFilter(); render(); });
+    cRef().child('lecturePool').on('value', snap => { CONF_POOL = snap.val() || {}; render(); });
 }
 
 /* ---------- 일정(강의/사회) 계산 ---------- */
@@ -35,6 +37,7 @@ function personSchedule(id) {
     const m = Masters.speaker(id) || {};
     const nameMatch = sp => sp.id === id || (!sp.id && ((sp.nameKo && sp.nameKo === m.nameKo) || (sp.nameEn && sp.nameEn === m.nameEn)));
     const lectures = [], sessionsMod = [];
+    const placedIds = new Set();
     toOrderedArray(CONF_ROOMS).forEach(room => {
         (computeRoom(room) || []).forEach(s => {
             const mod = s.moderator;
@@ -43,28 +46,42 @@ function personSchedule(id) {
             }
             (s.lectures || []).forEach(lec => {
                 if (lec.isBreak) return;
+                if (lec.lectureId) placedIds.add(lec.lectureId);
                 if ((lec.speakers || []).some(nameMatch)) {
                     lectures.push({ title: lec.titleKo || lec.titleEn || '(제목 없음)', session: s.name || '', room: room.name || '룸', date: room.date || '', start: lec._start, end: lec._end });
                 }
             });
         });
     });
+    // 강의 풀 중 시간표에 미배치된 강의(배치는 위에서 이미 반영) — 강의 관리 목록과 일치시키기 위함
+    toOrderedArray(CONF_POOL).forEach(lec => {
+        if (placedIds.has(lec.id)) return;
+        if ((lec.speakers || []).some(nameMatch)) {
+            lectures.push({ title: lec.titleKo || lec.titleEn || '(제목 없음)', session: '', room: '', date: '', start: null, end: null, unplaced: true });
+        }
+    });
     return { lectures, sessionsMod };
 }
 function applyFilterSort(arr, textKeys) {
     let out = arr.filter(x => (!FILTER_DATE || x.date === FILTER_DATE)
         && (!FILTER_Q || textKeys.map(k => x[k] || '').join(' ').toLowerCase().includes(FILTER_Q)));
-    out.sort((a, b) => FILTER_SORT === 'title'
-        ? (a.title || a.session || '').localeCompare(b.title || b.session || '', 'ko')
-        : ((a.date || '').localeCompare(b.date || '') || (a.start - b.start)));
+    out.sort((a, b) => {
+        if (FILTER_SORT === 'title') return (a.title || a.session || '').localeCompare(b.title || b.session || '', 'ko');
+        // 시간순: 미배치(날짜·시간 없음)는 항상 뒤로
+        if (!!a.unplaced !== !!b.unplaced) return a.unplaced ? 1 : -1;
+        return (a.date || '').localeCompare(b.date || '') || ((a.start ?? 0) - (b.start ?? 0));
+    });
     return out;
 }
 function schedRow(kind, x) {
     const time = (x.start != null) ? `${formatTime(x.start)}-${formatTime(x.end)}` : '';
     const title = kind === 'lec' ? x.title : x.session;
+    const meta = x.unplaced
+        ? '<span class="sch-unplaced">미배치</span>'
+        : `📍 ${escapeHtml(x.room)}${x.date ? ' · ' + escapeHtml(dowDate(x.date)) : ''}${time ? ' · ⏰ ' + time : ''}`;
     return `<div class="sch-row">
         <span class="sch-title">${escapeHtml(title)}</span>
-        <span class="sch-meta">📍 ${escapeHtml(x.room)}${x.date ? ' · ' + escapeHtml(dowDate(x.date)) : ''}${time ? ' · ⏰ ' + time : ''}</span>
+        <span class="sch-meta">${meta}</span>
     </div>`;
 }
 function scheduleHtml(id) {
@@ -96,10 +113,16 @@ function scheduleText(id) {
     const { lectures, sessionsMod } = personSchedule(id);
     const lec = applyFilterSort(lectures, ['title', 'session']);
     const mod = applyFilterSort(sessionsMod, ['session']);
-    const line = x => `- ${x.title || x.session}${x.room ? ' | 📍' + x.room : ''}${x.date ? ' | ' + dowDate(x.date) : ''}${x.start != null ? ' ' + formatTime(x.start) + '-' + formatTime(x.end) : ''}`;
+    // 카톡 가독성을 위해: 첫 줄에 시간·장소, 다음 줄에 제목. 항목 사이는 빈 줄로 구분.
+    const block = x => {
+        const head = x.unplaced
+            ? '📍(미배치)'
+            : `📍${x.room || '룸'} | ${dowDate(x.date)}${x.start != null ? ' ' + formatTime(x.start) + '-' + formatTime(x.end) : ''}`;
+        return head + '\n- ' + (x.title || x.session);
+    };
     let t = `[${confTitleText()}] 일정 안내 — ${name}\n`;
-    t += `\n■ 강의 (${lec.length})\n` + (lec.length ? lec.map(line).join('\n') : '- 없음');
-    t += `\n\n■ 사회/좌장 (${mod.length})\n` + (mod.length ? mod.map(line).join('\n') : '- 없음');
+    t += `\n■ 강의 (${lec.length})\n` + (lec.length ? lec.map(block).join('\n\n') : '- 없음');
+    t += `\n\n■ 사회/좌장 (${mod.length})\n` + (mod.length ? mod.map(block).join('\n\n') : '- 없음');
     return t;
 }
 window.mailSchedule = function (id) {
