@@ -11,9 +11,26 @@ let POSTER = null;               // { template, w, h, slots }
 let TEMPLATE_IMG = null;         // 캔버스 합성용 Image
 let scale = 1, SELECTED = 'event';
 let GEN = [];                    // [{name, canvas}]
+let posterDirty = false;         // 저장 안 된 템플릿/배치 변경 여부
+let autoGenDone = false;         // 이 행사 자동 생성 완료 여부
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('poster');
 Masters.init();
+
+// 저장 안 한 편집이 있으면 페이지를 떠날 때 경고
+window.addEventListener('beforeunload', e => {
+    if (posterDirty) { e.preventDefault(); e.returnValue = '저장하지 않은 포스터 배경·배치 변경이 있습니다. 나가시겠습니까?'; return e.returnValue; }
+});
+function markDirty() { posterDirty = true; }
+// 마스터(연자) 로드되면 저장된 템플릿으로 자동 생성 (다른 탭 다녀와도 다시 보이도록)
+document.addEventListener('masters-change', maybeAutoGenerate);
+function maybeAutoGenerate() {
+    if (autoGenDone) return;
+    if (!POSTER || !POSTER.template) return;
+    if (!Masters.ready) return;
+    autoGenDone = true;
+    generateAll();
+}
 
 function confTitle() { return (CONF_RAW && CONF_RAW.title) || (CONFS.find(c => c.id === CONF_ID) || {}).title || '행사'; }
 
@@ -36,7 +53,7 @@ window.onPosConfChange = function () {
 };
 
 function loadConf() {
-    TEMPLATE_IMG = null; GEN = [];
+    TEMPLATE_IMG = null; GEN = []; posterDirty = false; autoGenDone = false;
     document.getElementById('posGrid').innerHTML = '';
     document.getElementById('posCount').textContent = '';
     database.ref('/adminConferences/' + CONF_ID).once('value').then(snap => {
@@ -48,6 +65,7 @@ function loadConf() {
             POSTER = null;
         }
         renderStage();
+        maybeAutoGenerate();   // 저장된 템플릿이 있으면 자동으로 다시 생성
     });
 }
 
@@ -64,6 +82,7 @@ document.getElementById('posTplFile').addEventListener('change', async e => {
         const w = img.naturalWidth, h = img.naturalHeight;
         POSTER = { template: dataUrl, w, h, slots: (POSTER && POSTER.slots) ? POSTER.slots : defaultSlots(w, h) };
         TEMPLATE_IMG = img;
+        markDirty();
         renderStage();
         Toast.success('배경을 올렸습니다. 사진·이름·문구 위치를 맞춘 뒤 저장하세요.');
     } catch (err) { Toast.error('이미지 처리 실패: ' + (err.message || err)); }
@@ -154,7 +173,7 @@ function makeDraggable(el, key) {
     el.addEventListener('pointermove', e => {
         if (!dragging) return;
         const dx = (e.clientX - sx) / scale, dy = (e.clientY - sy) / scale;
-        if (Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 2) moved = true;
+        if (Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 2) { moved = true; markDirty(); }
         POSTER.slots[key].x = Math.max(0, Math.min(POSTER.w, ox + dx));
         POSTER.slots[key].y = Math.max(0, Math.min(POSTER.h, oy + dy));
         styleHandle(key);
@@ -186,13 +205,13 @@ function selectElement(key) {
         document.getElementById('posRingColor').value = toHex(s.ringColor || '#ffffff');
     }
 }
-window.onPosTextEdit = function () { POSTER.slots[SELECTED].text = document.getElementById('posText').value; styleHandle(SELECTED); };
-window.onPosSize = function () { POSTER.slots[SELECTED].fontPx = Number(document.getElementById('posSize').value) / 100 * POSTER.h; styleHandle(SELECTED); };
-window.onPosFont = function () { POSTER.slots[SELECTED].font = document.getElementById('posFont').value; styleHandle(SELECTED); };
-window.onPosBold = function () { POSTER.slots[SELECTED].weight = document.getElementById('posBold').checked ? '700' : '400'; styleHandle(SELECTED); };
-window.onPosColor = function () { POSTER.slots[SELECTED].color = document.getElementById('posColor').value; styleHandle(SELECTED); };
-window.onPosPhotoSize = function () { POSTER.slots.photo.size = Number(document.getElementById('posPhotoSize').value) / 100 * POSTER.w; styleHandle('photo'); };
-window.onPosRing = function () { POSTER.slots.photo.ring = document.getElementById('posRing').checked; POSTER.slots.photo.ringColor = document.getElementById('posRingColor').value; styleHandle('photo'); };
+window.onPosTextEdit = function () { markDirty(); POSTER.slots[SELECTED].text = document.getElementById('posText').value; styleHandle(SELECTED); };
+window.onPosSize = function () { markDirty(); POSTER.slots[SELECTED].fontPx = Number(document.getElementById('posSize').value) / 100 * POSTER.h; styleHandle(SELECTED); };
+window.onPosFont = function () { markDirty(); POSTER.slots[SELECTED].font = document.getElementById('posFont').value; styleHandle(SELECTED); };
+window.onPosBold = function () { markDirty(); POSTER.slots[SELECTED].weight = document.getElementById('posBold').checked ? '700' : '400'; styleHandle(SELECTED); };
+window.onPosColor = function () { markDirty(); POSTER.slots[SELECTED].color = document.getElementById('posColor').value; styleHandle(SELECTED); };
+window.onPosPhotoSize = function () { markDirty(); POSTER.slots.photo.size = Number(document.getElementById('posPhotoSize').value) / 100 * POSTER.w; styleHandle('photo'); };
+window.onPosRing = function () { markDirty(); POSTER.slots.photo.ring = document.getElementById('posRing').checked; POSTER.slots.photo.ringColor = document.getElementById('posRingColor').value; styleHandle('photo'); };
 
 function toHex(c) {
     if (!c) return '#000000';
@@ -210,6 +229,7 @@ window.savePoster = function () {
         template: POSTER.template, w: POSTER.w, h: POSTER.h, slots: POSTER.slots,
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     }).then(() => {
+        posterDirty = false;
         logActivity('update', 'conference', `연자 포스터 템플릿·배치 저장`, { confId: CONF_ID, confTitle: confTitle() });
         Toast.success('저장되었습니다. 아래에서 포스터를 생성하세요.');
         generateAll();

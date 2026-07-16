@@ -687,6 +687,21 @@ a { color: inherit; }
 @keyframes lecFlash { 0%, 100% { background: transparent; } 30% { background: #fff2c4; } }
 .lecture-row.lec-flash { animation: lecFlash 1.5s ease; }
 
+/* 연자/사회자 관리 — 일정 필터 & 강의/사회 목록 패널 */
+.cs-filterbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.cs-filter-label { font-size: 0.78rem; font-weight: 700; color: var(--text-dim); }
+.cs-filterbar select, .cs-filterbar input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.83rem; }
+.cs-filterbar input { width: 200px; }
+.sch-count { font-size: 0.72rem; opacity: 0.85; }
+.sch-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: -6px 0 14px 52px; padding: 12px 14px; background: #f7f8fa; border: 1px solid var(--border); border-radius: 10px; }
+@media (max-width: 720px) { .sch-panel { grid-template-columns: 1fr; margin-left: 0; } }
+.sch-sec-h { font-size: 0.82rem; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.sch-sec-h span { color: var(--primary); }
+.sch-row { padding: 6px 8px; border-radius: 7px; background: #fff; border: 1px solid var(--border); margin-bottom: 6px; }
+.sch-title { display: block; font-size: 0.85rem; font-weight: 600; }
+.sch-meta { display: block; font-size: 0.76rem; color: var(--text-dim); margin-top: 2px; }
+.sch-empty { font-size: 0.8rem; color: var(--text-dim); padding: 4px 2px; }
+
 /* CV 제출함 */
 .cvinbox-list { display: flex; flex-direction: column; gap: 12px; }
 .cvi-card { display: flex; gap: 14px; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow-sm); }
