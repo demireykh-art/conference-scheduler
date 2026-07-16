@@ -165,6 +165,7 @@ window.openConferenceModal = function () {
     document.getElementById('cfEnd').value = '';
     document.getElementById('cfLocation').value = '';
     setPosterFromValue('');
+    setSubmitConfigFields({});
     const _pubNew = document.getElementById('cfPublic'); if (_pubNew) _pubNew.checked = true;
     document.getElementById('confModal').classList.add('open');
 };
@@ -181,9 +182,33 @@ window.editConference = function (id) {
     document.getElementById('cfEnd').value = c.endDate || '';
     document.getElementById('cfLocation').value = c.location || '';
     setPosterFromValue(c.posterUrl || '');
+    setSubmitConfigFields(c.submitConfig || {});
     const _pubEdit = document.getElementById('cfPublic'); if (_pubEdit) _pubEdit.checked = c.visibility !== 'private';
     document.getElementById('confModal').classList.add('open');
 };
+
+/* 원고·CV 접수 설정 필드 채우기/읽기 */
+function setSubmitConfigFields(sc) {
+    document.getElementById('cfDeadline').value = sc.deadline || '';
+    document.getElementById('cfReminderDays').value = Array.isArray(sc.reminderDays) && sc.reminderDays.length ? sc.reminderDays.join(', ') : '14, 7, 3, 1';
+    document.getElementById('cfProgramUrl').value = sc.programUrl || '';
+    document.getElementById('cfManuscriptUrl').value = sc.manuscriptUploadUrl || '';
+    document.getElementById('cfFormatNote').value = sc.formatNote || '';
+    document.getElementById('cfInquiry').value = sc.inquiry || '';
+}
+function readSubmitConfigFields() {
+    const rd = (document.getElementById('cfReminderDays').value || '')
+        .split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n >= 0)
+        .sort((a, b) => b - a);
+    return {
+        deadline: document.getElementById('cfDeadline').value || '',
+        programUrl: document.getElementById('cfProgramUrl').value.trim(),
+        manuscriptUploadUrl: document.getElementById('cfManuscriptUrl').value.trim(),
+        formatNote: document.getElementById('cfFormatNote').value.trim(),
+        inquiry: document.getElementById('cfInquiry').value.trim(),
+        reminderDays: rd.length ? rd : [14, 7, 3, 1]
+    };
+}
 
 window.closeConferenceModal = function () {
     document.getElementById('confModal').classList.remove('open');
@@ -203,6 +228,7 @@ window.saveConference = function () {
         endDate: document.getElementById('cfEnd').value || startDate,
         location: document.getElementById('cfLocation').value.trim(),
         posterUrl: getPosterValue(),
+        submitConfig: readSubmitConfigFields(),
         visibility: (document.getElementById('cfPublic') || { checked: true }).checked ? 'public' : 'private',
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     };

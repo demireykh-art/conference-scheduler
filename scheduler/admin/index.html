@@ -92,6 +92,38 @@
                 </div>
                 <input type="text" id="cfPoster" placeholder="또는 이미지 URL 직접 입력 (https://...)" style="margin-top:8px">
             </div>
+
+            <div style="border-top:1px solid var(--border);margin:10px 0 14px"></div>
+            <div style="font-size:0.92rem;font-weight:700;margin-bottom:4px">📄 원고·CV 접수 설정</div>
+            <div style="font-size:0.78rem;color:var(--text-dim);margin-bottom:12px">연자 CV·초록 요청 메일과 제출 포털에 자동으로 사용됩니다. (장소·일자는 위 정보 사용)</div>
+            <div class="modal-grid2">
+                <div class="modal-field">
+                    <label>접수 마감일</label>
+                    <input type="date" id="cfDeadline">
+                </div>
+                <div class="modal-field">
+                    <label>리마인드 시점 (마감 D-일, 쉼표 구분)</label>
+                    <input type="text" id="cfReminderDays" placeholder="14, 7, 3, 1">
+                </div>
+            </div>
+            <div class="modal-field">
+                <label>프로그램 바로가기 링크 (선택)</label>
+                <input type="text" id="cfProgramUrl" placeholder="https://...">
+            </div>
+            <div class="modal-field">
+                <label>강의원고(워드·PPT) 외부 업로드 링크</label>
+                <input type="text" id="cfManuscriptUrl" placeholder="예: 드롭박스·구글드라이브 파일요청 https://www.dropbox.com/request/...">
+                <div style="font-size:0.72rem;color:var(--text-dim);margin-top:4px">초록은 제출 포털에서 직접 입력받고, 실제 워드/PPT 파일은 이 링크로 접수합니다.</div>
+            </div>
+            <div class="modal-field">
+                <label>접수형식 안내 (선택)</label>
+                <textarea id="cfFormatNote" rows="3" placeholder="예: 워드파일 2페이지 이내 (PPT 불가). 단, 유료강좌방은 PPT로 제출, 분량 제한 없음."></textarea>
+            </div>
+            <div class="modal-field">
+                <label>문의처 (선택)</label>
+                <textarea id="cfInquiry" rows="2" placeholder="예: 대한미용성형레이저의학회 사무국 02-3443-1232, demire@naver.com"></textarea>
+            </div>
+
             <div class="modal-actions">
                 <button class="btn" onclick="closeConferenceModal()">취소</button>
                 <button class="btn btn-primary" onclick="saveConference()">저장</button>
