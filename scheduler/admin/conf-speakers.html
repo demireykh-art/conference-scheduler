@@ -36,7 +36,17 @@
                         style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.9rem">
                     <div class="ac-list" id="spkAc"></div>
                 </div>
-                <div style="color:var(--text-dim);font-size:0.85rem;margin-bottom:14px">참여 연자/사회자 <span id="spkCount">0</span>명</div>
+                <div style="color:var(--text-dim);font-size:0.85rem;margin-bottom:8px">참여 연자/사회자 <span id="spkCount">0</span>명</div>
+
+                <div class="cs-filterbar">
+                    <span class="cs-filter-label">일정 필터</span>
+                    <select id="csvDate" onchange="onCsvFilter()"><option value="">전체 날짜</option></select>
+                    <input type="text" id="csvSearch" placeholder="🔍 제목/세션 검색" oninput="onCsvFilter()">
+                    <select id="csvSort" onchange="onCsvFilter()">
+                        <option value="time">시간순</option>
+                        <option value="title">제목순</option>
+                    </select>
+                </div>
 
                 <div id="peopleList" class="people-list"></div>
             </div>

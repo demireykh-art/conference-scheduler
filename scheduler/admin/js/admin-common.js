@@ -293,13 +293,13 @@ const SIDE_MENU = [
     {
         group: '학술대회 · 행사', items: [
             { key: 'timetable', label: '🗓️ 시간표' },
-            { key: 'lectures', label: '강의 관리', href: 'lectures.html' },
-            { key: 'speakers', label: '전체 연자 리스트', href: 'speakers.html' },
-            { key: 'partners', label: '행사별 참여사 관리', href: 'partners.html' },
-            { key: 'booth', label: '부스 등급별 혜택', href: 'booth-benefits.html' },
-            { key: 'sponsor', label: '스폰서 강의 점검', href: 'sponsor-roster.html' },
-            { key: 'poster', label: '연자 포스터 생성', href: 'poster.html' },
-            { key: 'aslsweek', label: 'ASLS Week 관리', href: 'asls-week.html' },
+            { key: 'lectures', label: '📚 강의 관리', href: 'lectures.html' },
+            { key: 'speakers', label: '🧑‍⚕️ 전체 연자 리스트', href: 'speakers.html' },
+            { key: 'partners', label: '🏢 행사별 참여사 관리', href: 'partners.html' },
+            { key: 'booth', label: '🏅 부스 등급별 혜택', href: 'booth-benefits.html' },
+            { key: 'sponsor', label: '🎤 스폰서 강의 점검', href: 'sponsor-roster.html' },
+            { key: 'poster', label: '🖼️ 연자 포스터 생성', href: 'poster.html' },
+            { key: 'aslsweek', label: '📆 ASLS Week 관리', href: 'asls-week.html' },
             { key: 'registrants', label: '등록자 관리' },
             { key: 'foreign', label: '외국인 등록자 관리' },
             { key: 'abstracts', label: '초록/간행물 관리' }

@@ -7,6 +7,9 @@
 const CONF_ID = new URLSearchParams(location.search).get('id');
 const cRef = () => database.ref('/adminConferences/' + CONF_ID);
 let CONF_SPK = [];   // [{id, role, order}]
+let CONF_ROOMS = {}; // 일정(강의/사회) 계산용
+let EXPANDED = new Set();          // 펼쳐진 사람 id
+let FILTER_DATE = '', FILTER_Q = '', FILTER_SORT = 'time';
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('events');
 Masters.init();
@@ -17,7 +20,81 @@ if (!CONF_ID) {
 } else {
     cRef().child('title').once('value').then(s => { document.getElementById('confName').textContent = s.val() || ''; });
     cRef().child('confSpeakers').on('value', snap => { CONF_SPK = toOrderedArray(snap.val()); render(); });
+    cRef().child('rooms').on('value', snap => { CONF_ROOMS = snap.val() || {}; populateDateFilter(); render(); });
 }
+
+/* ---------- 일정(강의/사회) 계산 ---------- */
+const DOW = ['일', '월', '화', '수', '목', '금', '토'];
+function dowDate(d) {
+    if (!d) return '';
+    const dt = new Date(d + 'T00:00:00');
+    const w = isNaN(dt.getTime()) ? '' : ' (' + DOW[dt.getDay()] + ')';
+    return d + w;
+}
+function personSchedule(id) {
+    const m = Masters.speaker(id) || {};
+    const nameMatch = sp => sp.id === id || (!sp.id && ((sp.nameKo && sp.nameKo === m.nameKo) || (sp.nameEn && sp.nameEn === m.nameEn)));
+    const lectures = [], sessionsMod = [];
+    toOrderedArray(CONF_ROOMS).forEach(room => {
+        (computeRoom(room) || []).forEach(s => {
+            const mod = s.moderator;
+            if (mod && (mod.id === id || (!mod.id && (mod.nameKo === m.nameKo)))) {
+                sessionsMod.push({ session: s.name || '(세션)', room: room.name || '룸', date: room.date || '', start: s._start, end: s._end });
+            }
+            (s.lectures || []).forEach(lec => {
+                if (lec.isBreak) return;
+                if ((lec.speakers || []).some(nameMatch)) {
+                    lectures.push({ title: lec.titleKo || lec.titleEn || '(제목 없음)', session: s.name || '', room: room.name || '룸', date: room.date || '', start: lec._start, end: lec._end });
+                }
+            });
+        });
+    });
+    return { lectures, sessionsMod };
+}
+function applyFilterSort(arr, textKeys) {
+    let out = arr.filter(x => (!FILTER_DATE || x.date === FILTER_DATE)
+        && (!FILTER_Q || textKeys.map(k => x[k] || '').join(' ').toLowerCase().includes(FILTER_Q)));
+    out.sort((a, b) => FILTER_SORT === 'title'
+        ? (a.title || a.session || '').localeCompare(b.title || b.session || '', 'ko')
+        : ((a.date || '').localeCompare(b.date || '') || (a.start - b.start)));
+    return out;
+}
+function schedRow(kind, x) {
+    const time = (x.start != null) ? `${formatTime(x.start)}-${formatTime(x.end)}` : '';
+    const title = kind === 'lec' ? x.title : x.session;
+    return `<div class="sch-row">
+        <span class="sch-title">${escapeHtml(title)}</span>
+        <span class="sch-meta">📍 ${escapeHtml(x.room)}${x.date ? ' · ' + escapeHtml(dowDate(x.date)) : ''}${time ? ' · ⏰ ' + time : ''}</span>
+    </div>`;
+}
+function scheduleHtml(id) {
+    const { lectures, sessionsMod } = personSchedule(id);
+    const lec = applyFilterSort(lectures, ['title', 'session']);
+    const mod = applyFilterSort(sessionsMod, ['session']);
+    return `<div class="sch-panel">
+        <div class="sch-sec"><div class="sch-sec-h">강의 <span>${lec.length}</span></div>
+            ${lec.length ? lec.map(x => schedRow('lec', x)).join('') : '<div class="sch-empty">해당 없음</div>'}</div>
+        <div class="sch-sec"><div class="sch-sec-h">사회/좌장 <span>${mod.length}</span></div>
+            ${mod.length ? mod.map(x => schedRow('mod', x)).join('') : '<div class="sch-empty">해당 없음</div>'}</div>
+    </div>`;
+}
+
+function populateDateFilter() {
+    const sel = document.getElementById('csvDate');
+    if (!sel) return;
+    const dates = [...new Set(toOrderedArray(CONF_ROOMS).map(r => r.date).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="">전체 날짜</option>' + dates.map(d => `<option value="${d}" ${d === FILTER_DATE ? 'selected' : ''}>${escapeHtml(dowDate(d))}</option>`).join('');
+}
+window.onCsvFilter = function () {
+    FILTER_DATE = document.getElementById('csvDate').value;
+    FILTER_Q = document.getElementById('csvSearch').value.trim().toLowerCase();
+    FILTER_SORT = document.getElementById('csvSort').value;
+    render();
+};
+window.toggleSchedule = function (id) {
+    if (EXPANDED.has(id)) EXPANDED.delete(id); else EXPANDED.add(id);
+    render();
+};
 
 document.addEventListener('masters-change', render);
 
@@ -45,8 +122,11 @@ function render() {
     }
     box.innerHTML = list.map(e => {
         const m = Masters.speaker(e.id) || {};
-        const name = m.nameKo || m.nameEn || '(삭제된 연자)';
+        const nameKo = m.nameKo || '', nameEn = m.nameEn || '';
+        const name = nameKo && nameEn ? `${nameKo} (${nameEn})` : (nameKo || nameEn || '(삭제된 연자)');
         const aff = m.affiliationKo || '';
+        const open = EXPANDED.has(e.id);
+        const sch = personSchedule(e.id);
         return `
         <div class="person-row">
             ${speakerAvatar(m, 40)}
@@ -54,14 +134,12 @@ function render() {
                 <div class="p-name">${escapeHtml(name)}</div>
                 ${aff ? `<div class="p-aff">${escapeHtml(aff)}</div>` : ''}
             </div>
-            <select class="p-role" onchange="setRole('${e.id}', this.value)">
-                <option value="연자" ${(e.role || '연자') === '연자' ? 'selected' : ''}>연자</option>
-                <option value="사회자" ${e.role === '사회자' ? 'selected' : ''}>사회자</option>
-            </select>
+            <button class="btn btn-sm ${open ? 'btn-dark' : ''}" title="이 연자의 강의·사회 일정 보기" onclick="toggleSchedule('${e.id}')">📋 강의/사회 목록 <span class="sch-count">${sch.lectures.length}/${sch.sessionsMod.length}</span> ${open ? '▲' : '▾'}</button>
             <button class="btn btn-sm" title="${m.email ? 'CV 요청 메일(Gmail 작성창 열기)' : '이메일이 없습니다 — 연자 정보에 이메일을 추가하세요'}" onclick="requestCV('${e.id}')">✉ CV 요청</button>
             <button class="btn btn-sm" title="제출 링크 복사(원하는 메신저·메일에 붙여넣기)" onclick="copyCVLink('${e.id}')">🔗 링크 복사</button>
             <button class="btn btn-sm btn-danger-ghost" onclick="removePerson('${e.id}')">제거</button>
-        </div>`;
+        </div>
+        ${open ? scheduleHtml(e.id) : ''}`;
     }).join('');
 }
 
