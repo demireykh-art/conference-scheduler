@@ -9,6 +9,8 @@ const cRef = () => database.ref('/adminConferences/' + CONF_ID);
 let CONF_SPK = [];   // [{id, role, order}]
 let CONF_ROOMS = {}; // 일정(강의/사회) 계산용
 let CONF_POOL = {};  // 강의 풀(배치·미배치 모두 포함)
+let CONF_SUBMIT = {}; // 원고·CV 접수 설정(submitConfig)
+let CONF_VENUE = ''; // 행사 장소(conference.location)
 let EXPANDED = new Set();          // 펼쳐진 사람 id
 let FILTER_DATE = '', FILTER_Q = '', FILTER_SORT = 'time';
 let CONF_CONFLICTS = new Set();    // 중복(연자 시간겹침) refId 집합 (강의 id + 'mod:세션id')
@@ -23,9 +25,11 @@ if (!CONF_ID) {
         '<div class="card empty-state">행사 id가 없습니다. <a href="index.html">행사 목록</a>에서 선택하세요.</div>';
 } else {
     cRef().child('title').once('value').then(s => { document.getElementById('confName').textContent = s.val() || ''; });
+    cRef().child('location').once('value').then(s => { CONF_VENUE = s.val() || ''; }).catch(() => { });
     cRef().child('confSpeakers').on('value', snap => { CONF_SPK = toOrderedArray(snap.val()); render(); });
     cRef().child('rooms').on('value', snap => { CONF_ROOMS = snap.val() || {}; populateDateFilter(); render(); });
     cRef().child('lecturePool').on('value', snap => { CONF_POOL = snap.val() || {}; render(); });
+    cRef().child('submitConfig').on('value', snap => { CONF_SUBMIT = snap.val() || {}; });
 }
 
 /* ---------- 일정(강의/사회) 계산 ---------- */
@@ -343,28 +347,69 @@ function cvLink(id) {
     return base.href;
 }
 
-/* 스팸에 안 걸리도록 자연스럽고 전문적인 안내문 (한 개의 링크, 명확한 발신 주체, 서명 포함) */
+// 이 연자의 강의 목록(필터 없이 전체) → 메일용 평문 텍스트
+function personLectureListText(id) {
+    const { lectures } = personSchedule(id);
+    const sorted = lectures.slice().sort((a, b) => {
+        if (!!a.unplaced !== !!b.unplaced) return a.unplaced ? 1 : -1;
+        return (a.date || '').localeCompare(b.date || '') || ((a.start ?? 0) - (b.start ?? 0));
+    });
+    return scheduleSectionText(sorted);
+}
+function deadlineText() {
+    const d = CONF_SUBMIT.deadline;
+    if (!d) return '';
+    return dowDate(d);   // YYYY-MM-DD (요일)
+}
+
+/* 스팸에 안 걸리도록 자연스럽고 전문적인 안내문 (명확한 발신 주체, 서명 포함) — CV·사진·강의 초록 접수 안내 */
 function cvEmailParts(id) {
     const m = Masters.speaker(id) || {};
     const title = confTitleText();
     const name = m.nameKo || m.nameEn || '';
-    const subject = `${title} 연자 정보(CV) 및 사진 등록 안내`;
-    const body =
-`안녕하세요, ${name ? name + ' 선생님' : '선생님'}.
+    const sc = CONF_SUBMIT || {};
+    const subject = `${title} 강의원고·CV 및 사진 접수 안내`;
 
-${ORG_NAME} 사무국입니다.
-${title} 연자로 모시게 되어 진심으로 감사드립니다.
+    const lines = [];
+    lines.push(`안녕하세요, ${name ? name + ' 선생님' : '선생님'}.`);
+    lines.push('');
+    lines.push(`${ORG_NAME} 사무국입니다.`);
+    lines.push(`${title} 연자로 모시게 되어 진심으로 감사드립니다.`);
+    lines.push('원활한 학술대회 준비를 위해 강의원고(초록)·CV·사진 접수를 아래와 같이 안내드립니다.');
 
-행사 준비를 위해 성함과 소속, 약력(CV), 프로필 사진을 아래 페이지에서 등록해 주시면 감사하겠습니다. 등록해 주신 내용은 학회 프로그램에 반영됩니다.
+    // 행사 개요
+    const overview = [];
+    if (sc.deadline) overview.push(`○ 접수 마감: ${deadlineText()} 까지`);
+    if (CONF_VENUE) overview.push(`○ 장소: ${CONF_VENUE}`);
+    if (sc.programUrl) overview.push(`○ 프로그램 바로가기: ${sc.programUrl}`);
+    if (overview.length) { lines.push(''); lines.push(...overview); }
 
-등록 페이지
-${cvLink(id)}
+    // 강의 일정
+    lines.push('');
+    lines.push('■ 선생님의 강의 일정');
+    lines.push(personLectureListText(id));
 
-궁금하신 점은 본 메일로 회신 주시면 안내드리겠습니다.
-늘 감사드립니다.
+    // 제출 방법
+    lines.push('');
+    lines.push('■ 제출 방법');
+    lines.push('① CV(약력)·사진·강의 초록: 아래 온라인 제출 페이지에서 직접 입력·제출');
+    lines.push(cvLink(id));
+    if (sc.manuscriptUploadUrl) {
+        lines.push('');
+        lines.push('② 강의원고(워드/PPT) 파일: 아래 링크로 업로드');
+        lines.push(sc.manuscriptUploadUrl);
+    }
 
-${ORG_NAME} 사무국 드림`;
-    return { m, subject, body };
+    if (sc.formatNote) { lines.push(''); lines.push('■ 접수 형식'); lines.push(sc.formatNote); }
+    if (sc.inquiry) { lines.push(''); lines.push('■ 문의처'); lines.push(sc.inquiry); }
+
+    lines.push('');
+    lines.push('강의 시간은 준비 상황에 따라 변경될 수 있으며, 변경 시 다시 안내드립니다.');
+    lines.push('늘 감사드립니다.');
+    lines.push('');
+    lines.push(`${ORG_NAME} 사무국 드림`);
+
+    return { m, subject, body: lines.join('\n') };
 }
 
 /* CV 요청 메일 — Gmail 작성창을 열어 안내문 + CV 등록 링크를 채워준다 */
