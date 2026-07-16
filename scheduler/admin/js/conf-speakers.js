@@ -35,7 +35,8 @@ function dowDate(d) {
 }
 function personSchedule(id) {
     const m = Masters.speaker(id) || {};
-    const nameMatch = sp => sp.id === id || (!sp.id && ((sp.nameKo && sp.nameKo === m.nameKo) || (sp.nameEn && sp.nameEn === m.nameEn)));
+    // 강의 관리 목록은 연자를 이름 기준으로 표시하므로, id가 달라도(중복 마스터 등) 이름이 같으면 동일인으로 매칭
+    const nameMatch = sp => (sp.id && sp.id === id) || (m.nameKo && sp.nameKo === m.nameKo) || (m.nameEn && sp.nameEn === m.nameEn);
     const lectures = [], sessionsMod = [];
     const placedIds = new Set();
     toOrderedArray(CONF_ROOMS).forEach(room => {
