@@ -175,17 +175,32 @@ function scheduleText(id) {
     const { lectures, sessionsMod } = personSchedule(id);
     const lec = applyFilterSort(lectures, ['title', 'session']);
     const mod = applyFilterSort(sessionsMod, ['session']);
-    // 카톡 가독성을 위해: 첫 줄에 시간·장소, 다음 줄에 제목. 항목 사이는 빈 줄로 구분.
-    const block = x => {
-        const head = x.unplaced
-            ? '📍(미배치)'
-            : `📍${x.room || '룸'} | ${dowDate(x.date)}${x.start != null ? ' ' + formatTime(x.start) + '-' + formatTime(x.end) : ''}`;
-        return head + '\n- ' + (x.title || x.session);
-    };
     let t = `[${confTitleText()}] 일정 안내 — ${name}\n`;
-    t += `\n■ 강의 (${lec.length})\n` + (lec.length ? lec.map(block).join('\n\n') : '- 없음');
-    t += `\n\n■ 사회/좌장 (${mod.length})\n` + (mod.length ? mod.map(block).join('\n\n') : '- 없음');
+    t += `\n■ 강의 (${lec.length})\n` + scheduleSectionText(lec);
+    t += `\n\n■ 사회/좌장 (${mod.length})\n` + scheduleSectionText(mod);
     return t;
+}
+// 카톡 가독성용 섹션 텍스트: 배치 항목은 [날짜(요일)]로 묶고 ▶시간 장소 / - 제목, 미배치는 📍(미배치)
+function scheduleSectionText(items) {
+    if (!items.length) return '- 없음';
+    const placed = items.filter(x => !x.unplaced && x.date);
+    const undated = items.filter(x => !x.unplaced && !x.date);   // 배치됐지만 날짜 미지정
+    const unplaced = items.filter(x => x.unplaced);
+    const blocks = [];
+
+    const byDate = {}, order = [];
+    placed.forEach(x => { if (!(x.date in byDate)) { byDate[x.date] = []; order.push(x.date); } byDate[x.date].push(x); });
+    order.sort((a, b) => a.localeCompare(b));
+    order.forEach(d => {
+        const rows = byDate[d].slice().sort((a, b) => (a.start ?? 0) - (b.start ?? 0)).map(x => {
+            const time = x.start != null ? `${formatTime(x.start)}-${formatTime(x.end)} ` : '';
+            return `▶${time}${x.room || ''}\n- ${x.title || x.session}`;
+        }).join('\n\n');
+        blocks.push(`[${dowDate(d)}]\n${rows}`);
+    });
+    undated.forEach(x => blocks.push(`📍${x.room || '룸'}\n- ${x.title || x.session}`));
+    unplaced.forEach(x => blocks.push(`📍(미배치)\n- ${x.title || x.session}`));
+    return blocks.join('\n\n');
 }
 window.mailSchedule = function (id) {
     const m = Masters.speaker(id) || {};
