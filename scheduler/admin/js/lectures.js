@@ -10,6 +10,7 @@ let CONF_ID = new URLSearchParams(location.search).get('id') || '';
 let CONF_ROOMS = null;      // 배치 여부 판단용
 let POOL = [];
 let LEC_SORT = 'nameAsc';
+let LEC_DUP_ONLY = false;   // 중복배치(같은 강의 2곳 이상)만 보기
 let LEC_EDIT_ID = null;
 let catDraft = [], tagDraft = [], spkDraft = [];
 
@@ -132,21 +133,27 @@ function placedLectureIds() {
     return ids;
 }
 
-// 강의 id → 배치된 룸 목록 [{ room, session, date }]
+// 강의 id → 배치된 룸 목록 [{ roomId, lecId, room, session, date }]
 function placedRoomsMap() {
     const map = {};
     if (!CONF_ROOMS) return map;
-    Object.values(CONF_ROOMS).forEach(room => {
-        Object.values(room.sessions || {}).forEach(session => {
-            Object.values(session.lectures || {}).forEach(lec => {
+    Object.entries(CONF_ROOMS).forEach(([rid, room]) => {
+        Object.entries(room.sessions || {}).forEach(([sid, session]) => {
+            Object.entries(session.lectures || {}).forEach(([lid, lec]) => {
                 if (!lec.lectureId) return;
                 const list = (map[lec.lectureId] = map[lec.lectureId] || []);
-                list.push({ room: room.name || '(룸)', session: session.name || '', date: room.date || '' });
+                list.push({ roomId: rid, lecId: lid, room: room.name || '(룸)', session: session.name || '', date: room.date || '' });
             });
         });
     });
     return map;
 }
+
+// 강의 관리에서 배치 위치 클릭 → 시간표의 해당 룸/강의로 이동
+window.gotoTimetable = function (roomId, lecId) {
+    const url = `timetable.html?id=${encodeURIComponent(CONF_ID)}&room=${encodeURIComponent(roomId)}${lecId ? '&lec=' + encodeURIComponent(lecId) : ''}`;
+    location.href = url;
+};
 
 /* ---------- 목록 렌더 ---------- */
 function renderPool() {
@@ -162,9 +169,17 @@ function renderPool() {
             .join(' ').toLowerCase();
         return hay.includes(q);
     });
+    if (LEC_DUP_ONLY) list = list.filter(l => (placedMap[l.id] || []).length >= 2);
 
+    const dupCount = POOL.filter(l => (placedMap[l.id] || []).length >= 2).length;
     document.getElementById('lecCount').textContent = POOL.length;
     document.getElementById('unplacedCount').textContent = POOL.filter(l => !placedMap[l.id]).length;
+    const dupBtn = document.getElementById('dupFilterBtn');
+    if (dupBtn) {
+        dupBtn.textContent = `🔴 중복배치 ${dupCount}`;
+        dupBtn.classList.toggle('active', LEC_DUP_ONLY);
+        dupBtn.style.display = (dupCount || LEC_DUP_ONLY) ? '' : 'none';
+    }
 
     const body = document.getElementById('poolBody');
     if (!list.length) {
@@ -179,12 +194,13 @@ function renderPool() {
         const spk = (l.speakers || []).map(s => escapeHtml(s.nameKo || s.nameEn)).join(', ') || '<span class="dim">-</span>';
         const pp = [l.partnerKo, l.productKo].filter(Boolean).map(escapeHtml).join(' · ') || '<span class="dim">-</span>';
         const spots = placedMap[l.id] || [];
+        const isDup = spots.length >= 2;
         const placeCell = spots.length
-            ? `<div class="place-rooms">${spots.map(s => `<span class="room-chip" title="${escapeHtml(s.session)}${s.date ? ' · ' + escapeHtml(s.date) : ''}">📍 ${escapeHtml(s.room)}</span>`).join('')}</div>
-               <span class="badge badge-ended" style="margin-top:4px">배치됨</span>`
+            ? `<div class="place-rooms">${spots.map(s => `<span class="room-chip clickable" title="시간표에서 보기 · ${escapeHtml(s.session)}${s.date ? ' · ' + escapeHtml(s.date) : ''}" onclick="gotoTimetable('${s.roomId}','${s.lecId}')">📍 ${escapeHtml(s.room)}</span>`).join('')}</div>
+               <span class="badge ${isDup ? 'badge-dup' : 'badge-ended'}" style="margin-top:4px" title="${isDup ? '같은 강의가 여러 곳에 배치됨' : ''}">${isDup ? '배치/중복' : '배치됨'}</span>`
             : '<span class="badge badge-upcoming">미배치</span>';
         return `
-        <tr>
+        <tr class="${isDup ? 'lec-dup-row' : ''}">
             <td><b>${escapeHtml(l.titleKo || '(제목 없음)')}</b>${l.titleEn ? `<div class="dim" style="font-size:0.8rem">${escapeHtml(l.titleEn)}</div>` : ''}</td>
             <td><div class="chips" style="margin:0">${types || ''}${cats || ''}${tags || ''}</div></td>
             <td>${spk}</td>
@@ -596,5 +612,7 @@ window.doMoveLecture = function (mode) {
         });
     }).catch(e => Toast.error('실패: ' + e.message));
 };
+
+window.toggleDupFilter = function () { LEC_DUP_ONLY = !LEC_DUP_ONLY; renderPool(); };
 
 // 배경 클릭으로는 닫지 않음 — 닫기/취소 버튼으로만 닫힘 (입력 보호)

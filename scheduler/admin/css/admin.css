@@ -1032,6 +1032,18 @@ tr.row-pre { background: #fffaf0; }
     padding: 2px 10px;
     border-radius: 5px;
 }
+/* 중복배치(같은 강의 여러 곳) — 연자 시간겹침 '중복'(빨강)과 구분되는 주황 */
+.dup-badge.dup-place { background: #f59e0b; color: #fff; }
+/* 빨강 '중복' 배지가 앞에 있으면 그 옆에 바로 붙임(둘 다 우측 정렬 유지) */
+.dup-badge + .dup-badge.dup-place { margin-left: 4px; }
+
+/* 강의 관리 — 중복배치 배지 · 행 강조 · 클릭 가능한 배치 위치 · 필터 버튼 */
+.badge-dup { background: #fff1de; color: #c2680a; }
+tr.lec-dup-row > td { background: #fff9ef; }
+tr.lec-dup-row > td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
+.room-chip.clickable { cursor: pointer; }
+.room-chip.clickable:hover { background: var(--primary); color: #fff; }
+.dup-filter-btn.active { background: #f59e0b; border-color: #f59e0b; color: #fff; }
 .lec-title { font-size: 0.94rem; font-weight: 600; color: var(--text); line-height: 1.4; }
 .lec-subtitle { font-size: 0.8rem; color: var(--text-dim); margin-top: 2px; }
 .lec-speaker { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }

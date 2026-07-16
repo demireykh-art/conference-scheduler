@@ -18,6 +18,7 @@ let editingDuration = null;   // { roomId, sessionId, lecId }
 let POOL = [];                // 이 행사의 강의 풀
 let newRoomDate = '';         // 룸 추가 모달에서 선택한 날짜
 let CONFLICT_IDS = new Set(); // 현재 중복(연자 겹침) 강의 id 집합
+let DUP_PLACE_IDS = new Set(); // 같은 강의(lectureId)가 2곳 이상 배치됨 = 중복배치
 let CONFS = [];               // 전체 행사 목록 (전환기용)
 
 const SPEAKER_TRAVEL_MIN = 10; // 다른 룸 이동 시간(분)
@@ -78,6 +79,7 @@ if (!CONF_ID) {
         renderAll();
         if (document.getElementById('placeModal').classList.contains('open')) renderPlaceList();
         if (ttQuery()) runTtSearch();
+        handleDeepLink();   // 강의 관리에서 배치 위치 클릭으로 진입 시 해당 룸/강의로 이동
     });
     confRef().child('lecturePool').on('value', snap => {
         POOL = toOrderedArray(snap.val());
@@ -200,6 +202,30 @@ window.clearTtSearch = function () {
     if (el) el.value = '';
     runTtSearch();
 };
+
+// 강의 관리 등 외부에서 ?room=&lec= 로 진입하면 해당 룸을 열고 강의를 강조 (최초 1회)
+let _deepLinkDone = false;
+function handleDeepLink() {
+    if (_deepLinkDone) return;
+    const params = new URLSearchParams(location.search);
+    const roomId = params.get('room'), lecId = params.get('lec');
+    if (!roomId || !(CONF && CONF.rooms && CONF.rooms[roomId])) return;
+    _deepLinkDone = true;
+    ttGoto(roomId, lecId || '');
+}
+
+// 같은 풀 강의(lectureId)가 시간표 여러 곳에 배치되었는지 계산 → 중복배치 집합
+function computeDupPlaceIds() {
+    const cnt = {};
+    Object.values((CONF && CONF.rooms) || {}).forEach(room =>
+        Object.values(room.sessions || {}).forEach(sess =>
+            Object.values(sess.lectures || {}).forEach(lec => {
+                if (lec.lectureId) cnt[lec.lectureId] = (cnt[lec.lectureId] || 0) + 1;
+            })));
+    const set = new Set();
+    Object.keys(cnt).forEach(id => { if (cnt[id] >= 2) set.add(id); });
+    return set;
+}
 
 /* ---------- 룸 정렬 헬퍼 ---------- */
 function orderedRooms() { return toOrderedArray(CONF && CONF.rooms); }
@@ -500,6 +526,7 @@ function renderSessions() {
     if (!room) { box.innerHTML = ''; return; }
 
     CONFLICT_IDS = computeConflictIds();   // 중복 강의 재계산 (자동 갱신)
+    DUP_PLACE_IDS = computeDupPlaceIds();   // 중복배치(같은 강의 2곳 이상) 재계산
     const sessions = computeRoom(room);
     if (!sessions.length) {
         box.innerHTML = `<div class="card empty-state">아직 세션이 없습니다.<br><b>+ 세션 추가</b>로 오전/점심/오후 등을 만드세요.</div>`;
@@ -671,6 +698,7 @@ function renderLectureRow(roomId, sessionId, lec, lang) {
                 ${partner}
                 ${(n.types || []).map(t => `<span class="chip type">${escapeHtml(t)}</span>`).join('')}
                 ${CONFLICT_IDS.has(lec.id) ? '<span class="dup-badge" title="같은 날 동일 연자 시간 겹침(또는 이동 10분 부족)">중복</span>' : ''}
+                ${lec.lectureId && DUP_PLACE_IDS.has(lec.lectureId) ? '<span class="dup-badge dup-place" title="같은 강의가 다른 룸/세션에도 배치됨 (중복배치)">중복배치</span>' : ''}
             </div>
             <div class="lec-title">${title}</div>
             ${subtitle ? `<div class="lec-subtitle">${escapeHtml(subtitle)}</div>` : ''}
