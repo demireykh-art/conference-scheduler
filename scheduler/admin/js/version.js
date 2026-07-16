@@ -3,7 +3,7 @@
  * 강제 새로고침(Ctrl+Shift+R) 없이 최신 버전을 자동 반영한다.
  * 배포할 때마다 APP_VERSION 값을 갱신한다. (배포 스크립트에서 자동 증가)
  */
-window.APP_VERSION = '2026.07.10-17';
+window.APP_VERSION = '2026.07.10-18';
 
 (function () {
     const LOADED = window.APP_VERSION;
