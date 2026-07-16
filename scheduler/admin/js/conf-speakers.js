@@ -68,6 +68,7 @@ function schedRow(kind, x) {
     </div>`;
 }
 function scheduleHtml(id) {
+<<<<<<< HEAD
     const m = Masters.speaker(id) || {};
     const { lectures, sessionsMod } = personSchedule(id);
     const lec = applyFilterSort(lectures, ['title', 'session']);
@@ -157,6 +158,19 @@ window.bulkCopySchedule = function () {
     else fallbackCopy(blocks, done);
 };
 
+=======
+    const { lectures, sessionsMod } = personSchedule(id);
+    const lec = applyFilterSort(lectures, ['title', 'session']);
+    const mod = applyFilterSort(sessionsMod, ['session']);
+    return `<div class="sch-panel">
+        <div class="sch-sec"><div class="sch-sec-h">강의 <span>${lec.length}</span></div>
+            ${lec.length ? lec.map(x => schedRow('lec', x)).join('') : '<div class="sch-empty">해당 없음</div>'}</div>
+        <div class="sch-sec"><div class="sch-sec-h">사회/좌장 <span>${mod.length}</span></div>
+            ${mod.length ? mod.map(x => schedRow('mod', x)).join('') : '<div class="sch-empty">해당 없음</div>'}</div>
+    </div>`;
+}
+
+>>>>>>> origin/main
 function populateDateFilter() {
     const sel = document.getElementById('csvDate');
     if (!sel) return;
@@ -212,12 +226,19 @@ function render() {
                 <div class="p-name">${escapeHtml(name)}</div>
                 ${aff ? `<div class="p-aff">${escapeHtml(aff)}</div>` : ''}
             </div>
+<<<<<<< HEAD
             <button class="btn btn-sm ${open ? 'btn-dark' : ''}" title="이 연자의 강의·사회 일정 보기·전송" onclick="toggleSchedule('${e.id}')">📋 강의/사회 목록 <span class="sch-count">${sch.lectures.length}/${sch.sessionsMod.length}</span> ${open ? '▲' : '▾'}</button>
             <div class="cv-group">
                 <button class="btn btn-sm" title="${m.email ? 'CV 등록 요청 메일(Gmail 작성창)' : '이메일이 없습니다 — 연자 정보에 이메일을 추가하세요'}" onclick="requestCV('${e.id}')">✉️ CV요청 메일보내기</button>
                 <button class="btn btn-sm" title="CV 등록 링크 복사(카톡·문자 등에 붙여넣기)" onclick="copyCVLink('${e.id}')">🔗 CV요청 링크복사</button>
                 <button class="btn btn-sm btn-danger-ghost" onclick="removePerson('${e.id}')">제거</button>
             </div>
+=======
+            <button class="btn btn-sm ${open ? 'btn-dark' : ''}" title="이 연자의 강의·사회 일정 보기" onclick="toggleSchedule('${e.id}')">📋 강의/사회 목록 <span class="sch-count">${sch.lectures.length}/${sch.sessionsMod.length}</span> ${open ? '▲' : '▾'}</button>
+            <button class="btn btn-sm" title="${m.email ? 'CV 요청 메일(Gmail 작성창 열기)' : '이메일이 없습니다 — 연자 정보에 이메일을 추가하세요'}" onclick="requestCV('${e.id}')">✉ CV 요청</button>
+            <button class="btn btn-sm" title="제출 링크 복사(원하는 메신저·메일에 붙여넣기)" onclick="copyCVLink('${e.id}')">🔗 링크 복사</button>
+            <button class="btn btn-sm btn-danger-ghost" onclick="removePerson('${e.id}')">제거</button>
+>>>>>>> origin/main
         </div>
         ${open ? scheduleHtml(e.id) : ''}`;
     }).join('');
