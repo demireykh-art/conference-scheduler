@@ -709,6 +709,11 @@ a { color: inherit; }
 .sch-meta { display: block; font-size: 0.76rem; color: var(--text-dim); margin-top: 2px; }
 .sch-empty { font-size: 0.8rem; color: var(--text-dim); padding: 4px 2px; }
 .sch-unplaced { display: inline-block; font-size: 0.72rem; font-weight: 700; color: #8a5a00; background: #fff8ef; border: 1px solid #f0d3a0; border-radius: 5px; padding: 1px 7px; }
+.sch-badge { display: inline-block; margin-left: 6px; font-size: 0.68rem; font-weight: 700; color: #fff; border-radius: 5px; padding: 1px 7px; vertical-align: middle; }
+.sch-badge.dup { background: var(--danger); }
+.sch-badge.dupplace { background: #f59e0b; }
+.sch-row.sch-link { cursor: pointer; }
+.sch-row.sch-link:hover { border-color: var(--primary); background: #f0f5ff; }
 
 /* CV 제출함 */
 .cvinbox-list { display: flex; flex-direction: column; gap: 12px; }

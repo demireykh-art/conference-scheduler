@@ -11,6 +11,9 @@ let CONF_ROOMS = {}; // 일정(강의/사회) 계산용
 let CONF_POOL = {};  // 강의 풀(배치·미배치 모두 포함)
 let EXPANDED = new Set();          // 펼쳐진 사람 id
 let FILTER_DATE = '', FILTER_Q = '', FILTER_SORT = 'time';
+let CONF_CONFLICTS = new Set();    // 중복(연자 시간겹침) refId 집합 (강의 id + 'mod:세션id')
+let CONF_DUPPLACE = new Set();     // 중복배치(같은 강의 2곳 이상) lectureId 집합
+const SPEAKER_TRAVEL_MIN = 10;     // 다른 룸 이동 버퍼(분) — 시간표와 동일
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('events');
 Masters.init();
@@ -33,6 +36,51 @@ function dowDate(d) {
     const w = isNaN(dt.getTime()) ? '' : ' (' + DOW[dt.getDay()] + ')';
     return d + w;
 }
+/* ---------- 중복(연자 겹침) · 중복배치 계산 (시간표 로직과 동일) ---------- */
+function _speakerKeysOf(speakers) {
+    return (speakers || []).map(s => (typeof s === 'string' ? s : (s.id || s.nameKo || '')).trim()).filter(Boolean);
+}
+function _panelKeysOfSession(session) {
+    const keys = new Set();
+    (session.lectures || []).forEach(l => { if (l.isBreak || l.isPanel) return; _speakerKeysOf(l.speakers).forEach(k => keys.add(k)); });
+    return [...keys];
+}
+function _collectOccupancy() {
+    const out = [];
+    toOrderedArray(CONF_ROOMS).forEach(room => {
+        (computeRoom(room) || []).forEach(session => {
+            (session.lectures || []).forEach(lec => {
+                if (lec.isBreak) return;
+                const keys = lec.isPanel ? _panelKeysOfSession(session) : _speakerKeysOf(lec.speakers);
+                out.push({ roomId: room.id, sessionId: session.id, date: room.date || '', refId: lec.id, start: lec._start, end: lec._end, keys });
+            });
+            const mod = session.moderator, modKey = mod && (mod.id || mod.nameKo);
+            if (modKey) out.push({ roomId: room.id, sessionId: session.id, date: room.date || '', refId: 'mod:' + session.id, start: session._start, end: session._end, keys: [String(modKey).trim()].filter(Boolean) });
+        });
+    });
+    return out;
+}
+function computeConflictIds() {
+    const occ = _collectOccupancy(), ids = new Set();
+    for (let i = 0; i < occ.length; i++) for (let j = i + 1; j < occ.length; j++) {
+        const a = occ[i], b = occ[j];
+        if ((a.date || '') !== (b.date || '')) continue;
+        if (a.roomId === b.roomId && a.sessionId === b.sessionId) continue;
+        if (!a.keys.some(k => b.keys.includes(k))) continue;
+        const buffer = (a.roomId === b.roomId) ? 0 : SPEAKER_TRAVEL_MIN;
+        if (a.start < b.end + buffer && b.start < a.end + buffer) { ids.add(a.refId); ids.add(b.refId); }
+    }
+    return ids;
+}
+function computeDupPlaceIds() {
+    const cnt = {};
+    Object.values(CONF_ROOMS || {}).forEach(room => Object.values(room.sessions || {}).forEach(sess =>
+        Object.values(sess.lectures || {}).forEach(lec => { if (lec.lectureId) cnt[lec.lectureId] = (cnt[lec.lectureId] || 0) + 1; })));
+    const set = new Set();
+    Object.keys(cnt).forEach(id => { if (cnt[id] >= 2) set.add(id); });
+    return set;
+}
+
 function personSchedule(id) {
     const m = Masters.speaker(id) || {};
     // 강의 관리 목록은 연자를 이름 기준으로 표시하므로, id가 달라도(중복 마스터 등) 이름이 같으면 동일인으로 매칭
@@ -43,13 +91,17 @@ function personSchedule(id) {
         (computeRoom(room) || []).forEach(s => {
             const mod = s.moderator;
             if (mod && (mod.id === id || (!mod.id && (mod.nameKo === m.nameKo)))) {
-                sessionsMod.push({ session: s.name || '(세션)', room: room.name || '룸', date: room.date || '', start: s._start, end: s._end });
+                sessionsMod.push({ session: s.name || '(세션)', room: room.name || '룸', date: room.date || '', start: s._start, end: s._end, roomId: room.id, conflict: CONF_CONFLICTS.has('mod:' + s.id) });
             }
             (s.lectures || []).forEach(lec => {
                 if (lec.isBreak) return;
                 if (lec.lectureId) placedIds.add(lec.lectureId);
                 if ((lec.speakers || []).some(nameMatch)) {
-                    lectures.push({ title: lec.titleKo || lec.titleEn || '(제목 없음)', session: s.name || '', room: room.name || '룸', date: room.date || '', start: lec._start, end: lec._end });
+                    lectures.push({
+                        title: lec.titleKo || lec.titleEn || '(제목 없음)', session: s.name || '', room: room.name || '룸', date: room.date || '',
+                        start: lec._start, end: lec._end, roomId: room.id, lecId: lec.id, lectureId: lec.lectureId || '',
+                        conflict: CONF_CONFLICTS.has(lec.id), dupPlace: !!lec.lectureId && CONF_DUPPLACE.has(lec.lectureId)
+                    });
                 }
             });
         });
@@ -77,14 +129,23 @@ function applyFilterSort(arr, textKeys) {
 function schedRow(kind, x) {
     const time = (x.start != null) ? `${formatTime(x.start)}-${formatTime(x.end)}` : '';
     const title = kind === 'lec' ? x.title : x.session;
+    const badges = (x.conflict ? '<span class="sch-badge dup" title="같은 날 동일 연자 시간 겹침">중복</span>' : '')
+        + (x.dupPlace ? '<span class="sch-badge dupplace" title="같은 강의가 다른 룸/세션에도 배치됨">중복배치</span>' : '');
     const meta = x.unplaced
         ? '<span class="sch-unplaced">미배치</span>'
         : `📍 ${escapeHtml(x.room)}${x.date ? ' · ' + escapeHtml(dowDate(x.date)) : ''}${time ? ' · ⏰ ' + time : ''}`;
-    return `<div class="sch-row">
-        <span class="sch-title">${escapeHtml(title)}</span>
+    const clickable = (!x.unplaced && x.roomId) ? ` class="sch-row sch-link" title="시간표에서 보기" onclick="gotoTimetable('${x.roomId}','${x.lecId || ''}')"` : ' class="sch-row"';
+    return `<div${clickable}>
+        <span class="sch-title">${escapeHtml(title)}${badges}</span>
         <span class="sch-meta">${meta}</span>
     </div>`;
 }
+
+// 강의/사회 목록에서 배치 위치 클릭 → 시간표의 해당 룸/강의로 이동
+window.gotoTimetable = function (roomId, lecId) {
+    if (!roomId) return;
+    location.href = `timetable.html?id=${encodeURIComponent(CONF_ID)}&room=${encodeURIComponent(roomId)}${lecId ? '&lec=' + encodeURIComponent(lecId) : ''}`;
+};
 function scheduleHtml(id) {
     const m = Masters.speaker(id) || {};
     const { lectures, sessionsMod } = personSchedule(id);
@@ -205,6 +266,8 @@ let SPK_Q = '';
 document.getElementById('spkInput').addEventListener('input', e => { SPK_Q = e.target.value.trim().toLowerCase(); render(); });
 
 function render() {
+    CONF_CONFLICTS = computeConflictIds();   // 중복(연자 겹침) 재계산
+    CONF_DUPPLACE = computeDupPlaceIds();     // 중복배치 재계산
     document.getElementById('spkCount').textContent = CONF_SPK.length;
     const box = document.getElementById('peopleList');
     if (!CONF_SPK.length) {
