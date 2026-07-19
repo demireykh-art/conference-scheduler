@@ -67,6 +67,110 @@ window.compressImage = function (file, maxW = 800, quality = 0.82) {
     });
 };
 
+/* ------------------------------------------------------------
+   사진 위치 조정(크롭) — 원형 미리보기에서 드래그 이동 + 확대로 얼굴 가운데 맞춤
+   외부 라이브러리 없이 canvas만 사용. 적용 시 정사각(out×out) JPEG data URL 반환.
+   취소 시 null resolve. (모달 DOM은 자체 주입/정리)
+   ------------------------------------------------------------ */
+window.openImageCropper = function (file, opts) {
+    opts = opts || {};
+    const VIEW = 288, OUT = opts.out || 400, QUALITY = opts.quality || 0.85;
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = () => build(img);
+            img.onerror = () => reject(new Error('이미지를 읽을 수 없습니다.'));
+            img.src = reader.result;
+        };
+        reader.onerror = () => reject(new Error('파일을 읽을 수 없습니다.'));
+        reader.readAsDataURL(file);
+
+        function build(img) {
+            const iw = img.naturalWidth, ih = img.naturalHeight;
+            const minScale = Math.max(VIEW / iw, VIEW / ih);
+            let scale = minScale, ox = (VIEW - iw * scale) / 2, oy = (VIEW - ih * scale) / 2;
+            const r = VIEW / 2 - 2;
+
+            const ov = document.createElement('div');
+            ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px';
+            const box = document.createElement('div');
+            box.style.cssText = 'background:#fff;border-radius:14px;padding:18px;max-width:340px;width:100%;box-shadow:0 12px 44px rgba(0,0,0,.32)';
+            box.innerHTML = '<div style="font-weight:700;font-size:0.98rem;margin-bottom:4px">사진 위치 조정</div>'
+                + '<div style="font-size:0.78rem;color:#6b7280;margin-bottom:12px">드래그로 이동, 슬라이더로 확대해 얼굴을 원 안에 맞추세요.</div>';
+            const canvas = document.createElement('canvas');
+            canvas.width = VIEW; canvas.height = VIEW;
+            canvas.style.cssText = 'width:100%;max-width:288px;display:block;margin:0 auto;border-radius:10px;background:#f1f3f5;touch-action:none;cursor:grab';
+            const ctx = canvas.getContext('2d');
+            const zoom = document.createElement('input');
+            zoom.type = 'range'; zoom.min = '100'; zoom.max = '300'; zoom.value = '100';
+            zoom.style.cssText = 'width:100%;margin:14px 0 4px';
+            const acts = document.createElement('div');
+            acts.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;margin-top:6px';
+            const cancel = document.createElement('button');
+            cancel.type = 'button'; cancel.className = 'btn btn-sm'; cancel.textContent = '취소';
+            const apply = document.createElement('button');
+            apply.type = 'button'; apply.className = 'btn btn-sm btn-primary'; apply.textContent = '적용';
+            acts.append(cancel, apply);
+            box.append(canvas, zoom, acts);
+            ov.append(box);
+            document.body.append(ov);
+
+            function clamp() {
+                const minOx = VIEW - iw * scale, minOy = VIEW - ih * scale;
+                ox = Math.min(0, Math.max(minOx, ox));
+                oy = Math.min(0, Math.max(minOy, oy));
+            }
+            function redraw() {
+                ctx.clearRect(0, 0, VIEW, VIEW);
+                ctx.drawImage(img, ox, oy, iw * scale, ih * scale);
+                ctx.save();
+                ctx.fillStyle = 'rgba(0,0,0,0.42)';
+                ctx.beginPath();
+                ctx.rect(0, 0, VIEW, VIEW);
+                ctx.arc(VIEW / 2, VIEW / 2, r, 0, Math.PI * 2, true);
+                ctx.fill('evenodd');
+                ctx.restore();
+                ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(VIEW / 2, VIEW / 2, r, 0, Math.PI * 2); ctx.stroke();
+            }
+            clamp(); redraw();
+
+            zoom.addEventListener('input', () => {
+                const cx = VIEW / 2, cy = VIEW / 2;
+                const imgX = (cx - ox) / scale, imgY = (cy - oy) / scale;
+                scale = minScale * (Number(zoom.value) / 100);
+                ox = cx - imgX * scale; oy = cy - imgY * scale;
+                clamp(); redraw();
+            });
+
+            let dragging = false, lx = 0, ly = 0;
+            const evtK = () => VIEW / (canvas.getBoundingClientRect().width || VIEW);
+            canvas.addEventListener('pointerdown', e => { dragging = true; lx = e.clientX; ly = e.clientY; try { canvas.setPointerCapture(e.pointerId); } catch (x) { } canvas.style.cursor = 'grabbing'; });
+            canvas.addEventListener('pointermove', e => {
+                if (!dragging) return;
+                const k = evtK();
+                ox += (e.clientX - lx) * k; oy += (e.clientY - ly) * k;
+                lx = e.clientX; ly = e.clientY; clamp(); redraw();
+            });
+            const end = () => { dragging = false; canvas.style.cursor = 'grab'; };
+            canvas.addEventListener('pointerup', end);
+            canvas.addEventListener('pointercancel', end);
+
+            cancel.addEventListener('click', () => { ov.remove(); resolve(null); });
+            apply.addEventListener('click', () => {
+                const k = OUT / VIEW;
+                const oc = document.createElement('canvas'); oc.width = OUT; oc.height = OUT;
+                const octx = oc.getContext('2d');
+                octx.fillStyle = '#ffffff'; octx.fillRect(0, 0, OUT, OUT);
+                octx.drawImage(img, ox * k, oy * k, iw * scale * k, ih * scale * k);
+                ov.remove();
+                resolve(oc.toDataURL('image/jpeg', QUALITY));
+            });
+        }
+    });
+};
+
 // 타이핑 검색 자동완성 (공용) — input에 입력 시 listEl에 후보 표시, Enter/클릭 선택
 // getItems(query) → [{label, value}], onPick(value) 호출
 window.setupAutocomplete = function (input, listEl, getItems, onPick) {
