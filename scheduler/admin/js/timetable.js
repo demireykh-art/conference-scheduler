@@ -245,19 +245,45 @@ function renderAll() {
     renderSessions();
 }
 
-/* ---------- 룸 탭 ---------- */
+/* ---------- 룸 탭 (날짜별 한 줄 · 룸이 많으면 가로 스크롤) ---------- */
 function renderRoomTabs(rooms) {
     const box = document.getElementById('roomTabs');
-    const tabs = rooms.map(r => `
+
+    // 날짜별 그룹화 (전역 order 유지) → 날짜 오름차순, 날짜미정은 마지막
+    const groups = [], byDate = {};
+    rooms.forEach(r => {
+        const key = r.date || '';
+        if (!byDate[key]) { byDate[key] = { date: key, rooms: [] }; groups.push(byDate[key]); }
+        byDate[key].rooms.push(r);
+    });
+    groups.sort((a, b) => (!a.date ? 1 : !b.date ? -1 : a.date.localeCompare(b.date)));
+
+    const tabBtn = r => `
         <button class="room-tab ${r.id === CURRENT_ROOM ? 'active' : ''}" data-room="${r.id}"
             onclick="selectRoom('${r.id}')">
             <span class="grip" title="드래그하여 순서 변경">⋮⋮</span>${escapeHtml(r.name || '(이름 없음)')}
-            <span class="room-tab-date ${r.date ? '' : 'nodate'}">${r.date ? escapeHtml(dayLabel(r.date)) : '날짜미정'}</span>
             ${r.kmaSubmit ? '<span class="room-tab-kma" title="의협제출 대상">의협</span>' : ''}
-        </button>`).join('');
-    box.innerHTML = tabs + `<button class="room-tab add-tab" onclick="openRoomModal()">+ 룸 추가</button>`;
+        </button>`;
 
-    enableSort(box, '.room-tab[data-room]', 'data-room', ids => persistRoomOrder(ids), 'room');
+    const rowsHtml = groups.map(g => {
+        const label = g.date
+            ? `<span class="room-tab-daterow">${escapeHtml(dayLabel(g.date))}</span>`
+            : `<span class="room-tab-daterow nodate">날짜미정</span>`;
+        return `<div class="room-tab-row">${label}<div class="room-tab-scroll">${g.rooms.map(tabBtn).join('')}</div></div>`;
+    }).join('');
+
+    box.innerHTML = rowsHtml + `<div class="room-tab-row addrow"><button class="room-tab add-tab" onclick="openRoomModal()">+ 룸 추가</button></div>`;
+
+    // 각 날짜(줄) 스크롤 컨테이너 안에서만 드래그 정렬 (줄 간 이동은 자연 차단) — 순서는 전역으로 저장
+    box.querySelectorAll('.room-tab-scroll').forEach(sc => {
+        enableSort(sc, '.room-tab[data-room]', 'data-room', () => persistRoomOrderFromDom(), 'room');
+    });
+}
+
+// 화면(날짜별 그룹) DOM 순서대로 전역 룸 order 저장
+function persistRoomOrderFromDom() {
+    const ids = [...document.querySelectorAll('#roomTabs .room-tab[data-room]')].map(el => el.getAttribute('data-room'));
+    if (ids.length) persistRoomOrder(ids);
 }
 
 window.selectRoom = function (id) { CURRENT_ROOM = id; renderRoomTabs(orderedRooms()); renderRoomSettings(); renderSessions(); };
