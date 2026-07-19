@@ -176,16 +176,17 @@ window.editSpeaker = function (id) {
 
 window.closeSpeakerModal = function () { document.getElementById('spkModal').classList.remove('open'); };
 
-window.saveSpeaker = function () {
-    if (!AdminAuth.requireEdit()) return;
+// 저장 처리 → 저장된 연자 id를 resolve. closeAfter=false면 모달 유지(CV 요청 발송용).
+function doSaveSpeaker(closeAfter) {
+    if (!AdminAuth.requireEdit()) return Promise.reject(new Error('권한 없음'));
     const nameKo = document.getElementById('spkNameKo').value.trim();
-    if (!nameKo) { Toast.warning('연자 이름(국문)을 입력하세요.'); return; }
+    if (!nameKo) { Toast.warning('연자 이름(국문)을 입력하세요.'); return Promise.reject(new Error('이름 없음')); }
 
     // 중복 체크 (국문 이름 + 소속국문 조합)
     const affKo = document.getElementById('spkAffKo').value.trim();
     const dup = SPEAKERS.find(s => s.id !== SPK_EDIT_ID
         && (s.nameKo || '').trim() === nameKo && (s.affiliationKo || '').trim() === affKo);
-    if (dup) { Toast.warning('이미 같은 이름·소속의 연자가 등록되어 있습니다.'); return; }
+    if (dup) { Toast.warning('이미 같은 이름·소속의 연자가 등록되어 있습니다.'); return Promise.reject(new Error('중복')); }
 
     const data = {
         nameKo,
@@ -202,24 +203,98 @@ window.saveSpeaker = function () {
     };
 
     if (SPK_EDIT_ID) {
-        SPK_ROOT.child(SPK_EDIT_ID).update(data)
+        return SPK_ROOT.child(SPK_EDIT_ID).update(data)
             .then(() => {
                 logActivity('update', 'speaker', `연자 "${nameKo}" 수정`, { entityId: SPK_EDIT_ID });
-                Toast.success('저장되었습니다.'); closeSpeakerModal();
+                if (closeAfter) { Toast.success('저장되었습니다.'); closeSpeakerModal(); }
+                return SPK_EDIT_ID;
             })
-            .catch(e => Toast.error('저장 실패: ' + e.message));
+            .catch(e => { Toast.error('저장 실패: ' + e.message); throw e; });
     } else {
         data.order = SPEAKERS.length;
         data.createdAt = firebase.database.ServerValue.TIMESTAMP;
         const id = uuid();
-        SPK_ROOT.child(id).set(data)
+        return SPK_ROOT.child(id).set(data)
             .then(() => {
                 logActivity('create', 'speaker', `연자 "${nameKo}" 등록`, { entityId: id });
-                Toast.success('연자가 등록되었습니다.'); closeSpeakerModal();
+                SPK_EDIT_ID = id;   // 이후 편집/재발송이 같은 연자에 반영되도록
+                document.getElementById('spkModalTitle').textContent = '연자 수정';
+                if (closeAfter) { Toast.success('연자가 등록되었습니다.'); closeSpeakerModal(); }
+                return id;
             })
-            .catch(e => Toast.error('등록 실패: ' + e.message));
+            .catch(e => { Toast.error('등록 실패: ' + e.message); throw e; });
     }
-};
+}
+window.saveSpeaker = function () { doSaveSpeaker(true).catch(() => { }); };
+
+/* ---------- CV 요청 (메일 / 링크복사) — 저장 후 발송 ---------- */
+const ORG_NAME = '대한미용성형레이저의학회(ASLS)';
+
+// 전역(행사무관) CV 토큰 → /cvTokens/<t> = {c:'', s:id}
+function shortToken(id) {
+    const key = 'g|' + id;
+    let h = 0x811c9dc5;
+    for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return (h >>> 0).toString(36);
+}
+function cvLink(id) {
+    const t = shortToken(id);
+    database.ref('/cvTokens/' + t).set({ c: '', s: id }).catch(() => { });
+    const base = new URL('../../cv.html', location.href);   // 저장소 루트 cv.html?t=<t>
+    base.searchParams.set('t', t);
+    return base.href;
+}
+function cvContact(id) {
+    if (id === SPK_EDIT_ID) {
+        return {
+            email: document.getElementById('spkEmail').value.trim(),
+            name: document.getElementById('spkNameKo').value.trim() || document.getElementById('spkNameEn').value.trim()
+        };
+    }
+    const s = SPEAKERS.find(x => x.id === id) || {};
+    return { email: s.email || '', name: s.nameKo || s.nameEn || '' };
+}
+function requestCV(id) {
+    const { email, name } = cvContact(id);
+    const subject = 'ASLS 연자 정보(CV) 및 사진 등록 안내';
+    const body =
+`안녕하세요, ${name ? name + ' 선생님' : '선생님'}.
+
+${ORG_NAME} 사무국입니다.
+연자로 모시게 되어 진심으로 감사드립니다.
+
+행사 준비를 위해 성함과 소속, 약력(CV), 프로필 사진을 아래 페이지에서 등록해 주시면 감사하겠습니다. 등록해 주신 내용은 학회에 자동 반영됩니다.
+
+등록 페이지
+${cvLink(id)}
+
+궁금하신 점은 본 메일로 회신 주시면 안내드리겠습니다.
+늘 감사드립니다.
+
+${ORG_NAME} 사무국 드림`;
+    const gmail = 'https://mail.google.com/mail/?view=cm&fs=1'
+        + '&to=' + encodeURIComponent(email || '')
+        + '&su=' + encodeURIComponent(subject)
+        + '&body=' + encodeURIComponent(body);
+    window.open(gmail, '_blank');
+    if (!email) Toast.info('이메일이 없습니다. Gmail 작성창에서 수신인을 직접 입력하세요.');
+}
+function copyCVLink(id) {
+    const url = 'ASLS 연자 정보 · CV 제출\n' + cvLink(id);
+    const done = () => Toast.success('제출 링크를 복사했습니다. 문자·카톡 등에 붙여넣으세요.');
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done).catch(() => fallbackCopy(url, done));
+    else fallbackCopy(url, done);
+}
+function fallbackCopy(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { Toast.info('복사 실패 — 링크: ' + text); }
+    ta.remove();
+}
+// 모달 버튼 — 입력값 저장 후 발송/복사
+window.sendCvMail = function () { doSaveSpeaker(false).then(id => requestCV(id)).catch(() => { }); };
+window.copyCvLinkBtn = function () { doSaveSpeaker(false).then(id => copyCVLink(id)).catch(() => { }); };
 
 window.deleteSpeaker = async function (id) {
     if (!AdminAuth.requireEdit()) return;
