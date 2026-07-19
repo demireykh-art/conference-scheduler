@@ -330,8 +330,8 @@ document.getElementById('spkPhotoFile').addEventListener('change', async e => {
     if (!file) return;
     if (!file.type.startsWith('image/')) { Toast.warning('이미지 파일만 업로드할 수 있습니다.'); e.target.value = ''; return; }
     try {
-        spkPhotoData = await compressImage(file, 400, 0.82);
-        refreshSpkPhotoPreview();
+        const cropped = await openImageCropper(file, { out: 400 });
+        if (cropped) { spkPhotoData = cropped; refreshSpkPhotoPreview(); }   // 취소 시 기존 사진 유지
     } catch (err) { Toast.error('이미지 처리 실패: ' + err.message); }
     e.target.value = '';
 });
