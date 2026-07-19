@@ -35,15 +35,15 @@
 
     // 대상 행사/연자 정보 로드(공개 읽기 허용) → 안내 + 프리필
     function init() {
-        if (!CONF_ID || !SPK_ID) {
+        if (!SPK_ID) {
             $('cvSub').innerHTML = '<span class="cv-err">잘못된 링크입니다. 학회에서 받은 제출 링크로 다시 접속해 주세요.</span>';
             return;
         }
         Promise.all([
-            database.ref('/adminConferences/' + CONF_ID + '/title').once('value').then(s => s.val()).catch(() => ''),
+            CONF_ID ? database.ref('/adminConferences/' + CONF_ID + '/title').once('value').then(s => s.val()).catch(() => '') : Promise.resolve(''),
             database.ref('/adminSpeakers/' + SPK_ID).once('value').then(s => s.val() || {}).catch(() => ({}))
         ]).then(([title, spk]) => {
-            $('cvTitle').textContent = (title || '행사') + ' · 연자 정보 제출';
+            $('cvTitle').textContent = (title || 'ASLS') + ' · 연자 정보 제출';
             $('cvSub').innerHTML = '아래에 성함·소속·약력(CV)과 사진을 입력해 <b>제출</b>해 주세요. 제출하시면 학회 시스템에 자동 반영됩니다.';
             $('cvNameKo').value = spk.nameKo || '';
             $('cvNameEn').value = spk.nameEn || '';
