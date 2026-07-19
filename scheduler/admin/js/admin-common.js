@@ -325,7 +325,8 @@ const SIDE_MENU = [
         group: '관리', items: [
             { key: 'cvinbox', label: '📥 CV 제출함', href: 'cv-inbox.html' },
             { key: 'activity', label: '🕘 변경이력', href: 'activity.html' },
-            { key: 'users', label: '👥 사용자 관리', href: 'users.html' }
+            { key: 'users', label: '👥 사용자 관리', href: 'users.html' },
+            { key: 'guide', label: '📘 스케쥴러 사용방법', href: 'https://app.notion.com/p/3a28bb6212958047bfc7cdff64b732bf', external: true }
         ]
     }
 ];
@@ -343,7 +344,8 @@ window.renderSidebar = function (activeKey) {
         const items = visible.map(it => {
             const active = it.key === activeKey ? ' active' : '';
             const href = it.key === 'timetable' ? timetableHref : it.href;
-            return `<a class="side-link${active}" href="${href}">${escapeHtml(it.label)}</a>`;
+            const ext = it.external ? ' target="_blank" rel="noopener"' : '';
+            return `<a class="side-link${active}" href="${href}"${ext}>${escapeHtml(it.label)}</a>`;
         }).join('');
         return `<div class="side-group-label">${escapeHtml(g.group)}</div>${items}`;
     }).join('');
