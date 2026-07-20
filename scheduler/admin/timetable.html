@@ -53,7 +53,7 @@
 
                 <!-- 세션 추가 -->
                 <div class="add-session-row" id="addSessionRow" style="display:none">
-                    <button class="btn btn-dark" onclick="openSessionModal()">+ 세션 추가</button>
+                    <button class="btn btn-dark" onclick="openSessionModal()">+ 세션/개회/휴식/점심/폐회 추가</button>
                 </div>
 
                 <!-- 세션 목록 -->
@@ -103,7 +103,14 @@
             <h3 id="sessionModalTitle">세션 추가</h3>
             <div class="modal-field">
                 <label>세션 이름</label>
-                <input type="text" id="sessionName" placeholder="예: 오전 / 점심 / 오후">
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                    <input type="text" id="sessionName" placeholder="예: 오전 / 점심 / 오후" style="flex:1;min-width:160px">
+                    <button type="button" class="btn btn-sm" onclick="setSessionName('Opening')" title="개회 (Opening)">개회</button>
+                    <button type="button" class="btn btn-sm" onclick="setSessionName('Coffee Break')" title="휴식 (Coffee Break)">휴식</button>
+                    <button type="button" class="btn btn-sm" onclick="setSessionName('Lunch')" title="점심 (Lunch)">점심</button>
+                    <button type="button" class="btn btn-sm" onclick="setSessionName('Closing')" title="폐회 (Closing)">폐회</button>
+                </div>
+                <div style="font-size:0.72rem;color:var(--text-dim);margin-top:4px">퀵 버튼을 누르면 표준 명칭이 채워집니다. (PDF에서 색상·명칭이 일관되게 출력됩니다)</div>
             </div>
             <div class="modal-field">
                 <label>사회자 (Moderator) — 선택 · ASLS 관계자만</label>
