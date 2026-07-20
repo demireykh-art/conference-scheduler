@@ -29,7 +29,20 @@
                     </div>
                 </div>
                 <div style="display:flex;gap:8px">
-                    <button class="btn btn-success" onclick="exportExcel()">📊 엑셀 다운로드</button>
+                    <div class="export-dd" style="position:relative">
+                        <button class="btn btn-success" onclick="toggleExportMenu(event)">📥 강의 목록 다운 ▾</button>
+                        <div id="exportMenu" class="export-menu" style="display:none">
+                            <div class="export-group">해당 룸</div>
+                            <button class="export-item" onclick="exportRoomExcel()">📊 해당룸 강의 — 엑셀</button>
+                            <button class="export-item" onclick="exportRoomPdf()">📄 해당룸 강의 — PDF</button>
+                            <div class="export-group">전체</div>
+                            <button class="export-item" onclick="exportAllExcel()">📊 전체강의 — 엑셀</button>
+                            <button class="export-item" onclick="exportAllPdf()">📄 전체룸 강의 — PDF</button>
+                            <div class="export-group">의협 아젠다 (의협제출 룸)</div>
+                            <button class="export-item" onclick="exportKmaExcel()">📊 의협 아젠다 — 엑셀</button>
+                            <button class="export-item" onclick="exportKmaPdf()">📄 의협 아젠다 — PDF</button>
+                        </div>
+                    </div>
                     <button class="btn" data-soon="1">🕘 변경 이력</button>
                 </div>
             </div>

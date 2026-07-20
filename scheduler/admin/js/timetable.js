@@ -1341,21 +1341,37 @@ function rebuildRoomLecturesFromDOM(roomId) {
 }
 
 /* ============================================================
-   엑셀 다운로드
+   다운로드 (엑셀 / PDF 아젠다) — 해당룸 / 전체 / 의협
    ============================================================ */
-window.exportExcel = function () {
+window.toggleExportMenu = function (e) {
+    if (e) e.stopPropagation();
+    const m = document.getElementById('exportMenu');
+    if (!m) return;
+    m.style.display = m.style.display === 'none' ? 'block' : 'none';
+};
+document.addEventListener('click', e => {
+    const m = document.getElementById('exportMenu');
+    if (m && m.style.display !== 'none' && !e.target.closest('.export-dd')) m.style.display = 'none';
+});
+function closeExportMenu() { const m = document.getElementById('exportMenu'); if (m) m.style.display = 'none'; }
+function safeName() { return ((CONF && CONF.title) || '시간표').replace(/[\\/:*?"<>|]/g, '_'); }
+function kmaRooms() { return orderedRooms().filter(r => r.kmaSubmit); }
+
+/* ---------- 엑셀 ---------- */
+function exportExcelRooms(rooms, suffix) {
     if (typeof XLSX === 'undefined') { Toast.error('엑셀 모듈을 불러오지 못했습니다.'); return; }
     if (!CONF) return;
-    const rows = [['룸', '세션', '시작', '종료', '시간(분)',
+    if (!rooms.length) { Toast.warning('내보낼 룸이 없습니다.'); return; }
+    const rows = [['룸', '날짜', '세션', '시작', '종료', '시간(분)',
         '제목(국문)', '제목(영문)', '연자(국문)', '연자(영문)', '소속(국문)', '소속(영문)',
         '파트너사(국문)', '파트너사(영문)', '제품(국문)', '제품(영문)', '제품분류', '제품설명']];
     const join = arr => arr.filter(Boolean).join('; ');
-    orderedRooms().forEach(r => {
+    rooms.forEach(r => {
         computeRoom(r).forEach(s => {
             s.lectures.forEach(lec => {
                 const n = normalizeLecture(lec);
                 rows.push([
-                    r.name, s.name, formatTime(lec._start), formatTime(lec._end), lec.duration || 0,
+                    r.name, r.date || '', s.name, formatTime(lec._start), formatTime(lec._end), lec.duration || 0,
                     n.titleKo, n.titleEn,
                     join(n.speakers.map(x => x.nameKo)), join(n.speakers.map(x => x.nameEn)),
                     join(n.speakers.map(x => x.affiliationKo)), join(n.speakers.map(x => x.affiliationEn)),
@@ -1365,14 +1381,149 @@ window.exportExcel = function () {
         });
     });
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 18 }, { wch: 8 }, { wch: 7 }, { wch: 7 }, { wch: 8 },
+    ws['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 7 }, { wch: 7 }, { wch: 8 },
         { wch: 40 }, { wch: 40 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 18 },
         { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 40 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '시간표');
-    const safe = (CONF.title || '시간표').replace(/[\\/:*?"<>|]/g, '_');
-    XLSX.writeFile(wb, `${safe}_시간표.xlsx`);
+    XLSX.writeFile(wb, `${safeName()}${suffix}.xlsx`);
     Toast.success('엑셀 파일을 내려받았습니다.');
-};
+}
+window.exportRoomExcel = function () { closeExportMenu(); const r = getRoom(CURRENT_ROOM); exportExcelRooms(r ? [r] : [], `_${(r && r.name) || '룸'}`); };
+window.exportAllExcel = function () { closeExportMenu(); exportExcelRooms(orderedRooms(), '_전체강의'); };
+window.exportKmaExcel = function () { closeExportMenu(); const rs = kmaRooms(); if (!rs.length) { Toast.warning('의협제출로 지정된 룸이 없습니다. (룸 설정에서 "의협제출" 체크)'); return; } exportExcelRooms(rs, '_의협아젠다'); };
+
+/* ---------- PDF 아젠다 (인쇄 → PDF로 저장) ---------- */
+window.exportRoomPdf = function () { closeExportMenu(); const r = getRoom(CURRENT_ROOM); openAgendaPrint(r ? [r] : [], (r && r.name) || '룸'); };
+window.exportAllPdf = function () { closeExportMenu(); openAgendaPrint(orderedRooms(), '전체 룸'); };
+window.exportKmaPdf = function () { closeExportMenu(); const rs = kmaRooms(); if (!rs.length) { Toast.warning('의협제출로 지정된 룸이 없습니다. (룸 설정에서 "의협제출" 체크)'); return; } openAgendaPrint(rs, '의협 아젠다'); };
+
+const PDF_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function fmtLongDate(d) {
+    if (!d) return '';
+    const [y, m, day] = d.split('-').map(Number);
+    if (!y || !m || !day) return d;
+    const wd = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(y, m - 1, day).getDay()];
+    return `${PDF_MONTHS[m - 1]} ${day}, ${y} (${wd})`;
+}
+function pdfEsc(s) { return (s == null ? '' : String(s)).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+function sessionCategory(name) {
+    const n = (name || '').toLowerCase();
+    if (/open|개회/.test(n)) return 'opening';
+    if (/clos|폐회/.test(n)) return 'closing';
+    if (/lunch|luncheon|점심|런천/.test(n)) return 'lunch';
+    if (/coffee|break|휴식|정리/.test(n)) return 'coffee';
+    if (/regist|등록|受付|접수/.test(n)) return 'registration';
+    return 'regular';
+}
+function lecCategory(lec) {
+    if (lec.isPanel) return 'qna';
+    if (lec.isBreak) {
+        const n = ((lec.titleKo || '') + ' ' + (lec.titleEn || '')).toLowerCase();
+        if (/lunch|luncheon|점심|런천/.test(n)) return 'lunch';
+        if (/open|개회/.test(n)) return 'opening';
+        if (/clos|폐회/.test(n)) return 'closing';
+        if (/regist|등록|受付|접수/.test(n)) return 'registration';
+        return 'coffee';
+    }
+    return 'lecture';
+}
+function timeCell(lec) { return `${formatTime(lec._start)}<br><span class="tw">~</span><br>${formatTime(lec._end)}`; }
+
+function agendaRoomHtml(room) {
+    const sessions = computeRoom(room);
+    let html = `<table class="agenda"><colgroup><col class="c-time"><col class="c-title"><col class="c-spk"><col class="c-mod"></colgroup>`;
+    html += `<tr class="date-band"><td colspan="4">${pdfEsc(fmtLongDate(room.date)) || '날짜 미정'}</td></tr>`;
+    html += `<tr class="room-band"><td class="room-name">${pdfEsc(room.name || '')}</td><td colspan="3" class="room-topic">${pdfEsc(room.topic || '')}</td></tr>`;
+    html += `<tr class="col-head"><td>Time</td><td>Title</td><td>Speaker</td><td>Moderator</td></tr>`;
+
+    let sno = 0;
+    sessions.forEach(s => {
+        const cat = sessionCategory(s.name);
+        if (cat === 'regular') {
+            sno++;
+            const mod = s.moderator;
+            const modName = mod && (mod.nameEn || mod.nameKo) ? `Moderator (모더레이터)<br><b>${pdfEsc(mod.nameEn || mod.nameKo)}</b>` : '';
+            html += `<tr class="ses-head"><td class="time"></td><td class="title"><span class="sno">Session #${sno}</span> <b>${pdfEsc(s.name || '')}</b></td><td></td><td class="mod">${modName}</td></tr>`;
+        } else {
+            // 개회/휴식/점심/폐회/등록 세션 자체를 색상 밴드로
+            html += `<tr class="cat-${cat}"><td class="time">${s._start != null ? formatTime(s._start) + ' ~ ' + formatTime(s._end) : ''}</td><td class="title" colspan="3"><b>${pdfEsc(s.name || '')}</b></td></tr>`;
+        }
+        (s.lectures || []).forEach(lec => {
+            const lc = lecCategory(lec);
+            if (lc === 'lecture') {
+                const n = normalizeLecture(lec);
+                const titleMain = pdfEsc(n.titleEn || n.titleKo || '(제목 없음)');
+                const titleSub = (n.titleEn && n.titleKo) ? `<div class="sub">${pdfEsc(n.titleKo)}</div>` : '';
+                const spk = n.speakers.map(x => {
+                    const main = pdfEsc(x.nameEn || x.nameKo || '');
+                    const sub = (x.nameEn && x.nameKo) ? `<div class="sub">${pdfEsc(x.nameKo)}</div>` : '';
+                    return main + sub;
+                }).join('<div class="spk-gap"></div>') || '';
+                const aff = pdfEsc((n.speakers[0] && (n.speakers[0].affiliationEn || n.speakers[0].affiliationKo)) || '');
+                html += `<tr class="lec"><td class="time">${timeCell(lec)}</td><td class="title"><b>${titleMain}</b>${titleSub}</td><td class="spk">${spk}</td><td class="mod aff">${aff}</td></tr>`;
+            } else {
+                const t = pdfEsc(lec.titleEn || lec.titleKo || (lc === 'qna' ? 'Q&A & Panel Discussion' : ''));
+                const tsub = (lec.titleEn && lec.titleKo) ? `<div class="sub">${pdfEsc(lec.titleKo)}</div>` : '';
+                html += `<tr class="cat-${lc}"><td class="time">${timeCell(lec)}</td><td class="title" colspan="3"><b>${t}</b>${tsub}</td></tr>`;
+            }
+        });
+    });
+    html += `</table>`;
+    return html;
+}
+
+function agendaDocHtml(rooms, label) {
+    const confTitle = (CONF && CONF.title) || '';
+    const body = rooms.map((r, i) => `<div class="page"${i < rooms.length - 1 ? ' style="page-break-after:always"' : ''}>${agendaRoomHtml(r)}</div>`).join('');
+    return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>${pdfEsc(confTitle)} — ${pdfEsc(label)}</title>
+<style>
+  @page { size: A4 portrait; margin: 12mm 10mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR','Noto Sans JP',sans-serif; color: #1a1a1a; margin: 0; }
+  .toolbar { position: sticky; top: 0; background: #f5f6f8; padding: 10px 14px; border-bottom: 1px solid #ddd; display: flex; gap: 10px; align-items: center; }
+  .toolbar button { padding: 8px 16px; border: none; border-radius: 8px; background: #2f6fed; color: #fff; font-size: 0.9rem; font-weight: 700; cursor: pointer; }
+  .toolbar .hint { font-size: 0.82rem; color: #555; }
+  .page { padding: 6px 0 18px; }
+  table.agenda { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8.5pt; }
+  .agenda col.c-time { width: 15%; } .agenda col.c-title { width: 52%; } .agenda col.c-spk { width: 17%; } .agenda col.c-mod { width: 16%; }
+  .agenda td { border: 0.5pt solid #b9b9b9; padding: 3px 5px; vertical-align: middle; word-break: break-word; }
+  .date-band td { background: #1f3864; color: #fff; font-weight: 700; text-align: center; font-size: 9pt; padding: 4px; }
+  .room-band .room-name { background: #dbe5f1; color: #7a1f1f; font-weight: 800; font-size: 13pt; text-align: center; }
+  .room-band .room-topic { background: #c0392b; color: #fff; font-weight: 700; text-align: center; font-size: 10pt; }
+  .col-head td { background: #eef0f3; font-weight: 700; text-align: center; }
+  .agenda .time { text-align: center; font-weight: 700; white-space: nowrap; font-size: 8pt; }
+  .agenda .time .tw { color: #888; font-weight: 400; }
+  .agenda .title b { font-weight: 700; }
+  .agenda .title .sub { color: #555; font-size: 7.5pt; margin-top: 1px; }
+  .agenda .sno { display: inline-block; font-weight: 800; color: #2f6fed; margin-right: 4px; }
+  .agenda .spk { text-align: center; font-size: 8pt; } .agenda .spk .sub { color: #555; font-size: 7.2pt; }
+  .agenda .spk-gap { height: 3px; }
+  .agenda .mod { text-align: center; font-size: 8pt; } .agenda .aff { color: #333; }
+  .ses-head td { background: #fbfcff; }
+  .cat-opening td, .cat-closing td { background: #f2dcdb; font-style: italic; }
+  .cat-lunch td { background: #e5dfec; font-style: italic; }
+  .cat-coffee td { background: #ffe699; }
+  .cat-qna td { background: #fff2cc; }
+  .cat-registration td { background: #dce6f1; font-style: italic; }
+  @media print { .toolbar { display: none; } .page { padding: 0; } }
+</style></head><body>
+<div class="toolbar"><button onclick="window.print()">🖨️ PDF로 저장 / 인쇄</button><span class="hint">인쇄창이 안 뜨면 이 버튼을 누르고, 대상에서 <b>‘PDF로 저장’</b>을 선택하세요.</span></div>
+${body}
+</body></html>`;
+}
+
+function openAgendaPrint(rooms, label) {
+    if (!CONF) return;
+    if (!rooms || !rooms.length) { Toast.warning('내보낼 룸이 없습니다.'); return; }
+    const w = window.open('', '_blank');
+    if (!w) { Toast.warning('팝업이 차단되었습니다. 팝업을 허용한 뒤 다시 시도하세요.'); return; }
+    w.document.open();
+    w.document.write(agendaDocHtml(rooms, label));
+    w.document.close();
+    const go = () => { try { w.focus(); w.print(); } catch (e) { } };
+    w.onload = () => setTimeout(go, 300);
+    Toast.success('아젠다 창을 열었습니다. 인쇄창에서 "PDF로 저장"을 선택하세요.');
+}
 
 /* 배경 클릭으로는 닫지 않음 — 닫기/취소 버튼으로만 닫힘 (입력 보호) */
