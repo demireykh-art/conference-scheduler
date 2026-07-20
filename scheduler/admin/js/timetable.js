@@ -1362,28 +1362,30 @@ function exportExcelRooms(rooms, suffix) {
     if (typeof XLSX === 'undefined') { Toast.error('엑셀 모듈을 불러오지 못했습니다.'); return; }
     if (!CONF) return;
     if (!rooms.length) { Toast.warning('내보낼 룸이 없습니다.'); return; }
-    const rows = [['룸', '날짜', '세션', '시작', '종료', '시간(분)',
-        '제목(국문)', '제목(영문)', '연자(국문)', '연자(영문)', '소속(국문)', '소속(영문)',
-        '파트너사(국문)', '파트너사(영문)', '제품(국문)', '제품(영문)', '제품분류', '제품설명']];
+    // 표시언어(룸/세션 설정)에 맞춰 단일 언어로 출력 — 한글이면 한글만, 영어면 영어만
+    const rows = [['룸', '날짜', '세션', '표시언어', '시작', '종료', '시간(분)',
+        '제목', '연자', '소속', '파트너사', '제품', '제품분류', '제품설명']];
     const join = arr => arr.filter(Boolean).join('; ');
     rooms.forEach(r => {
         computeRoom(r).forEach(s => {
+            const lang = effectiveLang(r, s);
             s.lectures.forEach(lec => {
                 const n = normalizeLecture(lec);
                 rows.push([
-                    r.name, r.date || '', s.name, formatTime(lec._start), formatTime(lec._end), lec.duration || 0,
-                    n.titleKo, n.titleEn,
-                    join(n.speakers.map(x => x.nameKo)), join(n.speakers.map(x => x.nameEn)),
-                    join(n.speakers.map(x => x.affiliationKo)), join(n.speakers.map(x => x.affiliationEn)),
-                    n.partnerKo, n.partnerEn, n.productKo, n.productEn, n.productCategory, n.productDesc
+                    r.name, r.date || '', s.name, lang === 'en' ? '영어' : '한글',
+                    formatTime(lec._start), formatTime(lec._end), lec.duration || 0,
+                    pickLang(lang, n.titleKo, n.titleEn),
+                    join(n.speakers.map(x => pickLang(lang, x.nameKo, x.nameEn))),
+                    join(n.speakers.map(x => pickLang(lang, x.affiliationKo, x.affiliationEn))),
+                    pickLang(lang, n.partnerKo, n.partnerEn),
+                    pickLang(lang, n.productKo, n.productEn), n.productCategory, n.productDesc
                 ]);
             });
         });
     });
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 7 }, { wch: 7 }, { wch: 8 },
-        { wch: 40 }, { wch: 40 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 18 },
-        { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 40 }];
+    ws['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 7 }, { wch: 7 }, { wch: 8 },
+        { wch: 44 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 28 }, { wch: 40 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '시간표');
     XLSX.writeFile(wb, `${safeName()}${suffix}.xlsx`);
@@ -1439,11 +1441,13 @@ function agendaRoomHtml(room) {
 
     let sno = 0;
     sessions.forEach(s => {
+        const lang = effectiveLang(room, s);   // 표시언어(룸/세션) — 한글이면 한글만, 영어면 영어만
+        const modLabel = lang === 'en' ? 'Moderator' : '좌장/사회';
         const cat = sessionCategory(s.name);
         if (cat === 'regular') {
             sno++;
             const mod = s.moderator;
-            const modName = mod && (mod.nameEn || mod.nameKo) ? `Moderator (모더레이터)<br><b>${pdfEsc(mod.nameEn || mod.nameKo)}</b>` : '';
+            const modName = mod && (mod.nameEn || mod.nameKo) ? `${modLabel}<br><b>${pdfEsc(pickLang(lang, mod.nameKo, mod.nameEn))}</b>` : '';
             html += `<tr class="ses-head"><td class="time"></td><td class="title"><span class="sno">Session #${sno}</span> <b>${pdfEsc(s.name || '')}</b></td><td></td><td class="mod">${modName}</td></tr>`;
         } else {
             // 개회/휴식/점심/폐회/등록 세션 자체를 색상 밴드로
@@ -1453,19 +1457,14 @@ function agendaRoomHtml(room) {
             const lc = lecCategory(lec);
             if (lc === 'lecture') {
                 const n = normalizeLecture(lec);
-                const titleMain = pdfEsc(n.titleEn || n.titleKo || '(제목 없음)');
-                const titleSub = (n.titleEn && n.titleKo) ? `<div class="sub">${pdfEsc(n.titleKo)}</div>` : '';
-                const spk = n.speakers.map(x => {
-                    const main = pdfEsc(x.nameEn || x.nameKo || '');
-                    const sub = (x.nameEn && x.nameKo) ? `<div class="sub">${pdfEsc(x.nameKo)}</div>` : '';
-                    return main + sub;
-                }).join('<div class="spk-gap"></div>') || '';
-                const aff = pdfEsc((n.speakers[0] && (n.speakers[0].affiliationEn || n.speakers[0].affiliationKo)) || '');
-                html += `<tr class="lec"><td class="time">${timeCell(lec)}</td><td class="title"><b>${titleMain}</b>${titleSub}</td><td class="spk">${spk}</td><td class="mod aff">${aff}</td></tr>`;
+                const titleMain = pdfEsc(pickLang(lang, n.titleKo, n.titleEn) || '(제목 없음)');
+                const spk = n.speakers.map(x => pdfEsc(pickLang(lang, x.nameKo, x.nameEn) || ''))
+                    .filter(Boolean).join('<div class="spk-gap"></div>');
+                const aff = pdfEsc((n.speakers[0] && pickLang(lang, n.speakers[0].affiliationKo, n.speakers[0].affiliationEn)) || '');
+                html += `<tr class="lec"><td class="time">${timeCell(lec)}</td><td class="title"><b>${titleMain}</b></td><td class="spk">${spk}</td><td class="mod aff">${aff}</td></tr>`;
             } else {
-                const t = pdfEsc(lec.titleEn || lec.titleKo || (lc === 'qna' ? 'Q&A & Panel Discussion' : ''));
-                const tsub = (lec.titleEn && lec.titleKo) ? `<div class="sub">${pdfEsc(lec.titleKo)}</div>` : '';
-                html += `<tr class="cat-${lc}"><td class="time">${timeCell(lec)}</td><td class="title" colspan="3"><b>${t}</b>${tsub}</td></tr>`;
+                const t = pdfEsc(pickLang(lang, lec.titleKo, lec.titleEn) || (lc === 'qna' ? 'Q&A & Panel Discussion' : ''));
+                html += `<tr class="cat-${lc}"><td class="time">${timeCell(lec)}</td><td class="title" colspan="3"><b>${t}</b></td></tr>`;
             }
         });
     });
