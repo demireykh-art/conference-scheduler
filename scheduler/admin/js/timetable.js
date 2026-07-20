@@ -862,6 +862,11 @@ window.editSession = function (roomId, sessionId) {
     renderModChosen();
     document.getElementById('sessionModal').classList.add('open');
 };
+// 세션 이름 퀵버튼 (개회/휴식/점심/폐회) — 표준 명칭으로 채움. PDF에서 색상·명칭 일관 출력.
+window.setSessionName = function (v) {
+    const el = document.getElementById('sessionName');
+    if (el) { el.value = v; el.focus(); }
+};
 window.closeSessionModal = function () { document.getElementById('sessionModal').classList.remove('open'); };
 window.saveSession = function () {
     if (!AdminAuth.requireEdit()) return;
