@@ -288,6 +288,17 @@ function persistRoomOrderFromDom() {
 
 window.selectRoom = function (id) { CURRENT_ROOM = id; renderRoomTabs(orderedRooms()); renderRoomSettings(); renderSessions(); };
 
+// 아젠다담당 선택용 — 등록된 연자 이름 목록(datalist)
+function agendaOwnerOptions() {
+    const list = (window.Masters && Masters.speakers) || [];
+    return list.map(s => {
+        const val = s.nameKo || s.nameEn || '';
+        if (!val) return '';
+        const hint = [s.nameEn && s.nameEn !== val ? s.nameEn : '', s.affiliationKo].filter(Boolean).join(' · ');
+        return `<option value="${escapeHtml(val)}">${escapeHtml(hint)}</option>`;
+    }).join('');
+}
+
 /* ---------- 룸 설정 ---------- */
 function renderRoomSettings() {
     const el = document.getElementById('roomSettings');
@@ -321,6 +332,11 @@ function renderRoomSettings() {
                 <button type="button" class="lang-btn ${roomLang(room) === 'en' ? 'active' : ''}" onclick="updateRoom('lang','en')">영어(EN)</button>
             </div>
         </div>
+        <div class="field" style="min-width:150px">
+            <label>아젠다담당</label>
+            <input type="text" list="agendaOwnerList" value="${escapeHtml(room.agendaOwner || '')}" placeholder="연자 이름 선택/입력" onchange="updateRoom('agendaOwner', this.value.trim())">
+            <datalist id="agendaOwnerList">${agendaOwnerOptions()}</datalist>
+        </div>
         <label class="check-inline">
             <input type="checkbox" ${room.kmaSubmit ? 'checked' : ''} onchange="updateRoom('kmaSubmit', this.checked)">
             의협제출
@@ -345,6 +361,7 @@ window.duplicateRoom = function () {
         visible: room.visible !== false,
         kmaSubmit: !!room.kmaSubmit,
         lang: room.lang || 'ko',
+        agendaOwner: room.agendaOwner || '',
         order: orderedRooms().length,
         sessions: {}
     };
