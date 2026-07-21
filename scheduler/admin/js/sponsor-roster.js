@@ -76,6 +76,23 @@ function entitledOf(grade) {
     });
     return { total, byType };
 }
+// 파트너의 추가 유료강의 신청 { col: count }
+function paidOf(pid) {
+    const cp = confPartners()[pid];
+    return (cp && cp.paidLectures && typeof cp.paidLectures === 'object') ? cp.paidLectures : {};
+}
+// 파트너 실제 배정 = 등급 숫자 배정 + 추가 유료강의 신청 (총합·유형별)
+function entitledForPartner(pid) {
+    const base = entitledOf(gradeOf(pid));
+    const byType = { ...base.byType };
+    let total = base.total;
+    const paid = paidOf(pid);
+    Object.keys(paid).forEach(col => {
+        const n = parseInt(paid[col], 10) || 0;
+        if (n > 0) { byType[col] = (byType[col] || 0) + n; total += n; }
+    });
+    return { total, byType };
+}
 
 // 강의 id → 배치 위치
 function placementMap() {
@@ -112,7 +129,7 @@ function renderRoster() {
 
     const partners = [...partnerIds].map(pid => {
         const grade = gradeOf(pid);
-        const ent = entitledOf(grade);
+        const ent = entitledForPartner(pid);
         const lects = P.filter(l => l.partnerId === pid);
         const registered = lects.length;
         const placedCount = lects.filter(l => placements[l.id]).length;
@@ -220,7 +237,7 @@ window.exportRosterExcel = function () {
         .sort((a, c) => gradeIndex(gradeOf(a)) - gradeIndex(gradeOf(c)) || partnerName(a).localeCompare(partnerName(c), 'ko'))
         .forEach(pid => {
             const grade = gradeOf(pid) || '(미지정)';
-            const ent = entitledOf(grade).total;
+            const ent = entitledForPartner(pid).total;
             const lects = P.filter(l => l.partnerId === pid);
             const ct = contactText(pid);
             if (!lects.length) {

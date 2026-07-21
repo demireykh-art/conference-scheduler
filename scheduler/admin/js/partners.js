@@ -128,23 +128,36 @@ function confGradeOf(p) {
     return (cp && cp.grade) || p.grade || '';
 }
 
-// 파트너 등급 → 혜택(숫자) 태그: "정규강의(일) 미배치 X · 배치 Y"
+// 숫자 혜택인지 판별 (셀 값이 순수 숫자)
+function numericBenefit(val) {
+    const n = parseInt(val, 10);
+    return (!isNaN(n) && String(n) === String(val == null ? '' : val).trim()) ? n : 0;
+}
+// 이 셀이 "신청가능(유료)" 대상인지
+function isPaidEligibleCell(val) { return String(val == null ? '' : val).includes('신청가능'); }
+// 파트너의 이 행사 추가 유료강의 신청 { col: count }
+function paidOf(p) {
+    const cp = CONF_PARTNER_MAP[p.id];
+    return (cp && cp.paidLectures && typeof cp.paidLectures === 'object') ? cp.paidLectures : {};
+}
+
+// 파트너 등급 → 혜택(숫자) + 추가 유료강의 신청 태그: "정규강의(일) 미배치 X · 배치 Y"
 function benefitTags(p) {
     const grade = confGradeOf(p);
-    if (!grade || !BOOTH.cells[grade]) return '';
-    const cells = BOOTH.cells[grade];
+    const cells = (grade && BOOTH.cells[grade]) || {};
     const placed = PLACED[p.id] || {};
-    const tags = [];
-    BOOTH.columns.forEach(col => {
-        const val = cells[col];
-        if (val == null || String(val).trim() === '') return;
-        const n = parseInt(val, 10);
-        if (!isNaN(n) && String(n) === String(val).trim()) {   // 숫자 혜택만
-            const done = placed[col] || 0;
-            const un = Math.max(0, n - done);
-            tags.push(`<span class="benefit-tag">${escapeHtml(col)} <span class="un">미배치 ${un}</span>${done ? ` · <b>배치 ${done}</b>` : ''}</span>`);
-        }
-    });
+    const paid = paidOf(p);
+    const cols = [];
+    BOOTH.columns.forEach(col => { if (numericBenefit(cells[col]) > 0 || (parseInt(paid[col], 10) || 0) > 0) cols.push(col); });
+    const tags = cols.map(col => {
+        const paidN = parseInt(paid[col], 10) || 0;
+        const entitled = numericBenefit(cells[col]) + paidN;
+        if (entitled <= 0) return '';
+        const done = placed[col] || 0;
+        const un = Math.max(0, entitled - done);
+        const paidMark = paidN > 0 ? ` <span class="paid-mark">유료 ${paidN}</span>` : '';
+        return `<span class="benefit-tag">${escapeHtml(col)}${paidMark} <span class="un">미배치 ${un}</span>${done ? ` · <b>배치 ${done}</b>` : ''}</span>`;
+    }).filter(Boolean);
     return tags.join('');
 }
 
@@ -367,6 +380,62 @@ function productRowHtml(pr = {}) {
 window.addProductRow = function (pr) {
     document.getElementById('ptnProducts').insertAdjacentHTML('beforeend', productRowHtml(pr));
 };
+
+/* ---------- 추가 유료강의 신청 (이 행사) ---------- */
+let PAID_ELIGIBLE_COLS = [];   // 이 파트너 등급의 "신청가능(유료)" 강의 종류
+
+function paidRowHtml(col = '', cnt = 1) {
+    const opts = PAID_ELIGIBLE_COLS.map(c => `<option value="${escapeHtml(c)}" ${c === col ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+    return `<div class="paid-item" style="display:flex;gap:8px;align-items:center;margin-top:6px">
+        <select class="paid-col" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.86rem">${opts}</select>
+        <input type="number" class="paid-cnt" min="1" max="20" value="${cnt}" style="width:74px;padding:8px;border:1px solid var(--border);border-radius:8px" title="신청 건수">
+        <span style="font-size:0.8rem;color:var(--text-dim)">건</span>
+        <button type="button" class="btn btn-sm btn-danger-ghost" onclick="this.closest('.paid-item').remove()">✕</button>
+    </div>`;
+}
+window.addPaidLecture = function () {
+    if (!PAID_ELIGIBLE_COLS.length) {
+        Toast.info('이 등급은 추가 유료강의 신청 대상이 없습니다. (부스 등급별 혜택에서 "신청가능(유료)"으로 설정된 강의 종류가 필요하며, 이 행사 등급을 먼저 지정하세요.)');
+        return;
+    }
+    document.getElementById('ptnPaid').insertAdjacentHTML('beforeend', paidRowHtml());
+};
+function collectPaidLectures() {
+    const out = {};
+    document.querySelectorAll('#ptnPaid .paid-item').forEach(row => {
+        const col = row.querySelector('.paid-col').value;
+        const cnt = parseInt(row.querySelector('.paid-cnt').value, 10) || 0;
+        if (col && cnt > 0) out[col] = (out[col] || 0) + cnt;
+    });
+    return out;
+}
+// 편집 대상 파트너의 등급 → 신청가능(유료) 강의 종류 계산 + 기존 신청 채우기
+function setupPaidSection(p) {
+    const field = document.getElementById('ptnPaidField');
+    const addBtn = document.getElementById('ptnPaidAddBtn');
+    const box = document.getElementById('ptnPaid');
+    const hint = document.getElementById('ptnPaidHint');
+    box.innerHTML = '';
+    if (!p) {   // 신규 등록: 행사·등급 맥락 없음 → 숨김
+        field.style.display = 'none'; addBtn.style.display = 'none'; PAID_ELIGIBLE_COLS = [];
+        return;
+    }
+    field.style.display = ''; addBtn.style.display = '';
+    const grade = confGradeOf(p);
+    const cells = (grade && BOOTH.cells[grade]) || {};
+    PAID_ELIGIBLE_COLS = grade ? BOOTH.columns.filter(col => isPaidEligibleCell(cells[col])) : [];
+    const existing = paidOf(p);
+    Object.keys(existing).forEach(col => {
+        const cnt = parseInt(existing[col], 10) || 0;
+        if (cnt <= 0) return;
+        // 기존 신청 컬럼이 목록에 없어도 표시되도록 포함
+        if (!PAID_ELIGIBLE_COLS.includes(col)) PAID_ELIGIBLE_COLS.push(col);
+        box.insertAdjacentHTML('beforeend', paidRowHtml(col, cnt));
+    });
+    hint.textContent = !grade
+        ? '이 행사 등급을 먼저 지정하세요. (목록에서 등급 선택)'
+        : (PAID_ELIGIBLE_COLS.length ? `선택 가능: ${PAID_ELIGIBLE_COLS.join(', ')}` : '이 등급에는 "신청가능(유료)" 강의가 없습니다.');
+}
 function collectProducts() {
     return [...document.querySelectorAll('#ptnProducts .product-item')].map(row => ({
         nameKo: row.querySelector('.prod-ko').value.trim(),
@@ -384,6 +453,7 @@ window.openPartnerModal = function () {
     document.getElementById('ptnNameKo').value = '';
     document.getElementById('ptnNameEn').value = '';
     document.getElementById('ptnProducts').innerHTML = '';
+    setupPaidSection(null);
     document.getElementById('ptnModal').classList.add('open');
     setTimeout(() => document.getElementById('ptnNameKo').focus(), 50);
 };
@@ -398,6 +468,7 @@ window.editPartner = function (id) {
     document.getElementById('ptnNameEn').value = p.nameEn || '';
     document.getElementById('ptnProducts').innerHTML = '';
     partnerProducts(p).forEach(pr => addProductRow(pr));
+    setupPaidSection(p);
     document.getElementById('ptnModal').classList.add('open');
 };
 
@@ -419,9 +490,17 @@ window.savePartner = function () {
     };
 
     if (PTN_EDIT_ID) {
+        const paid = collectPaidLectures();
         PTN_ROOT.child(PTN_EDIT_ID).update(data)
             .then(() => {
-                logActivity('update', 'partner', `파트너사 "${nameKo}" 수정`, { entityId: PTN_EDIT_ID });
+                // 이 행사 추가 유료강의 신청 저장 (행사별 confPartners)
+                if (PLACED_CONF_ID) {
+                    return database.ref('/adminConferences/' + PLACED_CONF_ID + '/confPartners/' + PTN_EDIT_ID + '/paidLectures')
+                        .set(Object.keys(paid).length ? paid : null);
+                }
+            })
+            .then(() => {
+                logActivity('update', 'partner', `파트너사 "${nameKo}" 수정`, { confId: PLACED_CONF_ID, entityId: PTN_EDIT_ID });
                 Toast.success('저장되었습니다.'); closePartnerModal();
             })
             .catch(e => Toast.error('저장 실패: ' + e.message));
