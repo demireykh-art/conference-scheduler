@@ -224,7 +224,6 @@ function renderPool() {
     const dupCount = POOL.filter(l => (placedMap[l.id] || []).length >= 2).length;
     const unplacedCount = POOL.filter(l => !placedMap[l.id]).length;
     document.getElementById('lecCount').textContent = POOL.length;
-    document.getElementById('unplacedCount').textContent = unplacedCount;
     const unpBtn = document.getElementById('unplacedFilterBtn');
     if (unpBtn) {
         unpBtn.textContent = `⬜ 미배치 ${unplacedCount}`;
