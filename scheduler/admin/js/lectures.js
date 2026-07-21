@@ -167,6 +167,22 @@ function lecDayLabel(d) {
     const wd = ['일', '월', '화', '수', '목', '금', '토'][new Date(p[0], p[1] - 1, p[2]).getDay()];
     return `${String(p[1]).padStart(2, '0')}/${String(p[2]).padStart(2, '0')} (${wd})`;
 }
+// 날짜 → 요일 문자('토'/'일' 등)
+function dateDayToken(d) {
+    const p = (d || '').split('-').map(Number);
+    if (p.length < 3 || !p[0]) return '';
+    return ['일', '월', '화', '수', '목', '금', '토'][new Date(p[0], p[1] - 1, p[2]).getDay()];
+}
+// 강의 유형/분류/태그에서 요일 표기 감지 → Set('토','일')
+// 예: 정규강의(일,15분), 정규강의(토,20분), 일반강의(토), 학회강의(비스폰)/토요일
+// 주의: '일반'의 '일'은 매칭되지 않도록 괄호·쉼표·슬래시·'요일' 경계로만 감지
+function lecDayTokens(l) {
+    const hay = [...(l.types || []), ...(l.categories || []), ...(l.tags || [])].join(' | ');
+    const days = new Set();
+    if (/\(토|토\)|토,|토요일|\/토|토\//.test(hay)) days.add('토');
+    if (/\(일|일\)|일,|일요일|\/일|일\//.test(hay)) days.add('일');
+    return days;
+}
 function renderDateFilter() {
     const box = document.getElementById('lecDateFilter');
     if (!box) return;
@@ -188,7 +204,13 @@ function renderPool() {
 
     let list = sortList(POOL, LEC_SORT, 'titleKo');
     if (cat) list = list.filter(l => (l.categories || []).includes(cat));
-    if (LEC_DATE) list = list.filter(l => (placedMap[l.id] || []).some(s => s.date === LEC_DATE));
+    if (LEC_DATE) {
+        // 이 날짜에 배치된 강의 + (미배치라도) 유형/분류/태그에 그 요일(토/일)이 표기된 강의
+        const dtok = dateDayToken(LEC_DATE);
+        list = list.filter(l =>
+            (placedMap[l.id] || []).some(s => s.date === LEC_DATE)
+            || (dtok && lecDayTokens(l).has(dtok)));
+    }
     if (q) list = list.filter(l => {
         const hay = [l.titleKo, l.titleEn, ...(l.tags || []), ...(l.categories || []), ...(l.types || []),
         ...((l.speakers || []).map(s => s.nameKo + ' ' + s.nameEn)), l.partnerKo, l.productKo]
