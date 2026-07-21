@@ -11,6 +11,7 @@ let CONF_ROOMS = null;      // 배치 여부 판단용
 let POOL = [];
 let LEC_SORT = 'nameAsc';
 let LEC_DUP_ONLY = false;   // 중복배치(같은 강의 2곳 이상)만 보기
+let LEC_DATE = '';          // 일정별 필터(선택한 행사 일자, 그 날짜에 배치된 강의만)
 let LEC_EDIT_ID = null;
 let catDraft = [], tagDraft = [], spkDraft = [];
 
@@ -155,14 +156,40 @@ window.gotoTimetable = function (roomId, lecId) {
     location.href = url;
 };
 
+/* ---------- 일정별(날짜) 필터 ---------- */
+function confDates() {
+    const set = new Set();
+    Object.values(CONF_ROOMS || {}).forEach(r => { if (r && r.date) set.add(r.date); });
+    return [...set].sort();
+}
+function lecDayLabel(d) {
+    const p = (d || '').split('-').map(Number);
+    if (p.length < 3 || !p[0]) return d;
+    const wd = ['일', '월', '화', '수', '목', '금', '토'][new Date(p[0], p[1] - 1, p[2]).getDay()];
+    return `${String(p[1]).padStart(2, '0')}/${String(p[2]).padStart(2, '0')} (${wd})`;
+}
+function renderDateFilter() {
+    const box = document.getElementById('lecDateFilter');
+    if (!box) return;
+    const dates = confDates();
+    if (LEC_DATE && !dates.includes(LEC_DATE)) LEC_DATE = '';   // 사라진 날짜 방어
+    if (!dates.length) { box.innerHTML = ''; return; }
+    box.innerHTML = `<span class="lec-date-cap">일정별</span>`
+        + `<button class="lec-date-btn ${LEC_DATE === '' ? 'active' : ''}" onclick="setLecDate('')">전체</button>`
+        + dates.map(d => `<button class="lec-date-btn ${LEC_DATE === d ? 'active' : ''}" onclick="setLecDate('${d}')">${escapeHtml(lecDayLabel(d))}</button>`).join('');
+}
+window.setLecDate = function (d) { LEC_DATE = d; renderPool(); };
+
 /* ---------- 목록 렌더 ---------- */
 function renderPool() {
     const placedMap = placedRoomsMap();
+    renderDateFilter();
     const q = document.getElementById('lecSearch').value.trim().toLowerCase();
     const cat = document.getElementById('catFilter').value;
 
     let list = sortList(POOL, LEC_SORT, 'titleKo');
     if (cat) list = list.filter(l => (l.categories || []).includes(cat));
+    if (LEC_DATE) list = list.filter(l => (placedMap[l.id] || []).some(s => s.date === LEC_DATE));
     if (q) list = list.filter(l => {
         const hay = [l.titleKo, l.titleEn, ...(l.tags || []), ...(l.categories || []), ...(l.types || []),
         ...((l.speakers || []).map(s => s.nameKo + ' ' + s.nameEn)), l.partnerKo, l.productKo]
