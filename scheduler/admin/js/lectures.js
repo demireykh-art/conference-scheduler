@@ -34,8 +34,8 @@ document.getElementById('lecSearch').addEventListener('input', renderPool);
     sel.addEventListener('change', () => { LEC_SORT = sel.value; renderPool(); });
 })();
 
-// 강의 유형 체크박스 — 행사별 부스 등급 혜택 열 + 학회강의(비스폰)
-const EXTRA_LECTURE_TYPES = ['학회강의'];
+// 강의 유형 체크박스 — 행사별 부스 등급 혜택 열 + 학회강의(비스폰) 요일 구분
+const EXTRA_LECTURE_TYPES = ['학회강의(비스폰)요일미정', '학회강의(비스폰)/토요일', '학회강의(비스폰)/일요일'];
 let CONF_BOOTH_COLS = null;      // 현재 행사 부스 혜택 열
 let BOOTH_TEMPLATE_COLS = null;  // 전역 템플릿 열 (fallback)
 function currentTypeList() {
@@ -57,10 +57,9 @@ function renderTypeChecks(includeTypes) {
     const list = currentTypeList().slice();
     (includeTypes || []).forEach(t => { if (t && !list.includes(t)) list.push(t); });
     if (cur && !list.includes(cur)) list.push(cur);
-    sel.innerHTML = '<option value="">(유형 없음)</option>' + list.map(t => {
-        const extra = EXTRA_LECTURE_TYPES.includes(t);
-        return `<option value="${escapeHtml(t)}" ${t === cur ? 'selected' : ''}>${escapeHtml(t)}${extra ? ' (비스폰)' : ''}</option>`;
-    }).join('');
+    sel.innerHTML = '<option value="">(유형 없음)</option>' + list.map(t =>
+        `<option value="${escapeHtml(t)}" ${t === cur ? 'selected' : ''}>${escapeHtml(t)}</option>`
+    ).join('');
     sel.value = cur;
 }
 function setTypes(arr) {
