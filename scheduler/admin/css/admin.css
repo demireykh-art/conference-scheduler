@@ -475,6 +475,7 @@ a { color: inherit; }
 .benefit-tag { display:inline-block; background:#eef4ff; color:#2f6fed; font-size:0.72rem; padding:2px 8px; border-radius:6px; margin:2px 4px 2px 0; white-space:nowrap; }
 .benefit-tag b { color:#12a150; }
 .benefit-tag .un { color:#e5484d; font-weight:600; }
+.benefit-tag .paid-mark, .paid-mark { display:inline-block; background:#fff1de; color:#c2680a; font-size:0.66rem; font-weight:700; padding:0 5px; border-radius:5px; }
 
 .count-pill {
     display: inline-block; min-width: 22px; text-align: center;

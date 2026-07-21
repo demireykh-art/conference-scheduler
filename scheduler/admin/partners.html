@@ -85,7 +85,15 @@
             <div class="modal-field">
                 <label>제품 목록 (선택)</label>
                 <div id="ptnProducts"></div>
-                <button type="button" class="btn btn-sm" onclick="addProductRow()" style="align-self:flex-start;margin-top:4px">+ 제품 추가</button>
+                <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
+                    <button type="button" class="btn btn-sm" onclick="addProductRow()">+ 제품 추가</button>
+                    <button type="button" class="btn btn-sm" id="ptnPaidAddBtn" onclick="addPaidLecture()">+ 추가 유료강의 신청</button>
+                </div>
+            </div>
+            <div class="modal-field" id="ptnPaidField" style="display:none">
+                <label>추가 유료강의 신청 (이 행사 · 부스 등급의 "신청가능(유료)" 강의)</label>
+                <div id="ptnPaid"></div>
+                <div id="ptnPaidHint" style="font-size:0.72rem;color:var(--text-dim);margin-top:4px"></div>
             </div>
             <div class="modal-actions">
                 <button class="btn" onclick="closePartnerModal()">취소</button>
