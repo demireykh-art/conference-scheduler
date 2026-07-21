@@ -1080,6 +1080,7 @@ tr.lec-dup-row > td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
 .room-chip.clickable { cursor: pointer; }
 .room-chip.clickable:hover { background: var(--primary); color: #fff; }
 .dup-filter-btn.active { background: #f59e0b; border-color: #f59e0b; color: #fff; }
+.unplaced-filter-btn.active { background: #2f6fed; border-color: #2f6fed; color: #fff; }
 
 /* 강의 관리 — 일정별(날짜) 필터 */
 .lec-date-filter { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }

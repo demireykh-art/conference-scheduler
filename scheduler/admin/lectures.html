@@ -39,6 +39,7 @@
                         <select id="lecSort" style="padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.86rem"></select>
                         <span class="lec-date-filter" id="lecDateFilter"></span>
                         <span style="color:var(--text-dim);font-size:0.85rem">총 <span id="lecCount">0</span>개 · 미배치 <span id="unplacedCount">0</span>개</span>
+                        <button id="unplacedFilterBtn" class="btn btn-sm unplaced-filter-btn" onclick="toggleUnplacedFilter()" title="아직 시간표에 배치되지 않은 강의만 보기" style="display:none">⬜ 미배치 0</button>
                         <button id="dupFilterBtn" class="btn btn-sm dup-filter-btn" onclick="toggleDupFilter()" title="같은 강의가 시간표 여러 곳에 배치된 강의만 보기" style="display:none">🔴 중복배치 0</button>
                         <span style="flex:1"></span>
                         <button class="btn btn-primary" onclick="openLectureModal()">+ 강의 등록</button>

@@ -11,6 +11,7 @@ let CONF_ROOMS = null;      // 배치 여부 판단용
 let POOL = [];
 let LEC_SORT = 'nameAsc';
 let LEC_DUP_ONLY = false;   // 중복배치(같은 강의 2곳 이상)만 보기
+let LEC_UNPLACED_ONLY = false;  // 미배치만 보기
 let LEC_DATE = '';          // 일정별 필터(선택한 행사 일자, 그 날짜에 배치된 강의만)
 let LEC_EDIT_ID = null;
 let catDraft = [], tagDraft = [], spkDraft = [];
@@ -218,10 +219,18 @@ function renderPool() {
         return hay.includes(q);
     });
     if (LEC_DUP_ONLY) list = list.filter(l => (placedMap[l.id] || []).length >= 2);
+    if (LEC_UNPLACED_ONLY) list = list.filter(l => !placedMap[l.id]);
 
     const dupCount = POOL.filter(l => (placedMap[l.id] || []).length >= 2).length;
+    const unplacedCount = POOL.filter(l => !placedMap[l.id]).length;
     document.getElementById('lecCount').textContent = POOL.length;
-    document.getElementById('unplacedCount').textContent = POOL.filter(l => !placedMap[l.id]).length;
+    document.getElementById('unplacedCount').textContent = unplacedCount;
+    const unpBtn = document.getElementById('unplacedFilterBtn');
+    if (unpBtn) {
+        unpBtn.textContent = `⬜ 미배치 ${unplacedCount}`;
+        unpBtn.classList.toggle('active', LEC_UNPLACED_ONLY);
+        unpBtn.style.display = (unplacedCount || LEC_UNPLACED_ONLY) ? '' : 'none';
+    }
     const dupBtn = document.getElementById('dupFilterBtn');
     if (dupBtn) {
         dupBtn.textContent = `🔴 중복배치 ${dupCount}`;
@@ -661,6 +670,7 @@ window.doMoveLecture = function (mode) {
     }).catch(e => Toast.error('실패: ' + e.message));
 };
 
-window.toggleDupFilter = function () { LEC_DUP_ONLY = !LEC_DUP_ONLY; renderPool(); };
+window.toggleDupFilter = function () { LEC_DUP_ONLY = !LEC_DUP_ONLY; if (LEC_DUP_ONLY) LEC_UNPLACED_ONLY = false; renderPool(); };
+window.toggleUnplacedFilter = function () { LEC_UNPLACED_ONLY = !LEC_UNPLACED_ONLY; if (LEC_UNPLACED_ONLY) LEC_DUP_ONLY = false; renderPool(); };
 
 // 배경 클릭으로는 닫지 않음 — 닫기/취소 버튼으로만 닫힘 (입력 보호)
