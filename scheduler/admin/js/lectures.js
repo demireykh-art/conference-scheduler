@@ -184,46 +184,56 @@ function lecDayTokens(l) {
     if (/\(일|일\)|일,|일요일|\/일|일\//.test(hay)) days.add('일');
     return days;
 }
-function renderDateFilter() {
+// 강의 l 이 날짜 d 에 해당하는가 (그 날짜 배치 OR 유형/분류/태그의 요일 표기)
+function dateMatch(l, d, placedMap) {
+    if ((placedMap[l.id] || []).some(s => s.date === d)) return true;
+    const dtok = dateDayToken(d);
+    return !!(dtok && lecDayTokens(l).has(dtok));
+}
+// 날짜 버튼 — 검색으로 좁힌 기준집합(baseList) 기준 개수 표시
+function renderDateFilter(baseList, placedMap) {
     const box = document.getElementById('lecDateFilter');
     if (!box) return;
     const dates = confDates();
     if (LEC_DATE && !dates.includes(LEC_DATE)) LEC_DATE = '';   // 사라진 날짜 방어
     if (!dates.length) { box.innerHTML = ''; return; }
     box.innerHTML = `<span class="lec-date-cap">일정별</span>`
-        + `<button class="lec-date-btn ${LEC_DATE === '' ? 'active' : ''}" onclick="setLecDate('')">전체</button>`
-        + dates.map(d => `<button class="lec-date-btn ${LEC_DATE === d ? 'active' : ''}" onclick="setLecDate('${d}')">${escapeHtml(lecDayLabel(d))}</button>`).join('');
+        + `<button class="lec-date-btn ${LEC_DATE === '' ? 'active' : ''}" onclick="setLecDate('')">전체 ${baseList.length}</button>`
+        + dates.map(d => {
+            const n = baseList.filter(l => dateMatch(l, d, placedMap)).length;
+            return `<button class="lec-date-btn ${LEC_DATE === d ? 'active' : ''}" onclick="setLecDate('${d}')">${escapeHtml(lecDayLabel(d))} ${n}</button>`;
+        }).join('');
 }
 window.setLecDate = function (d) { LEC_DATE = d; renderPool(); };
 
 /* ---------- 목록 렌더 ---------- */
 function renderPool() {
     const placedMap = placedRoomsMap();
-    renderDateFilter();
     const q = document.getElementById('lecSearch').value.trim().toLowerCase();
     const cat = document.getElementById('catFilter').value;
 
-    let list = sortList(POOL, LEC_SORT, 'titleKo');
-    if (cat) list = list.filter(l => (l.categories || []).includes(cat));
-    if (LEC_DATE) {
-        // 이 날짜에 배치된 강의 + (미배치라도) 유형/분류/태그에 그 요일(토/일)이 표기된 강의
-        const dtok = dateDayToken(LEC_DATE);
-        list = list.filter(l =>
-            (placedMap[l.id] || []).some(s => s.date === LEC_DATE)
-            || (dtok && lecDayTokens(l).has(dtok)));
-    }
-    if (q) list = list.filter(l => {
+    // 기준집합(baseList): 검색·분류만 반영 (일정/미배치/중복 토글과 무관) → 모든 개수의 기준
+    let baseList = sortList(POOL, LEC_SORT, 'titleKo');
+    if (cat) baseList = baseList.filter(l => (l.categories || []).includes(cat));
+    if (q) baseList = baseList.filter(l => {
         const hay = [l.titleKo, l.titleEn, ...(l.tags || []), ...(l.categories || []), ...(l.types || []),
         ...((l.speakers || []).map(s => s.nameKo + ' ' + s.nameEn)), l.partnerKo, l.productKo]
             .join(' ').toLowerCase();
         return hay.includes(q);
     });
+
+    renderDateFilter(baseList, placedMap);
+
+    // 실제 표시 목록: 기준집합 + 일정/미배치/중복 토글
+    let list = baseList.slice();
+    if (LEC_DATE) list = list.filter(l => dateMatch(l, LEC_DATE, placedMap));
     if (LEC_DUP_ONLY) list = list.filter(l => (placedMap[l.id] || []).length >= 2);
     if (LEC_UNPLACED_ONLY) list = list.filter(l => !placedMap[l.id]);
 
-    const dupCount = POOL.filter(l => (placedMap[l.id] || []).length >= 2).length;
-    const unplacedCount = POOL.filter(l => !placedMap[l.id]).length;
-    document.getElementById('lecCount').textContent = POOL.length;
+    // 개수는 검색 반영 기준집합에서 (일정/토글과 무관)
+    const dupCount = baseList.filter(l => (placedMap[l.id] || []).length >= 2).length;
+    const unplacedCount = baseList.filter(l => !placedMap[l.id]).length;
+    document.getElementById('lecCount').textContent = baseList.length;
     const unpBtn = document.getElementById('unplacedFilterBtn');
     if (unpBtn) {
         unpBtn.textContent = `⬜ 미배치 ${unplacedCount}`;
