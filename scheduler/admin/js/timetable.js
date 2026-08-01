@@ -258,12 +258,16 @@ function renderRoomTabs(rooms) {
     });
     groups.sort((a, b) => (!a.date ? 1 : !b.date ? -1 : a.date.localeCompare(b.date)));
 
-    const tabBtn = r => `
+    const tabBtn = r => {
+        const alerts = r.id === CURRENT_ROOM ? 0 : roomAlertCount(r.id);
+        return `
         <button class="room-tab ${r.id === CURRENT_ROOM ? 'active' : ''}" data-room="${r.id}"
             onclick="selectRoom('${r.id}')">
             <span class="grip" title="드래그하여 순서 변경">⋮⋮</span>${escapeHtml(r.name || '(이름 없음)')}
             ${r.kmaSubmit ? '<span class="room-tab-kma" title="의협제출 대상">의협</span>' : ''}
+            ${alerts ? `<span class="room-tab-alert" title="이 룸에서 최근 이동/삭제된 강의 ${alerts}건">🔔${alerts}</span>` : ''}
         </button>`;
+    };
 
     const rowsHtml = groups.map(g => {
         const label = g.date
@@ -286,7 +290,110 @@ function persistRoomOrderFromDom() {
     if (ids.length) persistRoomOrder(ids);
 }
 
-window.selectRoom = function (id) { CURRENT_ROOM = id; renderRoomTabs(orderedRooms()); renderRoomSettings(); renderSessions(); };
+window.selectRoom = function (id) {
+    setRoomSeen(id);   // 이 룸을 보면 변경 배지 해제 기준 갱신
+    CURRENT_ROOM = id; renderRoomTabs(orderedRooms()); renderRoomSettings(); renderSessions();
+};
+
+/* ============================================================
+   강의 성격(요일·시간) 경고 + 룸 변경 알림(디렉터용)
+   ============================================================ */
+// 유형 문자열에서 요일 토큰 추출 (일반의 '일' 오탐 방지)
+function lecDayTok(t) {
+    if (/\(토|토\)|토,|토요일|\/토|토\//.test(t)) return '토';
+    if (/\(일|일\)|일,|일요일|\/일|일\//.test(t)) return '일';
+    return '';
+}
+function dayFullName(tok) { return tok === '토' ? '토요일' : tok === '일' ? '일요일' : ''; }
+// 날짜 → 요일 토큰
+function dateWeekdayTok(d) {
+    if (!d) return '';
+    const p = d.split('-').map(Number);
+    if (!p[0]) return '';
+    return ['일', '월', '화', '수', '목', '금', '토'][new Date(p[0], p[1] - 1, p[2]).getDay()];
+}
+// 강의 유형에서 지정 요일·시간(분) 파싱 (예: 정규강의(일,20) → {day:'일', min:20})
+function lecTypeSpec(lec) {
+    let day = '', min = null, label = '';
+    ((lec && lec.types) || []).forEach(t => {
+        if (!t) return;
+        const d = lecDayTok(t);
+        const mm = /(\d+)\s*분?\s*\)/.exec(t);
+        const mn = mm ? parseInt(mm[1], 10) : null;
+        if (d || mn != null) { if (!day) day = d; if (min == null) min = mn; if (!label) label = t; }
+    });
+    return { day, min, label };
+}
+// 배치/이동/시간변경이 지정 성격과 다르면 확인창 (true=진행)
+async function confirmSpecChange(lec, targetRoom, newDur) {
+    const spec = lecTypeSpec(lec);
+    if (!spec.label) return true;
+    const issues = [];
+    const roomTok = targetRoom ? dateWeekdayTok(targetRoom.date) : '';
+    if (spec.day && roomTok && roomTok !== spec.day) issues.push(`지정 요일 ${dayFullName(spec.day)} → ${dayFullName(roomTok)}`);
+    const dur = (newDur != null) ? newDur : (Number(lec.duration) || 0);
+    if (spec.min != null && dur && dur !== spec.min) issues.push(`지정 시간 ${spec.min}분 → ${dur}분`);
+    if (!issues.length) return true;
+    const title = normalizeLecture(lec).titleKo || '(제목 없음)';
+    const msg = `이 강의는 '${spec.label}' 유형입니다.\n( ${issues.join(' · ')} )\n\n"${title}" 를 지정과 다르게 두시겠습니까?\n※ 변경 시 담당 디렉터에게 알려주세요.`;
+    return await confirmDialog(msg, { okText: '계속' });
+}
+// 룸 변경 로그 기록 (누가·언제·무엇을)
+function logRoomChange(entry) {
+    try {
+        const u = (window.AdminAuth && AdminAuth.user) || null;
+        confRef().child('roomLog').push({
+            action: entry.action || 'move',
+            title: entry.title || '',
+            fromRoomId: entry.fromRoomId || '', fromRoomName: entry.fromRoomName || '',
+            toRoomId: entry.toRoomId || '', toRoomName: entry.toRoomName || '',
+            byUid: u ? (u.uid || '') : '', byName: u ? (u.displayName || u.email || '') : '',
+            at: firebase.database.ServerValue.TIMESTAMP
+        });
+    } catch (e) { }
+}
+function roomLogArr() {
+    const arr = [];
+    Object.entries((CONF && CONF.roomLog) || {}).forEach(([id, e]) => { if (e) arr.push({ id, ...e }); });
+    arr.sort((a, b) => (b.at || 0) - (a.at || 0));
+    return arr;
+}
+const ROOMLOG_WINDOW = 3 * 24 * 60 * 60 * 1000;   // 최근 3일
+function recentRoomChanges(roomId) {
+    const cutoff = Date.now() - ROOMLOG_WINDOW;
+    return roomLogArr().filter(e => (e.at || 0) >= cutoff && (e.fromRoomId === roomId || e.toRoomId === roomId));
+}
+// 디렉터가 마지막으로 본 시점 (배지 계산용)
+function getRoomSeen(roomId) { try { return Number(localStorage.getItem('asls_roomseen_' + roomId)) || 0; } catch (e) { return 0; } }
+function setRoomSeen(roomId) { try { localStorage.setItem('asls_roomseen_' + roomId, String(Date.now())); } catch (e) { } }
+// 이 룸에서 '빠져나간'(이동/삭제) 미확인 변경 수
+function roomAlertCount(roomId) {
+    const seen = getRoomSeen(roomId);
+    return recentRoomChanges(roomId).filter(e => e.fromRoomId === roomId && (e.at || 0) > seen).length;
+}
+function rcTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts), p = n => String(n).padStart(2, '0');
+    return `${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+// 룸 상단 얇은 변경 알림 바 (접이식)
+function renderRoomChangeBar(roomId) {
+    const list = recentRoomChanges(roomId);
+    if (!list.length) return '';
+    const out = list.filter(e => e.fromRoomId === roomId && e.at > getRoomSeen(roomId)).length;
+    const rows = list.slice(0, 20).map(e => {
+        const dir = e.action === 'delete'
+            ? `<b>삭제</b>`
+            : (e.fromRoomId === roomId
+                ? `${escapeHtml(e.fromRoomName || '')} → <b>${escapeHtml(e.toRoomName || '')}</b> 이동`
+                : `<b>${escapeHtml(e.fromRoomName || '')}</b> → ${escapeHtml(e.toRoomName || '')} 이동(들어옴)`);
+        return `<div class="rc-row"><span class="rc-when">${rcTime(e.at)}</span> <span class="rc-who">${escapeHtml(e.byName || '누군가')}</span> · "${escapeHtml(e.title || '')}" · ${dir}</div>`;
+    }).join('');
+    return `<details class="room-change-bar"${out ? ' open' : ''}>
+        <summary>🔔 이 룸 최근 변경 <b>${list.length}</b>${out ? ` <span class="rc-new">새 ${out}</span>` : ''}</summary>
+        <div class="rc-list">${rows}</div>
+    </details>`;
+}
 
 // 아젠다담당 선택용 — 등록된 연자 이름 목록(datalist)
 function agendaOwnerOptions() {
@@ -570,13 +677,15 @@ function renderSessions() {
 
     CONFLICT_IDS = computeConflictIds();   // 중복 강의 재계산 (자동 갱신)
     DUP_PLACE_IDS = computeDupPlaceIds();   // 중복배치(같은 강의 2곳 이상) 재계산
+    const changeBar = renderRoomChangeBar(room.id);   // 룸 변경 알림(디렉터용)
+    setRoomSeen(room.id);   // 이 룸을 보고 있으므로 확인 처리
     const sessions = computeRoom(room);
     if (!sessions.length) {
-        box.innerHTML = `<div class="card empty-state">아직 세션이 없습니다.<br><b>+ 세션 추가</b>로 오전/점심/오후 등을 만드세요.</div>`;
+        box.innerHTML = changeBar + `<div class="card empty-state">아직 세션이 없습니다.<br><b>+ 세션 추가</b>로 오전/점심/오후 등을 만드세요.</div>`;
         return;
     }
 
-    box.innerHTML = sessions.map(s => renderSessionBlock(room.id, s)).join('');
+    box.innerHTML = changeBar + sessions.map(s => renderSessionBlock(room.id, s)).join('');
 
     // 세션 순서 드래그
     enableSort(box, '.session-block', 'data-session', ids => persistSessionOrder(room.id, ids), 'session');
@@ -1002,11 +1111,12 @@ function renderPlaceList() {
     }).join('');
 }
 
-window.placeLecture = function (poolId) {
+window.placeLecture = async function (poolId) {
     if (!AdminAuth.requireEdit()) return;
     const { roomId, sessionId } = placingTarget;
     const pool = POOL.find(l => l.id === poolId);
     if (!pool) { Toast.error('강의를 찾을 수 없습니다.'); return; }
+    if (!(await confirmSpecChange(pool, getRoom(roomId)))) return;   // 지정 요일·시간과 다르면 경고
 
     // 중복이어도 배치는 허용 — 중복은 시간표에서 빨간 '중복' 배지로 표시됨
     const data = {
@@ -1143,11 +1253,12 @@ window.openDurModal = function (roomId, sessionId, lecId) {
     document.getElementById('durModal').classList.add('open');
 };
 window.closeDurModal = function () { document.getElementById('durModal').classList.remove('open'); };
-window.saveDuration = function () {
+window.saveDuration = async function () {
     if (!AdminAuth.requireEdit()) return;
     const { roomId, sessionId, lecId } = editingDuration;
     const dur = Number(document.getElementById('durInput').value) || 0;
     const cur = CONF.rooms[roomId] && CONF.rooms[roomId].sessions[sessionId] && CONF.rooms[roomId].sessions[sessionId].lectures[lecId];
+    if (cur && !(await confirmSpecChange(cur, getRoom(roomId), dur))) return;   // 지정 시간과 다르면 경고
     const lectureId = cur && cur.lectureId;   // 강의 풀과 연결된 강의면 목록·다른 배치도 함께 반영
 
     const updates = {};
@@ -1178,6 +1289,10 @@ window.deleteLecture = async function (roomId, sessionId, lecId) {
     confRef().child(`rooms/${roomId}/sessions/${sessionId}/lectures/${lecId}`).remove()
         .then(() => {
             logActivity('delete', 'lecture', `시간표 강의 "${lec ? normalizeLecture(lec).titleKo : ''}" 삭제`, { confId: CONF_ID, confTitle: ctitle(), entityId: lec && lec.lectureId ? lec.lectureId : lecId });
+            if (!(lec && lec.isBreak)) logRoomChange({
+                action: 'delete', title: lec ? normalizeLecture(lec).titleKo : '',
+                fromRoomId: roomId, fromRoomName: (getRoom(roomId) || {}).name || ''
+            });
             Toast.success('삭제되었습니다.');
         });
 };
@@ -1207,7 +1322,7 @@ window.openMoveModal = function (roomId, sessionId, lecId) {
     document.getElementById('moveModal').classList.add('open');
 };
 window.closeMoveModal = function () { document.getElementById('moveModal').classList.remove('open'); };
-window.confirmMove = function () {
+window.confirmMove = async function () {
     if (!AdminAuth.requireEdit()) return;
     const val = document.getElementById('moveTarget').value;
     if (!val || !val.includes('|')) return;
@@ -1215,12 +1330,20 @@ window.confirmMove = function () {
     const { roomId, sessionId, lecId } = movingLecture;
     const lec = CONF.rooms[roomId].sessions[sessionId].lectures[lecId];
     if (!lec) return;
+    if (!(await confirmSpecChange(lec, getRoom(toRoom)))) return;   // 지정 요일·시간과 다르면 경고
     const targetLectures = toOrderedArray(CONF.rooms[toRoom].sessions[toSession].lectures);
     const moved = { ...lec, order: targetLectures.length };
     const updates = {};
     updates[`rooms/${roomId}/sessions/${sessionId}/lectures/${lecId}`] = null;
     updates[`rooms/${toRoom}/sessions/${toSession}/lectures/${lecId}`] = moved;
-    confRef().update(updates).then(() => { Toast.success('이동되었습니다.'); closeMoveModal(); });
+    confRef().update(updates).then(() => {
+        if (roomId !== toRoom) logRoomChange({
+            action: 'move', title: normalizeLecture(lec).titleKo,
+            fromRoomId: roomId, fromRoomName: (getRoom(roomId) || {}).name || '',
+            toRoomId: toRoom, toRoomName: (getRoom(toRoom) || {}).name || ''
+        });
+        Toast.success('이동되었습니다.'); closeMoveModal();
+    });
 };
 
 /* ============================================================

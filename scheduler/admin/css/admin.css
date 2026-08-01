@@ -626,6 +626,19 @@ a { color: inherit; }
     background: #eef0f3; border-radius: 6px; padding: 4px 10px; white-space: nowrap;
 }
 .room-tab-daterow.nodate { background: #fdecea; color: #c0392b; }
+.room-tab-alert { display: inline-block; margin-left: 4px; font-size: 0.68rem; font-weight: 700; color: #fff; background: #e5484d; border-radius: 999px; padding: 0 6px; }
+
+/* 룸 변경 알림 바 (디렉터용) — 얇은 접이식, 아젠다 레이아웃 영향 최소 */
+.room-change-bar { border: 1px solid #f0d3a0; background: #fff8ef; border-radius: 8px; margin-bottom: 10px; font-size: 0.82rem; }
+.room-change-bar > summary { cursor: pointer; padding: 7px 12px; color: #8a5a00; font-weight: 600; list-style: none; }
+.room-change-bar > summary::-webkit-details-marker { display: none; }
+.room-change-bar > summary::before { content: '▸ '; color: #c98a1a; }
+.room-change-bar[open] > summary::before { content: '▾ '; }
+.room-change-bar .rc-new { background: #e5484d; color: #fff; font-size: 0.68rem; font-weight: 700; border-radius: 999px; padding: 0 6px; margin-left: 4px; }
+.room-change-bar .rc-list { padding: 4px 12px 10px; border-top: 1px dashed #f0d3a0; }
+.room-change-bar .rc-row { padding: 3px 0; color: #5c4a2a; line-height: 1.5; }
+.room-change-bar .rc-when { color: #a07b3a; font-variant-numeric: tabular-nums; margin-right: 4px; }
+.room-change-bar .rc-who { font-weight: 700; color: #7a1f1f; }
 
 /* 다운로드 드롭다운 */
 .export-menu {
