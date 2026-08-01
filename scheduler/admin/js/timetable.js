@@ -56,6 +56,11 @@ function renderConfSwitcher() {
         ${cur && cur.startDate ? `<span class="cs-date">${escapeHtml(fmtDateRange(cur.startDate, cur.endDate))}</span>` : ''}`;
 }
 window.gotoConf = function (id) { if (id && id !== CONF_ID) location.href = 'timetable.html?id=' + id; };
+// 변경 이력 — 이 행사로 필터해서 열기
+window.gotoActivity = function () {
+    const t = (CONF && CONF.title) || '';
+    location.href = 'activity.html?conf=' + encodeURIComponent(CONF_ID || '') + (t ? '&t=' + encodeURIComponent(t) : '');
+};
 
 // 배치 모달 분류 필터 + 검색 이벤트
 document.getElementById('placeCatFilter').innerHTML =
