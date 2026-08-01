@@ -8,6 +8,10 @@ const LOG_REF = database.ref('/adminActivityLog');
 let LIMIT = 200;
 let LOGS = [];
 let logSub = null;
+// 시간표 등에서 ?conf=<id>&t=<title> 로 진입하면 그 행사로 자동 필터 (최초 1회)
+const PRESET_CONF = new URLSearchParams(location.search).get('conf') || '';
+const PRESET_CONF_TITLE = new URLSearchParams(location.search).get('t') || '';
+let presetApplied = false;
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('activity');
 
@@ -56,6 +60,16 @@ function populateFilters() {
     fillSelect('logEntity', '전체 유형', ents);
     const users = [...new Map(LOGS.filter(l => l.uid).map(l => [l.uid, l.userName || l.uid])).entries()];
     fillSelect('logUser', '전체 사용자', users);
+
+    // ?conf= 로 들어온 경우 그 행사로 자동 선택 (최초 1회; 로그가 아직 없으면 옵션 추가)
+    if (PRESET_CONF && !presetApplied) {
+        const sel = document.getElementById('logConf');
+        if (![...sel.options].some(o => o.value === PRESET_CONF)) {
+            sel.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(PRESET_CONF)}">${escapeHtml(PRESET_CONF_TITLE || PRESET_CONF)}</option>`);
+        }
+        sel.value = PRESET_CONF;
+        presetApplied = true;
+    }
 }
 
 function fmtTs(ts) {
