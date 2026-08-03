@@ -1563,7 +1563,8 @@ function exportExcelRooms(rooms, suffix) {
     // 표시언어(룸/세션 설정)에 맞춰 단일 언어로 출력 — 한글이면 한글만, 영어면 영어만
     const rows = [['룸', '날짜', '세션', '표시언어', '시작', '종료', '시간(분)',
         '제목', '연자', '소속', '파트너사', '제품', '제품분류', '제품설명']];
-    const redRows = [];   // 데이터 행별 '오늘 변경' 여부(빨간색)
+    const redRows = [];   // 데이터 행별 '기준 시각 이후 변경' 여부(빨간색)
+    const refTs = getChangeSinceTs();
     const join = arr => arr.filter(Boolean).join('; ');
     let changedCnt = 0;
     rooms.forEach(r => {
@@ -1580,7 +1581,7 @@ function exportExcelRooms(rooms, suffix) {
                     pickLang(lang, n.partnerKo, n.partnerEn),
                     pickLang(lang, n.productKo, n.productEn), n.productCategory, n.productDesc
                 ]);
-                const red = changedToday(lec);
+                const red = changedSince(lec, refTs);
                 if (red) changedCnt++;
                 redRows.push(red);
             });
@@ -1606,19 +1607,49 @@ function exportExcelRooms(rooms, suffix) {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '시간표');
     XLSX.writeFile(wb, `${safeName()}${suffix}.xlsx`);
-    Toast.success(changedCnt ? `엑셀 다운로드 — 오늘 변경 ${changedCnt}건 빨간색 표시` : '엑셀 파일을 내려받았습니다.');
+    Toast.success(changedCnt ? `엑셀 다운로드 — 기준 시각 이후 변경 ${changedCnt}건 빨간색 표시` : '엑셀 파일을 내려받았습니다. (기준 시각 이후 변경 없음)');
 }
-// 오늘(로컬 기준) 변경/생성된 강의인지 — 배치 사본 또는 풀 강의의 updatedAt/createdAt 기준
-function changedToday(lec) {
+// 기준 시각(refTs, ms) 이후 변경/생성된 강의인지 — 배치 사본 또는 풀 강의의 updatedAt/createdAt 기준
+function changedSince(lec, refTs) {
     const pool = (lec && lec.lectureId) ? POOL.find(p => p.id === lec.lectureId) : null;
     const ts = Math.max(
         Number((lec && lec.updatedAt)) || 0, Number((lec && lec.createdAt)) || 0,
         Number(pool && pool.updatedAt) || 0, Number(pool && pool.createdAt) || 0
     );
-    if (!ts) return false;
-    const d = new Date(ts), now = new Date();
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    return ts > 0 && ts > refTs;
 }
+
+/* ---------- 변경 기준 시각 (사용자 지정, 행사별 저장) ---------- */
+function changeSinceKey() { return 'asls_changeSince_' + (CONF_ID || ''); }
+function fmtLocalInput(d) {
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function getChangeSinceTs() {
+    const el = document.getElementById('changeSince');
+    const v = el && el.value;
+    if (v) { const t = new Date(v).getTime(); if (!isNaN(t)) return t; }
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime();   // 미설정 시 오늘 0시
+}
+window.saveChangeSince = function () {
+    const el = document.getElementById('changeSince');
+    try { localStorage.setItem(changeSinceKey(), (el && el.value) || ''); } catch (e) { }
+};
+window.setChangeSinceNow = function () {
+    const el = document.getElementById('changeSince');
+    if (!el) return;
+    el.value = fmtLocalInput(new Date());
+    saveChangeSince();
+    Toast.info('변경 기준 시각을 "지금"으로 설정했습니다. 이후 변경분이 엑셀에서 빨간색으로 표시됩니다.');
+};
+function initChangeSince() {
+    const el = document.getElementById('changeSince');
+    if (!el) return;
+    let v = ''; try { v = localStorage.getItem(changeSinceKey()) || ''; } catch (e) { }
+    if (!v) { const d = new Date(); d.setHours(0, 0, 0, 0); v = fmtLocalInput(d); }
+    el.value = v;
+}
+initChangeSince();
 window.exportRoomExcel = function () { closeExportMenu(); const r = getRoom(CURRENT_ROOM); exportExcelRooms(r ? [r] : [], `_${(r && r.name) || '룸'}`); };
 window.exportAllExcel = function () { closeExportMenu(); exportExcelRooms(orderedRooms(), '_전체강의'); };
 window.exportKmaExcel = function () { closeExportMenu(); const rs = kmaRooms(); if (!rs.length) { Toast.warning('의협제출로 지정된 룸이 없습니다. (룸 설정에서 "의협제출" 체크)'); return; } exportExcelRooms(rs, '_의협아젠다'); };

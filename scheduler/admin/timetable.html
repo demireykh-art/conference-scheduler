@@ -32,6 +32,11 @@
                     <div class="export-dd" style="position:relative">
                         <button class="btn btn-success" onclick="toggleExportMenu(event)">📥 강의 목록 다운 ▾</button>
                         <div id="exportMenu" class="export-menu" style="display:none">
+                            <div class="export-group">변경 기준 시각 (이 시각 이후 변경분 = 엑셀 빨간색)</div>
+                            <div class="export-since">
+                                <input type="datetime-local" id="changeSince" onchange="saveChangeSince()">
+                                <button type="button" class="btn btn-sm" onclick="setChangeSinceNow()" title="지금 시각으로 설정 (작업 마친 뒤 눌러두면 다음에 이후 변경분만 빨간색으로 보임)">지금으로</button>
+                            </div>
                             <div class="export-group">해당 룸</div>
                             <button class="export-item" onclick="exportRoomExcel()">📊 해당룸 강의 — 엑셀</button>
                             <button class="export-item" onclick="exportRoomPdf()">📄 해당룸 강의 — PDF</button>
