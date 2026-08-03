@@ -1085,6 +1085,24 @@ tr.row-pre { background: #fffaf0; }
 .dup-badge.dup-place { background: #f59e0b; color: #fff; }
 /* 빨강 '중복' 배지가 앞에 있으면 그 옆에 바로 붙임(둘 다 우측 정렬 유지) */
 .dup-badge + .dup-badge.dup-place { margin-left: 4px; }
+/* 클릭 가능한 중복 배지 (호버=정보, 클릭=이동) */
+.conflict-badge { cursor: pointer; }
+.conflict-badge:hover { background: #c1121f; box-shadow: 0 0 0 2px rgba(229,72,77,0.25); }
+
+/* 여러 겹침 강의 선택 메뉴 */
+.conflict-menu {
+    position: fixed; z-index: 3000; min-width: 220px; max-width: 300px;
+    background: #fff; border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.24); padding: 6px; font-size: 0.82rem;
+}
+.conflict-menu .cm-head { font-size: 0.72rem; font-weight: 700; color: var(--text-dim); padding: 6px 8px 4px; }
+.conflict-menu .cm-item {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    padding: 8px 8px; border-radius: 7px; cursor: pointer;
+}
+.conflict-menu .cm-item:hover { background: #f0f5ff; }
+.conflict-menu .cm-meta { display: block; color: var(--primary); font-weight: 600; font-size: 0.76rem; }
+.conflict-menu .cm-title { display: block; color: var(--text); margin-top: 1px; }
 
 /* 강의 관리 — 중복배치 배지 · 행 강조 · 클릭 가능한 배치 위치 · 필터 버튼 */
 .badge-dup { background: #fff1de; color: #c2680a; }

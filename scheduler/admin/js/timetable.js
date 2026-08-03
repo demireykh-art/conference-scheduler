@@ -18,6 +18,7 @@ let editingDuration = null;   // { roomId, sessionId, lecId }
 let POOL = [];                // 이 행사의 강의 풀
 let newRoomDate = '';         // 룸 추가 모달에서 선택한 날짜
 let CONFLICT_IDS = new Set(); // 현재 중복(연자 겹침) 강의 id 집합
+let CONFLICT_MAP = {};        // refId → 겹친 상대 목록 [{roomId,lecId,roomName,title,start,end,via}]
 let DUP_PLACE_IDS = new Set(); // 같은 강의(lectureId)가 2곳 이상 배치됨 = 중복배치
 let CONFS = [];               // 전체 행사 목록 (전환기용)
 
@@ -714,7 +715,7 @@ function renderSessionBlock(roomId, s) {
         const nm = escapeHtml(pickLang(lang, (master && master.nameKo) || mod.nameKo, (master && master.nameEn) || mod.nameEn));
         const affv = pickLang(lang, (master && master.affiliationKo) || mod.affiliationKo, (master && master.affiliationEn) || mod.affiliationEn);
         const aff = affv ? ` <span class="mod-aff">(${escapeHtml(affv)})</span>` : '';
-        const dup = CONFLICT_IDS.has('mod:' + s.id) ? '<span class="dup-badge" title="사회자가 같은 날 다른 곳과 시간 겹침">중복</span>' : '';
+        const dup = CONFLICT_IDS.has('mod:' + s.id) ? conflictBadge('mod:' + s.id) : '';
         modHtml = `<div class="session-mod"><span class="mod-inline">${speakerAvatar(m, 20)}사회자: ${nm}${aff}</span>${dup}</div>`;
     }
     // 세션 언어 개별설정 (전체 적용에서 제외)
@@ -776,7 +777,7 @@ function renderLectureRow(roomId, sessionId, lec, lang) {
             const master = s.id ? Masters.speaker(s.id) : null;
             return escapeHtml(pickLang(lang, (master && master.nameKo) || s.nameKo, (master && master.nameEn) || s.nameEn));
         }).join(', ') || '<span style="color:var(--text-dim)">이 세션에 연자 강의가 없습니다</span>';
-        const dup = CONFLICT_IDS.has(lec.id) ? '<span class="dup-badge" title="패널 연자 중 일부가 같은 시간 다른 곳과 겹침">중복</span>' : '';
+        const dup = CONFLICT_IDS.has(lec.id) ? conflictBadge(lec.id) : '';
         return `
         <div class="lecture-row panel-row" data-lec="${lec.id}">
             <span class="grip" title="드래그하여 순서 변경">⋮⋮</span>
@@ -854,7 +855,7 @@ function renderLectureRow(roomId, sessionId, lec, lang) {
                 <span class="dur-badge">${lec.duration || 0}분</span>
                 ${partner}
                 ${(n.types || []).map(t => `<span class="chip type">${escapeHtml(t)}</span>`).join('')}
-                ${CONFLICT_IDS.has(lec.id) ? '<span class="dup-badge" title="같은 날 동일 연자 시간 겹침(또는 이동 10분 부족)">중복</span>' : ''}
+                ${CONFLICT_IDS.has(lec.id) ? conflictBadge(lec.id) : ''}
                 ${lec.lectureId && DUP_PLACE_IDS.has(lec.lectureId) ? '<span class="dup-badge dup-place" title="같은 강의가 다른 룸/세션에도 배치됨 (중복배치)">중복배치</span>' : ''}
             </div>
             <div class="lec-title">${title}</div>
@@ -1186,7 +1187,9 @@ function collectOccupancy() {
                 const keys = lec.isPanel ? panelKeysOfSession(session) : speakerKeysOf(lec.speakers);
                 out.push({
                     kind: lec.isPanel ? 'panel' : 'lecture', roomId: room.id, sessionId: session.id, date: room.date || '',
-                    refId: lec.id, start: lec._start, end: lec._end, keys
+                    refId: lec.id, lecId: lec.id, roomName: room.name || '(룸)', sessionName: session.name || '',
+                    title: lec.isPanel ? 'Q&A & Panel' : (normalizeLecture(lec).titleKo || normalizeLecture(lec).titleEn || '(제목 없음)'),
+                    start: lec._start, end: lec._end, keys
                 });
             });
             const mod = session.moderator;
@@ -1194,7 +1197,9 @@ function collectOccupancy() {
             if (modKey) {
                 out.push({
                     kind: 'moderator', roomId: room.id, sessionId: session.id, date: room.date || '',
-                    refId: 'mod:' + session.id, start: session._start, end: session._end,
+                    refId: 'mod:' + session.id, lecId: '', roomName: room.name || '(룸)', sessionName: session.name || '',
+                    title: '사회자 ' + (mod.nameKo || mod.nameEn || ''),
+                    start: session._start, end: session._end,
                     keys: [String(modKey).trim()].filter(Boolean)
                 });
             }
@@ -1208,6 +1213,10 @@ function collectOccupancy() {
 function computeConflictIds() {
     const occ = collectOccupancy();
     const ids = new Set();
+    CONFLICT_MAP = {};
+    const viaOf = (a, b) => a.keys.filter(k => b.keys.includes(k))
+        .map(k => { const m = Masters.speaker(k); return (m && (m.nameKo || m.nameEn)) || k; }).join(', ');
+    const link = (a, b) => { (CONFLICT_MAP[a.refId] = CONFLICT_MAP[a.refId] || []).push(Object.assign({}, b, { via: viaOf(a, b) })); };
     for (let i = 0; i < occ.length; i++) {
         for (let j = i + 1; j < occ.length; j++) {
             const a = occ[i], b = occ[j];
@@ -1217,10 +1226,48 @@ function computeConflictIds() {
             const buffer = (a.roomId === b.roomId) ? 0 : SPEAKER_TRAVEL_MIN;  // 같은 룸은 이동 불필요
             if (a.start < b.end + buffer && b.start < a.end + buffer) {
                 ids.add(a.refId); ids.add(b.refId);
+                link(a, b); link(b, a);
             }
         }
     }
     return ids;
+}
+
+// 중복 배지 (호버=겹친 강의 정보, 클릭=이동/선택)
+function conflictBadge(refId) {
+    const list = CONFLICT_MAP[refId] || [];
+    if (!list.length) return '<span class="dup-badge" title="연자 시간 겹침">중복</span>';
+    const lines = list.map(c => `• ${c.via ? c.via + ' · ' : ''}${c.roomName} ${formatTime(c.start)}-${formatTime(c.end)} "${c.title}"`).join('\n');
+    const title = `연자 시간 겹침 ${list.length}건 — 클릭하면 이동\n${lines}`;
+    return `<span class="dup-badge conflict-badge" title="${escapeHtml(title)}" onclick="gotoConflict('${refId}', event)">중복${list.length > 1 ? ' ' + list.length : ''}</span>`;
+}
+function navConflict(c) {
+    if (c && c.roomId && c.lecId) ttGoto(c.roomId, c.lecId);
+    else if (c && c.roomId) selectRoom(c.roomId);
+}
+window.gotoConflict = function (refId, ev) {
+    if (ev) ev.stopPropagation();
+    const list = CONFLICT_MAP[refId] || [];
+    if (!list.length) return;
+    if (list.length === 1) { navConflict(list[0]); return; }
+    showConflictMenu(list, ev);   // 여러 개면 선택
+};
+function closeConflictMenu() { const m = document.getElementById('conflictMenu'); if (m) m.remove(); }
+function showConflictMenu(list, ev) {
+    closeConflictMenu();
+    const menu = document.createElement('div');
+    menu.className = 'conflict-menu'; menu.id = 'conflictMenu';
+    menu.innerHTML = `<div class="cm-head">이동할 겹친 강의 선택 (${list.length})</div>` + list.map((c, i) =>
+        `<button class="cm-item" data-i="${i}"><span class="cm-meta">${escapeHtml((c.via ? c.via + ' · ' : '') + c.roomName + ' ' + formatTime(c.start) + '-' + formatTime(c.end))}</span><span class="cm-title">${escapeHtml(c.title)}</span></button>`
+    ).join('');
+    document.body.appendChild(menu);
+    const x = ev ? ev.clientX : 120, y = ev ? ev.clientY : 120;
+    menu.style.left = Math.min(x, window.innerWidth - 280) + 'px';
+    menu.style.top = Math.min(y + 8, window.innerHeight - menu.offsetHeight - 8) + 'px';
+    menu.querySelectorAll('.cm-item').forEach(btn => btn.addEventListener('click', e => {
+        e.stopPropagation(); navConflict(list[Number(btn.dataset.i)]); closeConflictMenu();
+    }));
+    setTimeout(() => document.addEventListener('click', closeConflictMenu, { once: true }), 0);
 }
 
 // 후보 강의가 기존 배치와 연자·시간 충돌하는지 (같은 날짜만, 다른 룸은 이동 10분 버퍼)
