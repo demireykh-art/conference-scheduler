@@ -1134,7 +1134,8 @@ window.placeLecture = async function (poolId) {
         partnerId: pool.partnerId || '', partnerKo: pool.partnerKo || '', partnerEn: pool.partnerEn || '',
         productKo: pool.productKo || '', productEn: pool.productEn || '',
         productCategory: pool.productCategory || '', productDesc: pool.productDesc || '',
-        order: toOrderedArray(CONF.rooms[roomId].sessions[sessionId].lectures).length
+        order: toOrderedArray(CONF.rooms[roomId].sessions[sessionId].lectures).length,
+        updatedAt: firebase.database.ServerValue.TIMESTAMP   // 변경 표시(엑셀 빨간색)용
     };
     confRef().child(`rooms/${roomId}/sessions/${sessionId}/lectures/${uuid()}`).set(data)
         .then(() => {
@@ -1313,17 +1314,22 @@ window.saveDuration = async function () {
     if (cur && !(await confirmSpecChange(cur, getRoom(roomId), dur))) return;   // 지정 시간과 다르면 경고
     const lectureId = cur && cur.lectureId;   // 강의 풀과 연결된 강의면 목록·다른 배치도 함께 반영
 
+    const NOW = firebase.database.ServerValue.TIMESTAMP;
     const updates = {};
     updates[`rooms/${roomId}/sessions/${sessionId}/lectures/${lecId}/duration`] = dur;
+    updates[`rooms/${roomId}/sessions/${sessionId}/lectures/${lecId}/updatedAt`] = NOW;
     if (lectureId) {
         // 강의 관리(풀) 반영
         updates[`lecturePool/${lectureId}/duration`] = dur;
-        updates[`lecturePool/${lectureId}/updatedAt`] = firebase.database.ServerValue.TIMESTAMP;
+        updates[`lecturePool/${lectureId}/updatedAt`] = NOW;
         // 같은 풀 강의를 배치한 모든 사본도 동일 시간으로 반영
         Object.entries(CONF.rooms || {}).forEach(([rid, room]) => {
             Object.entries(room.sessions || {}).forEach(([sid, sess]) => {
                 Object.entries(sess.lectures || {}).forEach(([lid, l]) => {
-                    if (l.lectureId === lectureId) updates[`rooms/${rid}/sessions/${sid}/lectures/${lid}/duration`] = dur;
+                    if (l.lectureId === lectureId) {
+                        updates[`rooms/${rid}/sessions/${sid}/lectures/${lid}/duration`] = dur;
+                        updates[`rooms/${rid}/sessions/${sid}/lectures/${lid}/updatedAt`] = NOW;
+                    }
                 });
             });
         });
@@ -1384,7 +1390,7 @@ window.confirmMove = async function () {
     if (!lec) return;
     if (!(await confirmSpecChange(lec, getRoom(toRoom)))) return;   // 지정 요일·시간과 다르면 경고
     const targetLectures = toOrderedArray(CONF.rooms[toRoom].sessions[toSession].lectures);
-    const moved = { ...lec, order: targetLectures.length };
+    const moved = { ...lec, order: targetLectures.length, updatedAt: firebase.database.ServerValue.TIMESTAMP };
     const updates = {};
     updates[`rooms/${roomId}/sessions/${sessionId}/lectures/${lecId}`] = null;
     updates[`rooms/${toRoom}/sessions/${toSession}/lectures/${lecId}`] = moved;
@@ -1557,7 +1563,9 @@ function exportExcelRooms(rooms, suffix) {
     // 표시언어(룸/세션 설정)에 맞춰 단일 언어로 출력 — 한글이면 한글만, 영어면 영어만
     const rows = [['룸', '날짜', '세션', '표시언어', '시작', '종료', '시간(분)',
         '제목', '연자', '소속', '파트너사', '제품', '제품분류', '제품설명']];
+    const redRows = [];   // 데이터 행별 '오늘 변경' 여부(빨간색)
     const join = arr => arr.filter(Boolean).join('; ');
+    let changedCnt = 0;
     rooms.forEach(r => {
         computeRoom(r).forEach(s => {
             const lang = effectiveLang(r, s);
@@ -1572,16 +1580,44 @@ function exportExcelRooms(rooms, suffix) {
                     pickLang(lang, n.partnerKo, n.partnerEn),
                     pickLang(lang, n.productKo, n.productEn), n.productCategory, n.productDesc
                 ]);
+                const red = changedToday(lec);
+                if (red) changedCnt++;
+                redRows.push(red);
             });
         });
     });
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 7 }, { wch: 7 }, { wch: 8 },
         { wch: 44 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 28 }, { wch: 40 }];
+    // 오늘 변경된 강의 행은 빨간 글씨(+ 연한 빨강 바탕)
+    if (typeof XLSX.utils.encode_cell === 'function' && ws['!ref']) {
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        const redStyle = { font: { color: { rgb: 'DD0000' }, bold: true }, fill: { fgColor: { rgb: 'FDECEC' } } };
+        redRows.forEach((isRed, i) => {
+            if (!isRed) return;
+            const rr = i + 1;   // 헤더가 0행
+            for (let c = range.s.c; c <= range.e.c; c++) {
+                const ref = XLSX.utils.encode_cell({ r: rr, c });
+                if (!ws[ref]) ws[ref] = { t: 's', v: '' };
+                ws[ref].s = redStyle;
+            }
+        });
+    }
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '시간표');
     XLSX.writeFile(wb, `${safeName()}${suffix}.xlsx`);
-    Toast.success('엑셀 파일을 내려받았습니다.');
+    Toast.success(changedCnt ? `엑셀 다운로드 — 오늘 변경 ${changedCnt}건 빨간색 표시` : '엑셀 파일을 내려받았습니다.');
+}
+// 오늘(로컬 기준) 변경/생성된 강의인지 — 배치 사본 또는 풀 강의의 updatedAt/createdAt 기준
+function changedToday(lec) {
+    const pool = (lec && lec.lectureId) ? POOL.find(p => p.id === lec.lectureId) : null;
+    const ts = Math.max(
+        Number((lec && lec.updatedAt)) || 0, Number((lec && lec.createdAt)) || 0,
+        Number(pool && pool.updatedAt) || 0, Number(pool && pool.createdAt) || 0
+    );
+    if (!ts) return false;
+    const d = new Date(ts), now = new Date();
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
 }
 window.exportRoomExcel = function () { closeExportMenu(); const r = getRoom(CURRENT_ROOM); exportExcelRooms(r ? [r] : [], `_${(r && r.name) || '룸'}`); };
 window.exportAllExcel = function () { closeExportMenu(); exportExcelRooms(orderedRooms(), '_전체강의'); };
