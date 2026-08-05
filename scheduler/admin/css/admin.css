@@ -1001,8 +1001,8 @@ tr.row-pre { background: #fffaf0; }
     align-items: center;
     gap: 12px;
     padding: 16px 18px;
-    background: #fafbfc;
-    border-bottom: 1px solid var(--border);
+    background: #e5eaf2;
+    border-bottom: 2px solid #cdd6e2;
 }
 .session-head .grip { color: #c2c8d0; cursor: grab; }
 .session-title { font-size: 1.02rem; font-weight: 700; margin: 0; }
