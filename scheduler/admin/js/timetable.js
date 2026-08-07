@@ -1561,23 +1561,32 @@ function exportExcelRooms(rooms, suffix) {
     if (!CONF) return;
     if (!rooms.length) { Toast.warning('내보낼 룸이 없습니다.'); return; }
     // 표시언어(룸/세션 설정)에 맞춰 단일 언어로 출력 — 한글이면 한글만, 영어면 영어만
-    const rows = [['룸', '날짜', '세션', '표시언어', '시작', '종료', '시간(분)',
+    const rows = [['룸', '날짜', '세션', '좌장', '좌장소속', '표시언어', '시작', '종료', '시간(분)',
         '제목', '연자', '소속', '파트너사', '제품', '제품분류', '제품설명']];
     const redRows = [];   // 데이터 행별 '기준 시각 이후 변경' 여부(빨간색)
     const refTs = getChangeSinceTs();
     const join = arr => arr.filter(Boolean).join('; ');
     let changedCnt = 0;
+    // 연자/좌장 이름·소속은 마스터(최신) 우선, 없으면 사본 값 폴백
+    const spkName = (x, lang) => { const m = x.id && Masters.speaker(x.id); return pickLang(lang, (m && m.nameKo) || x.nameKo, (m && m.nameEn) || x.nameEn); };
+    const spkAff = (x, lang) => { const m = x.id && Masters.speaker(x.id); return pickLang(lang, (m && m.affiliationKo) || x.affiliationKo, (m && m.affiliationEn) || x.affiliationEn); };
+    const modInfo = (s, lang) => {
+        const mod = s.moderator;
+        if (!mod || !(mod.id || mod.nameKo || mod.nameEn)) return { name: '', aff: '' };
+        return { name: spkName(mod, lang), aff: spkAff(mod, lang) };
+    };
     rooms.forEach(r => {
         computeRoom(r).forEach(s => {
             const lang = effectiveLang(r, s);
+            const mod = modInfo(s, lang);
             s.lectures.forEach(lec => {
                 const n = normalizeLecture(lec);
                 rows.push([
-                    r.name, r.date || '', s.name, lang === 'en' ? '영어' : '한글',
+                    r.name, r.date || '', s.name, mod.name, mod.aff, lang === 'en' ? '영어' : '한글',
                     formatTime(lec._start), formatTime(lec._end), lec.duration || 0,
                     pickLang(lang, n.titleKo, n.titleEn),
-                    join(n.speakers.map(x => pickLang(lang, x.nameKo, x.nameEn))),
-                    join(n.speakers.map(x => pickLang(lang, x.affiliationKo, x.affiliationEn))),
+                    join(n.speakers.map(x => spkName(x, lang))),
+                    join(n.speakers.map(x => spkAff(x, lang))),
                     pickLang(lang, n.partnerKo, n.partnerEn),
                     pickLang(lang, n.productKo, n.productEn), n.productCategory, n.productDesc
                 ]);
@@ -1585,10 +1594,16 @@ function exportExcelRooms(rooms, suffix) {
                 if (red) changedCnt++;
                 redRows.push(red);
             });
+            // 강의 없이 좌장만 지정된 세션도 좌장 정보 포함
+            if (!s.lectures.length && mod.name) {
+                rows.push([r.name, r.date || '', s.name, mod.name, mod.aff, lang === 'en' ? '영어' : '한글',
+                    formatTime(s._start), formatTime(s._end), '', '(좌장만 지정된 세션)', '', '', '', '', '', '']);
+                redRows.push(false);
+            }
         });
     });
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 7 }, { wch: 7 }, { wch: 8 },
+    ws['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 20 }, { wch: 8 }, { wch: 7 }, { wch: 7 }, { wch: 8 },
         { wch: 44 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 28 }, { wch: 40 }];
     // 오늘 변경된 강의 행은 빨간 글씨(+ 연한 빨강 바탕)
     if (typeof XLSX.utils.encode_cell === 'function' && ws['!ref']) {
