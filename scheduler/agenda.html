@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학술대회 프로그램 · ASLS</title>
+    <link rel="icon" type="image/png" href="admin/assets/asls-logo.png">
+    <meta property="og:title" content="학술대회 프로그램 · ASLS">
+    <meta property="og:description" content="ASLS 학술대회 시간표 · 프로그램">
+    <meta name="theme-color" content="#6E2B7B">
+
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --ag-primary: #6E2B7B;
+            --ag-ink: #1f2430;
+            --ag-dim: #6b7280;
+            --ag-border: #e5e8ec;
+            --ag-soft: #f5f6f8;
+            --ag-break: #f3eef6;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+            color: var(--ag-ink); background: #fff; line-height: 1.5;
+            -webkit-text-size-adjust: 100%;
+        }
+        .ag-container { max-width: 920px; margin: 0 auto; padding: 20px 16px 40px; }
+
+        .ag-head { margin-bottom: 18px; }
+        .ag-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 4px; color: var(--ag-primary); }
+        .ag-range { color: var(--ag-dim); font-size: 0.95rem; margin-bottom: 14px; }
+        .ag-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .ag-seg { display: inline-flex; border: 1px solid var(--ag-border); border-radius: 9px; overflow: hidden; background: #fff; }
+        .ag-seg button { border: 0; background: #fff; padding: 8px 13px; font-size: 0.85rem; cursor: pointer; color: var(--ag-dim); border-left: 1px solid var(--ag-border); font-family: inherit; }
+        .ag-seg button:first-child { border-left: 0; }
+        .ag-seg button.on { background: var(--ag-primary); color: #fff; font-weight: 700; }
+        .ag-lang { margin-left: auto; }
+
+        .ag-day { font-size: 1.05rem; font-weight: 800; margin: 26px 0 10px; padding-bottom: 7px; border-bottom: 2px solid var(--ag-primary); color: var(--ag-primary); }
+        .ag-day:first-of-type { margin-top: 8px; }
+
+        .ag-room { border: 1px solid var(--ag-border); border-radius: 12px; overflow: hidden; margin-bottom: 16px; background: #fff; }
+        .ag-room-name { background: var(--ag-primary); color: #fff; font-weight: 700; font-size: 0.98rem; padding: 10px 14px; }
+
+        .ag-session { border-top: 1px solid var(--ag-border); }
+        .ag-session:first-of-type { border-top: 0; }
+        .ag-session-head { background: var(--ag-soft); padding: 8px 14px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; border-bottom: 1px solid var(--ag-border); }
+        .ag-session-name { font-weight: 700; font-size: 0.9rem; }
+        .ag-session-time { color: var(--ag-dim); font-size: 0.82rem; }
+        .ag-mod { color: var(--ag-dim); font-size: 0.82rem; }
+
+        .ag-lec { display: flex; gap: 12px; padding: 10px 14px; border-top: 1px dashed #eef0f3; }
+        .ag-lec:first-child { border-top: 0; }
+        .ag-time { flex: 0 0 92px; color: var(--ag-dim); font-size: 0.8rem; font-variant-numeric: tabular-nums; padding-top: 1px; white-space: nowrap; }
+        .ag-lec-main { flex: 1; min-width: 0; }
+        .ag-lec-title { font-weight: 600; font-size: 0.92rem; }
+        .ag-lec-spk { font-size: 0.85rem; margin-top: 2px; }
+        .ag-aff { color: var(--ag-dim); font-weight: 400; }
+        .ag-sep { color: var(--ag-dim); }
+        .ag-lec-meta { font-size: 0.8rem; color: var(--ag-dim); margin-top: 3px; display: flex; gap: 12px; flex-wrap: wrap; }
+        .ag-break { background: var(--ag-break); }
+        .ag-break .ag-lec-title, .ag-panel .ag-lec-title { color: var(--ag-primary); font-weight: 700; }
+
+        .ag-empty { padding: 12px 14px; color: var(--ag-dim); font-size: 0.84rem; }
+        .ag-foot { text-align: center; color: var(--ag-dim); font-size: 0.78rem; margin-top: 22px; }
+        .ag-msg { text-align: center; padding: 48px 16px; color: var(--ag-dim); }
+        .ag-msg-t { font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; color: var(--ag-ink); }
+        .ag-msg-s { font-size: 0.88rem; }
+        .ag-msg code { background: var(--ag-soft); padding: 1px 6px; border-radius: 5px; }
+
+        @media (max-width: 520px) {
+            .ag-title { font-size: 1.25rem; }
+            .ag-time { flex-basis: 78px; font-size: 0.76rem; }
+            .ag-lang { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="ag-container">
+        <div id="agenda"><div class="ag-msg"><div class="ag-msg-t">불러오는 중…</div></div></div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/agenda-embed.js"></script>
+</body>
+</html>
