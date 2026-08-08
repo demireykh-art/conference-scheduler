@@ -1270,3 +1270,59 @@ tr.lec-dup-row > td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
     .mobile-menu-btn { display: inline-flex !important; }
 }
 .mobile-menu-btn { display: none; background: none; border: none; font-size: 1.4rem; }
+
+/* ============================================================
+   인기 강의 (설문 집계) — feedback.html
+   ============================================================ */
+.fb-toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 14px 0 4px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: #fff; }
+.seg button { border: 0; background: #fff; padding: 8px 14px; font-size: 0.84rem; cursor: pointer; color: var(--text-dim); border-left: 1px solid var(--border); }
+.seg button:first-child { border-left: 0; }
+.seg button.active { background: var(--primary); color: #fff; font-weight: 600; }
+.fb-summary { color: var(--text-dim); font-size: 0.86rem; }
+.fb-summary b { color: var(--text); }
+#fbBody .dim { color: var(--text-dim); }
+
+/* 자리(순번)별 평균 추천 미니표 */
+.fb-bias { padding: 14px 16px; margin: 12px 0; }
+.fb-bias-head { font-weight: 700; font-size: 0.9rem; margin-bottom: 10px; }
+.fb-bias-head .dim { font-weight: 400; font-size: 0.78rem; color: var(--text-dim); }
+.fb-bias-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.fb-bias-cell { min-width: 76px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; text-align: center; background: #f8fafc; }
+.fb-bias-cell .ord { font-size: 0.76rem; color: var(--text-dim); }
+.fb-bias-cell .avg { font-size: 1.2rem; font-weight: 800; color: var(--primary); line-height: 1.3; }
+.fb-bias-cell .n { font-size: 0.7rem; color: var(--text-dim); }
+
+/* 상위 카드 */
+.fb-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin: 8px 0 20px; }
+.fb-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.fb-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.fb-card-top .rank { font-size: 1.5rem; }
+.fb-card-top .votes { font-size: 1.7rem; font-weight: 800; color: var(--primary); }
+.fb-card-top .votes .unit { font-size: 0.8rem; font-weight: 600; margin-left: 2px; }
+.fb-card-title { font-weight: 700; font-size: 0.98rem; line-height: 1.35; margin-bottom: 6px; }
+.fb-card-meta { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 6px; }
+.fb-card-spk { font-size: 0.84rem; margin-bottom: 4px; }
+.fb-card-sub { font-size: 0.8rem; color: var(--text-dim); }
+.fb-card-adj { margin-top: 8px; font-size: 0.78rem; color: var(--text-dim); border-top: 1px dashed var(--border); padding-top: 7px; }
+.fb-card-adj.pos { color: var(--success); }
+.fb-card-adj.neg { color: var(--danger); }
+
+/* 랭킹표 */
+.fb-table td { vertical-align: top; font-size: 0.84rem; }
+.fb-table .rank-cell { text-align: center; font-weight: 800; color: var(--text-dim); }
+.fb-table .adj-pos { color: var(--success); font-weight: 700; }
+.fb-table .adj-neg { color: var(--danger); font-weight: 700; }
+
+/* 입력 모드 */
+.fb-input-group { padding: 12px 14px; margin-bottom: 12px; }
+.fb-input-head { font-weight: 700; font-size: 0.92rem; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--border); }
+.fb-input-head .dim { font-weight: 400; color: var(--text-dim); font-size: 0.8rem; margin-left: 6px; }
+.fb-input-row { display: flex; align-items: center; gap: 12px; padding: 8px 4px; border-bottom: 1px solid #f1f3f5; }
+.fb-input-row:last-child { border-bottom: 0; }
+.fb-in-ord { flex: 0 0 26px; height: 26px; border-radius: 50%; background: #eef2f8; color: var(--text-dim); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; }
+.fb-in-main { flex: 1; min-width: 0; }
+.fb-in-title { font-weight: 600; font-size: 0.88rem; }
+.fb-in-votes { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; }
+.fb-in-votes input { width: 78px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; font-size: 0.9rem; text-align: right; }
+.fb-in-votes input:focus { border-color: var(--primary); outline: none; }
