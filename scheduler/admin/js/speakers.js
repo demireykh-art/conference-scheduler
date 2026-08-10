@@ -104,6 +104,7 @@ function aslsBadges(s) {
     if (s.roleExec) h += '<span class="asls-badge asls-exec">ASLS 임원</span>';
     if (s.roleAdvisor) h += '<span class="asls-badge asls-advisor">ASLS 고문</span>';
     if (s.roleAmb) h += '<span class="asls-badge asls-amb">엠베서더</span>';
+    if (s.roleModerator) h += '<span class="asls-badge asls-mod">좌장</span>';
     return h;
 }
 
@@ -146,6 +147,7 @@ window.openSpeakerModal = function () {
     document.getElementById('spkRoleExec').checked = false;
     document.getElementById('spkRoleAdvisor').checked = false;
     document.getElementById('spkRoleAmb').checked = false;
+    document.getElementById('spkRoleModerator').checked = false;
     spkPhotoData = '';
     document.getElementById('spkPhotoFile').value = '';
     refreshSpkPhotoPreview();
@@ -168,6 +170,7 @@ window.editSpeaker = function (id) {
     document.getElementById('spkRoleExec').checked = !!s.roleExec;
     document.getElementById('spkRoleAdvisor').checked = !!s.roleAdvisor;
     document.getElementById('spkRoleAmb').checked = !!s.roleAmb;
+    document.getElementById('spkRoleModerator').checked = !!s.roleModerator;
     spkPhotoData = s.photo || '';
     document.getElementById('spkPhotoFile').value = '';
     refreshSpkPhotoPreview();
@@ -198,6 +201,7 @@ function doSaveSpeaker(closeAfter) {
         roleExec: document.getElementById('spkRoleExec').checked,
         roleAdvisor: document.getElementById('spkRoleAdvisor').checked,
         roleAmb: document.getElementById('spkRoleAmb').checked,
+        roleModerator: document.getElementById('spkRoleModerator').checked,
         photo: spkPhotoData || '',
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     };
