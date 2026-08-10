@@ -1485,3 +1485,8 @@ tr.lec-dup-row > td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
     .role-check-row { gap: 12px 16px; }
     .role-check-row .check-inline { flex: 1 1 44%; }
 }
+
+/* 모바일 모달: 2열 필드(이름/소속, 파트너사/제품)를 1열로 쌓아 라벨 줄바꿈 어긋남 방지 */
+@media (max-width: 640px) {
+    .modal-grid2 { grid-template-columns: 1fr; gap: 0; }
+}
