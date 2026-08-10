@@ -546,4 +546,32 @@ document.addEventListener('click', function (e) {
     })();
 })();
 
+/* ------------------------------------------------------------
+   모달 열림 시 배경(뒤 페이지) 스크롤 잠금 — 모든 .modal-overlay 공통
+   정적 모달 + 동적 생성 모달(confirmDialog 등) 모두 감지.
+   ------------------------------------------------------------ */
+(function () {
+    function refresh() {
+        const open = !!document.querySelector('.modal-overlay.open');
+        document.documentElement.classList.toggle('modal-open', open);
+        document.body.classList.toggle('modal-open', open);
+    }
+    const attrObs = new MutationObserver(refresh);
+    function watch(el) { try { attrObs.observe(el, { attributes: true, attributeFilter: ['class'] }); } catch (e) { } }
+    function scan() { document.querySelectorAll('.modal-overlay').forEach(watch); refresh(); }
+    // 동적으로 추가/제거되는 오버레이(confirmDialog 등)까지 반영
+    new MutationObserver(function (muts) {
+        muts.forEach(function (m) {
+            (m.addedNodes || []).forEach(function (n) {
+                if (n.nodeType !== 1) return;
+                if (n.classList && n.classList.contains('modal-overlay')) watch(n);
+                else if (n.querySelectorAll) n.querySelectorAll('.modal-overlay').forEach(watch);
+            });
+        });
+        refresh();
+    }).observe(document.body, { childList: true, subtree: true });
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scan);
+    else scan();
+})();
+
 console.log('✅ admin-common.js 로드 완료');
