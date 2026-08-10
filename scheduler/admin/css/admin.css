@@ -1373,3 +1373,38 @@ tr.lec-dup-row > td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
 .ac-list .ac-item .sub { color: var(--text-dim); font-size: 0.78rem; }
 
 .asls-badge.asls-mod { background: #e6f4ec; color: #1F8A5B; }
+
+/* ============================================================
+   모바일 가시성 (시간표) — 좌우 넘침 방지 + 본문 폭·글자 확보
+   ============================================================ */
+@media (max-width: 640px) {
+    /* 가로 스크롤(좌우 흔들림) 차단 */
+    .main { overflow-x: hidden; }
+    .admin-layout { max-width: 100%; }
+
+    /* 바깥 여백 축소 → 본문 폭 확보 */
+    .main-topbar { padding: 12px 14px; flex-wrap: wrap; gap: 8px; }
+    .main-body { padding: 4px 14px 40px; }
+    .cs-select { max-width: 56vw; }
+    .room-settings { padding: 14px; gap: 12px; }
+
+    /* 세션 헤더: 제목은 한 줄 전체, 버튼은 다음 줄로 줄바꿈(넘침 방지) */
+    .session-head { flex-wrap: wrap; padding: 12px 14px; gap: 8px; align-items: flex-start; }
+    .session-head > .grip { display: none; }
+    .session-head .spacer { display: none; }
+    .session-head > div:not(.spacer) { flex: 1 1 100%; min-width: 0; }
+    .session-title { font-size: 1.05rem; }
+    .session-sub { font-size: 0.82rem; }
+    .session-head .btn-sm, .session-head .btn { font-size: 0.82rem; padding: 8px 12px; }
+
+    /* 강의 행: 액션(이동·시간·삭제)을 아래 줄로 내려 제목·연자 폭 확보 */
+    .lecture-row { flex-wrap: wrap; padding: 12px 14px; gap: 6px; }
+    .lecture-row > .grip { display: none; }
+    .lec-actions { flex: 1 1 100%; justify-content: flex-end; gap: 6px; margin-top: 2px; padding-top: 8px; border-top: 1px dashed #eef0f3; }
+    .lec-actions .txt-btn { padding: 7px 14px; font-size: 0.82rem; }
+
+    /* 가독성: 본문 글자 키움 + 줄간격 */
+    .lec-title { font-size: 1rem; line-height: 1.45; }
+    .lec-subtitle, .lec-speaker, .lec-product { font-size: 0.86rem; }
+    .lec-speaker { line-height: 1.7; }
+}
