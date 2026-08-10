@@ -1478,12 +1478,16 @@ tr.lec-dup-row > td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
 /* ASLS 관계자 구분 체크박스 줄 — 좁은 화면에서 겹치지 않게 줄바꿈 */
 .role-check-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 4px 0; }
 .role-check-row .check-inline { flex: 0 0 auto; white-space: nowrap; }
+/* 모달 내부 input width:100%가 체크박스에도 적용돼 레이아웃이 깨지는 것 방지 */
+.check-inline input[type="checkbox"] { width: auto; flex: 0 0 auto; margin: 0; }
 /* 모바일 모달: 여백 축소 + 가로 넘침 차단(흔들림 방지) */
 @media (max-width: 640px) {
     .modal-overlay { padding: 4vh 10px; }
     .modal { padding: 18px 16px; overflow-x: hidden; }
-    .role-check-row { gap: 12px 16px; }
-    .role-check-row .check-inline { flex: 1 1 44%; }
+    /* 관계자 구분 체크박스: 좁은 화면에선 세로 1열로 (겹침 방지) */
+    .role-check-row { display: block; }
+    .role-check-row .check-inline { display: flex; justify-content: flex-start; margin-bottom: 12px; white-space: nowrap; }
+    .role-check-row .check-inline:last-child { margin-bottom: 0; }
 }
 
 /* 모바일 모달: 2열 필드(이름/소속, 파트너사/제품)를 1열로 쌓아 라벨 줄바꿈 어긋남 방지 */
