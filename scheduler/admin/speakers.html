@@ -31,7 +31,10 @@
                         <select id="spkSort" style="padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.84rem"></select>
                         <span style="color:var(--text-dim);font-size:0.85rem">총 <span id="spkCount">0</span>명</span>
                     </div>
-                    <button class="btn btn-primary" onclick="openSpeakerModal()">+ 연자 등록</button>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn" onclick="exportSpeakersBackup()" title="연자 전체를 JSON으로 저장(안전용 백업)">💾 연자 백업</button>
+                        <button class="btn btn-primary" onclick="openSpeakerModal()">+ 연자 등록</button>
+                    </div>
                 </div>
                 <div class="card table-card">
                     <table class="data-table">

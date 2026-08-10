@@ -293,28 +293,28 @@ window.logActivity = function (action, entity, summary, extra) {
     } catch (e) { /* 로깅 실패는 무시 (본 작업에 영향 없음) */ }
 };
 
-/* 정렬 헬퍼 — 이름순/역순/등록순 (목록 페이지 공용) */
-window.sortList = function (arr, sort, nameKey) {
-    nameKey = nameKey || 'nameKo';
-    const a = arr.slice();
-    const byName = (x, y) => (x[nameKey] || '').localeCompare(y[nameKey] || '', 'ko');
-    switch (sort) {
-        case 'nameDesc': return a.sort((x, y) => byName(y, x));
-        case 'oldest': return a.sort((x, y) => (x.order ?? 0) - (y.order ?? 0));
-        case 'newest': return a.sort((x, y) => (y.order ?? 0) - (x.order ?? 0));
-        default: return a.sort(byName);   // nameAsc
-    }
+/* ------------------------------------------------------------
+   JSON 다운로드 + 연자 데이터 백업 (위험 작업 전 스냅샷)
+   ------------------------------------------------------------ */
+window.downloadJson = function (filename, obj) {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1500);
 };
-
-// 정렬 드롭다운 옵션 HTML
-window.sortOptionsHtml = function (cur, nameLabel) {
-    nameLabel = nameLabel || '이름';
-    return [
-        ['nameAsc', nameLabel + '순 (가나다)'],
-        ['nameDesc', nameLabel + '순 (역순)'],
-        ['newest', '최신 등록순'],
-        ['oldest', '오래된 등록순']
-    ].map(([v, l]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`).join('');
+window.exportSpeakersBackup = function () {
+    const arr = (window.Masters && Masters.speakers) || [];
+    if (!arr.length) { if (window.Toast) Toast.warning('연자 데이터가 아직 로드되지 않았습니다. 잠시 후 다시 시도하세요.'); return; }
+    const d = new Date();
+    const p = n => String(n).padStart(2, '0');
+    const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+    // 실제 DB에 되돌릴 수 있도록 id를 키로 하는 오브젝트 형태로 저장
+    const byId = {};
+    arr.forEach(s => { const { id, ...rest } = s; if (id) byId[id] = rest; });
+    window.downloadJson(`adminSpeakers_backup_${stamp}.json`, byId);
+    if (window.Toast) Toast.success(`연자 ${arr.length}명 백업(JSON)을 저장했습니다.`);
 };
 
 /* ------------------------------------------------------------
