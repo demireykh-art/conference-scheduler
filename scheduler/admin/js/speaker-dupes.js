@@ -186,9 +186,16 @@ async function repointAll(loserId, keepId, keep) {
         const snap = await ref.once('value');
         const val = snap.val();
         if (u.containerType === 'moderator') {
+            // 좌장을 대표 연자로 재매칭(유지). 이름은 대표값 우선, 없으면 기존 사본 유지 → 절대 빈칸 안 됨
             if (val && val.id === loserId) {
-                await ref.set({ id: keepId, nameKo: keep.nameKo || '', nameEn: keep.nameEn || '', affiliationKo: keep.affiliationKo || '' });
+                await ref.set({
+                    id: keepId,
+                    nameKo: keep.nameKo || val.nameKo || '',
+                    nameEn: keep.nameEn || val.nameEn || '',
+                    affiliationKo: keep.affiliationKo || val.affiliationKo || ''
+                });
             }
+            // val.id !== loserId 이면(이미 다른 값·변경됨) 좌장을 건드리지 않는다 (오삭제 방지)
         } else {
             // speakers 배열 (또는 객체) — 항상 배열로 되돌려 저장
             const listRaw = Array.isArray(val) ? val : (val ? Object.values(val) : []);
@@ -196,7 +203,7 @@ async function repointAll(loserId, keepId, keep) {
             const replaced = listRaw.map(el => {
                 if (el && el.id === loserId) {
                     changed = true;
-                    return { id: keepId, nameKo: keep.nameKo || '', nameEn: keep.nameEn || '', affiliationKo: keep.affiliationKo || '', affiliationEn: keep.affiliationEn || '' };
+                    return { id: keepId, nameKo: keep.nameKo || el.nameKo || '', nameEn: keep.nameEn || el.nameEn || '', affiliationKo: keep.affiliationKo || el.affiliationKo || '', affiliationEn: keep.affiliationEn || el.affiliationEn || '' };
                 }
                 return el;
             });
