@@ -1364,3 +1364,12 @@ tr.lec-dup-row > td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
   .dup-rec { flex-direction: column; }
   .dup-rec-actions { flex-direction: row; }
 }
+
+/* ---- 세션 모달: 사회자 후보 필터 ---- */
+.mod-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+.mod-toggle { border: 1px solid var(--border); background: #fff; color: var(--text-dim); border-radius: 8px; padding: 7px 12px; font-size: 0.82rem; cursor: pointer; }
+.mod-toggle.on { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 700; }
+.mod-promote { font-size: 0.68rem; font-weight: 700; color: #1F8A5B; background: #e6f4ec; padding: 1px 7px; border-radius: 999px; margin-left: 4px; }
+.ac-list .ac-item .sub { color: var(--text-dim); font-size: 0.78rem; }
+
+.asls-badge.asls-mod { background: #e6f4ec; color: #1F8A5B; }

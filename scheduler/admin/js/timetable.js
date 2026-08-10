@@ -931,43 +931,127 @@ function renderModChosen() {
     el.innerHTML = `<span class="chip">${speakerAvatar(m, 20)} ${escapeHtml(moderatorDraft.nameKo || moderatorDraft.nameEn)}${aff}<span class="x" onclick="clearModerator()">×</span></span>`;
 }
 
-// ASLS 관계자(임원·엠베서더)만 사회자로 지정 가능
-function isAslsStaff(s) { return !!(s && (s.roleExec || s.roleAdvisor || s.roleAmb)); }
+// ASLS 관계자(임원·고문·엠베서더) 또는 좌장 지정된 연자
+function isAslsStaff(s) { return !!(s && (s.roleExec || s.roleAdvisor || s.roleAmb || s.roleModerator)); }
 function aslsRoleText(s) {
     const r = [];
     if (s.roleExec) r.push('ASLS 임원');
     if (s.roleAdvisor) r.push('ASLS 고문');
     if (s.roleAmb) r.push('엠베서더');
+    if (s.roleModerator && !s.roleExec && !s.roleAdvisor && !s.roleAmb) r.push('좌장');
     return r.join('·');
 }
 
-// 사회자 검색 자동완성 (ASLS 관계자만 검색 + 새로 등록)
+/* ---------- 사회자 후보 필터 상태 ---------- */
+let MOD_SCOPE = 'all';   // 'all'(전체 연자) | 'staff'(ASLS 임원만)
+let MOD_AVAIL = false;   // 이 세션 시간에 가능한 연자만
+
+// 편집 중인 세션의 시간창(신규 세션은 시간 미정 → null)
+function modSessionWindow() {
+    if (!editingSession || !editingSession.sessionId) return null;
+    const room = getRoom(editingSession.roomId);
+    if (!room) return null;
+    const s = computeRoom(room).find(x => x.id === editingSession.sessionId);
+    if (!s) return null;
+    return { date: room.date || '', roomId: room.id, sessionId: s.id, start: s._start, end: s._end };
+}
+// 후보 연자(key)가 세션 시간창에 이미 다른 곳에서 배정돼 있으면 겹치는 항목 반환
+function modSpeakerBusy(key, win) {
+    if (!key || !win) return null;
+    for (const o of collectOccupancy()) {
+        if (o.roomId === win.roomId && o.sessionId === win.sessionId) continue;   // 이 세션 자체는 제외
+        if ((o.date || '') !== (win.date || '')) continue;
+        if (!o.keys.includes(key)) continue;
+        const buffer = (o.roomId === win.roomId) ? 0 : SPEAKER_TRAVEL_MIN;
+        if (win.start < o.end + buffer && o.start < win.end + buffer) return o;
+    }
+    return null;
+}
+// 연자별 좌장 지정 횟수 (이 행사 전체 세션 기준)
+function modCountMap() {
+    const m = {};
+    orderedRooms().forEach(room => {
+        Object.values((CONF.rooms[room.id] || {}).sessions || {}).forEach(sess => {
+            const mod = sess.moderator, k = mod && (mod.id || mod.nameKo);
+            if (k) m[String(k).trim()] = (m[String(k).trim()] || 0) + 1;
+        });
+    });
+    return m;
+}
+function syncModFilters() {
+    const a = document.getElementById('modSegAll'), b = document.getElementById('modSegStaff');
+    if (a) a.classList.toggle('on', MOD_SCOPE === 'all');
+    if (b) b.classList.toggle('on', MOD_SCOPE === 'staff');
+    const av = document.getElementById('modAvailBtn');
+    if (av) av.classList.toggle('on', MOD_AVAIL);
+}
+function refreshModList() {
+    // 버튼 클릭 시 input이 blur되며 닫히므로, 닫힘 이후 다시 열어 목록 갱신
+    setTimeout(() => { const el = document.getElementById('modInput'); if (el) { el.focus(); el.dispatchEvent(new Event('input')); } }, 180);
+}
+window.setModScope = function (v) { MOD_SCOPE = v; syncModFilters(); refreshModList(); };
+window.toggleModAvail = function () {
+    if (!MOD_AVAIL && !modSessionWindow()) {
+        Toast.info('신규 세션은 시간이 정해진 뒤(저장 후) 사용할 수 있습니다. 먼저 세션을 저장해 주세요.');
+        return;
+    }
+    MOD_AVAIL = !MOD_AVAIL; syncModFilters(); refreshModList();
+};
+
+// 사회자 검색 자동완성 (전체 연자 / 임원 필터 · 시간가능 필터 · 좌장 지정 횟수 표시)
+// 기존 연자를 재사용(관계자로 지정)하여 중복 등록을 방지한다.
 setupAutocomplete(
     document.getElementById('modInput'),
     document.getElementById('modAc'),
     q => {
-        const ql = q.toLowerCase();
-        const staff = Masters.speakers.filter(isAslsStaff);
-        const items = staff
-            .filter(s => [s.nameKo, s.nameEn, s.affiliationKo, s.affiliationEn].join(' ').toLowerCase().includes(ql))
-            .map(s => ({ label: `${escapeHtml(s.nameKo || '')} <span class="sub">${aslsRoleText(s)}${s.affiliationKo ? ' · ' + escapeHtml(s.affiliationKo) : ''}</span>`, value: { type: 'existing', s } }));
+        const ql = q.trim().toLowerCase();
+        const win = MOD_AVAIL ? modSessionWindow() : null;
+        const cnt = modCountMap();
+        let pool = (Masters.speakers || []).slice();
+        if (MOD_SCOPE === 'staff') pool = pool.filter(isAslsStaff);
+        pool = pool.filter(s => [s.nameKo, s.nameEn, s.affiliationKo, s.affiliationEn].join(' ').toLowerCase().includes(ql));
+        if (win) pool = pool.filter(s => !modSpeakerBusy((s.id || s.nameKo || '').trim(), win));
+        // 좌장 적게 맡은 연자 우선 → 이름순 (부담 분산)
+        pool.sort((a, b) => (cnt[a.id || a.nameKo] || 0) - (cnt[b.id || b.nameKo] || 0) || (a.nameKo || '').localeCompare(b.nameKo || '', 'ko'));
+        const items = pool.slice(0, 8).map(s => {
+            const staff = isAslsStaff(s);
+            const n = cnt[s.id || s.nameKo] || 0;
+            const tags = [aslsRoleText(s) || '연자', s.affiliationKo || '', n ? `좌장 ${n}회` : ''].filter(Boolean).join(' · ');
+            const promote = staff ? '' : ' <span class="mod-promote">＋관계자로 지정</span>';
+            return { label: `${escapeHtml(s.nameKo || s.nameEn || '')} <span class="sub">${escapeHtml(tags)}</span>${promote}`, value: { type: 'existing', s } };
+        });
+        // 정확히 일치하는 기존 연자가 없을 때만 '새로 등록' 노출 (중복 방지 가드)
+        const exactAll = (Masters.speakers || []).some(s => (s.nameKo || '').toLowerCase() === ql || (s.nameEn || '').toLowerCase() === ql);
+        if (ql && !exactAll) items.push({ label: `➕ "<b>${escapeHtml(q.trim())}</b>" 새 연자로 등록 (좌장)`, value: { type: 'new', name: q.trim() } });
         if (!items.length) {
-            items.push({ label: q
-                ? `ASLS 관계자 중 "<b>${escapeHtml(q)}</b>" 검색 결과가 없습니다. ➕ 새 ASLS 관계자로 등록`
-                : 'ASLS 관계자(임원·엠베서더)만 사회자로 지정할 수 있습니다. 연자 관리에서 먼저 지정하세요.',
-                value: q ? { type: 'new', name: q } : { type: 'none' } });
+            items.push({
+                label: win ? '이 시간대에 가능한 연자가 없습니다. (필터를 조정해 보세요)'
+                    : (MOD_SCOPE === 'staff' ? 'ASLS 임원 목록에 없습니다. "전체 연자"로 전환하거나 이름을 입력해 등록하세요.' : '일치하는 연자가 없습니다.'),
+                value: { type: 'none' }
+            });
         }
         return items;
     },
     async val => {
         if (val.type === 'none') return;
-        if (val.type === 'existing') { setModerator(val.s); return; }
+        if (val.type === 'existing') {
+            const s = val.s;
+            if (!isAslsStaff(s)) {
+                const ok = await confirmDialog(`"${s.nameKo || s.nameEn}" 님을 사회자(좌장)로 지정합니다.\n이 연자를 'ASLS 관계자(좌장)'로 표시합니다. (연자 관리에서 해제 가능) 계속할까요?`, { okText: '지정' });
+                if (!ok) return;
+                try { await database.ref('/adminSpeakers/' + s.id + '/roleModerator').set(true); }
+                catch (e) { Toast.error('지정 실패: ' + e.message); return; }
+            }
+            setModerator(s);
+            return;
+        }
+        // 새 연자로 등록 (좌장) — 기존에 같은 이름이 없을 때만 도달
         const name = (val.name || '').trim(); if (!name) return;
-        const ok = await confirmDialog(`"${name}" 님이 ASLS 관계자 목록에 없습니다.\n새 연자로 등록하고 ASLS 임원으로 지정하여 사회자로 넣을까요? (연자 관리에도 추가됨 · 임원/엠베서더 구분은 연자 관리에서 변경 가능)`, { okText: '등록' });
+        const ok = await confirmDialog(`"${name}" 님이 연자 목록에 없습니다.\n새 연자로 등록하고 사회자(좌장)로 지정할까요? (연자 관리에도 추가됨)`, { okText: '등록' });
         if (!ok) return;
         const id = uuid();
-        database.ref('/adminSpeakers/' + id).set({ nameKo: name, nameEn: '', affiliationKo: '', affiliationEn: '', roleExec: true, roleAmb: false, order: Masters.speakers.length, createdAt: firebase.database.ServerValue.TIMESTAMP })
-            .then(() => { setModerator({ id, nameKo: name }); Toast.success(`"${name}" ASLS 임원으로 등록`); })
+        database.ref('/adminSpeakers/' + id).set({ nameKo: name, nameEn: '', affiliationKo: '', affiliationEn: '', roleModerator: true, order: Masters.speakers.length, createdAt: firebase.database.ServerValue.TIMESTAMP })
+            .then(() => { setModerator({ id, nameKo: name }); Toast.success(`"${name}" 등록 · 좌장으로 지정했습니다.`); })
             .catch(e => Toast.error('등록 실패: ' + e.message));
     }
 );
@@ -979,6 +1063,7 @@ window.openSessionModal = function () {
     document.getElementById('sessionName').value = '';
     document.getElementById('modInput').value = '';
     moderatorDraft = null; renderModChosen();
+    MOD_SCOPE = 'all'; MOD_AVAIL = false; syncModFilters();
     document.getElementById('sessionModal').classList.add('open');
 };
 window.editSession = function (roomId, sessionId) {
@@ -992,6 +1077,7 @@ window.editSession = function (roomId, sessionId) {
         ? { id: s.moderator.id || '', nameKo: s.moderator.nameKo || '', nameEn: s.moderator.nameEn || '', affiliationKo: s.moderator.affiliationKo || '' }
         : null;
     renderModChosen();
+    MOD_SCOPE = 'all'; MOD_AVAIL = false; syncModFilters();
     document.getElementById('sessionModal').classList.add('open');
 };
 // 세션 이름 퀵버튼 (개회/휴식/점심/폐회) — 표준 명칭으로 채움. PDF에서 색상·명칭 일관 출력.
