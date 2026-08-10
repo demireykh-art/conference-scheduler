@@ -1427,3 +1427,40 @@ tr.lec-dup-row > td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
     /* 드로어 자체는 내용이 길면 세로 스크롤 */
     .sidebar { height: 100dvh; overflow-y: auto; }
 }
+
+/* ============================================================
+   강의 관리 모바일 — 필터바 정리 + 표를 카드형으로
+   ============================================================ */
+@media (max-width: 640px) {
+    /* 필터바: 검색 입력 전체폭, 셀렉트 넉넉히 */
+    .filter-bar { gap: 8px; }
+    .filter-bar #lecSearch { width: 100% !important; flex: 1 1 100%; }
+    .filter-bar select { flex: 1 1 auto; min-width: 44%; }
+    .filter-bar .btn-primary { flex: 1 1 100%; }
+
+    /* 표(.pool-table) → 강의별 카드 스택 */
+    .pool-table thead { display: none; }
+    .pool-table { min-width: 0; }
+    .pool-table, .pool-table tbody, .pool-table tr, .pool-table td { display: block; width: 100%; }
+    .pool-card { overflow-x: visible; border: none; background: transparent; box-shadow: none; padding: 0; }
+    .pool-table tr {
+        border: 1px solid var(--border); border-radius: 12px;
+        margin-bottom: 12px; padding: 12px 14px; background: #fff; box-shadow: var(--shadow-sm);
+    }
+    .pool-table tr.lec-dup-row { border-color: #f0c88a; }
+    .pool-table td { border: none !important; padding: 5px 0; text-align: left !important; }
+    .pool-table td[data-label]::before {
+        content: attr(data-label); display: block;
+        font-size: 0.68rem; font-weight: 700; color: var(--text-dim);
+        text-transform: uppercase; letter-spacing: .03em; margin-bottom: 3px;
+    }
+    /* 제목 셀 강조, 빈 셀 라벨 숨김 */
+    .pool-table td[data-label="제목"] { padding-top: 0; }
+    .pool-table td[data-label="제목"] b { font-size: 1rem; }
+    .pool-table .place-rooms { justify-content: flex-start; }
+    .pool-table .row-actions { justify-content: flex-start; flex-wrap: wrap; gap: 8px; white-space: normal; }
+    .pool-table .row-actions .btn { flex: 1 1 0; min-width: 0; white-space: nowrap; text-align: center; }
+    /* colspan 안내(빈 결과) 행 */
+    .pool-table td[colspan] { text-align: center !important; padding: 30px 10px !important; }
+    .pool-table td[colspan]::before { display: none; }
+}
