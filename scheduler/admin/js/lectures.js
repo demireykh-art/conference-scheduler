@@ -267,13 +267,13 @@ function renderPool() {
             : '<span class="badge badge-upcoming">미배치</span>';
         return `
         <tr class="${isDup ? 'lec-dup-row' : ''}">
-            <td><b>${escapeHtml(l.titleKo || '(제목 없음)')}</b>${l.titleEn ? `<div class="dim" style="font-size:0.8rem">${escapeHtml(l.titleEn)}</div>` : ''}</td>
-            <td><div class="chips" style="margin:0">${types || ''}${cats || ''}${tags || ''}</div></td>
-            <td>${spk}</td>
-            <td class="dim" style="font-size:0.82rem">${pp}</td>
-            <td style="text-align:center">${l.duration || 0}분</td>
-            <td style="text-align:center">${placeCell}</td>
-            <td>
+            <td data-label="제목"><b>${escapeHtml(l.titleKo || '(제목 없음)')}</b>${l.titleEn ? `<div class="dim" style="font-size:0.8rem">${escapeHtml(l.titleEn)}</div>` : ''}</td>
+            <td data-label="분류·태그"><div class="chips" style="margin:0">${types || ''}${cats || ''}${tags || ''}</div></td>
+            <td data-label="연자">${spk}</td>
+            <td data-label="파트너·제품" class="dim" style="font-size:0.82rem">${pp}</td>
+            <td data-label="시간" style="text-align:center">${l.duration || 0}분</td>
+            <td data-label="배치" style="text-align:center">${placeCell}</td>
+            <td data-label="관리">
                 <div class="row-actions">
                     <button class="btn btn-sm" onclick="editLecture('${l.id}')">수정</button>
                     <button class="btn btn-sm" onclick="openMoveLecModal('${l.id}')">다른 행사로</button>
