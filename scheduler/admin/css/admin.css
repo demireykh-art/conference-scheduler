@@ -1326,3 +1326,41 @@ tr.lec-dup-row > td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
 .fb-in-votes { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; }
 .fb-in-votes input { width: 78px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; font-size: 0.9rem; text-align: right; }
 .fb-in-votes input:focus { border-color: var(--primary); outline: none; }
+
+/* ============================================================
+   중복 연자 점검 — speaker-dupes.html
+   ============================================================ */
+.dup-group { padding: 0; overflow: hidden; margin-bottom: 14px; }
+.dup-group-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--card-bg); border-bottom: 1px solid var(--border); }
+.dup-name { font-weight: 800; font-size: 1.02rem; }
+.dup-badge { font-size: 0.74rem; font-weight: 700; color: var(--primary); background: rgba(47,111,237,0.10); padding: 3px 9px; border-radius: 999px; }
+.dup-recs { display: flex; flex-direction: column; }
+.dup-rec { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 13px 16px; border-top: 1px solid #f1f3f5; }
+.dup-rec:first-child { border-top: 0; }
+.dup-rec.is-safe { background: #fbfdfb; }
+.dup-rec.is-used { background: #fffdfa; }
+.dup-rec-main { display: flex; gap: 12px; min-width: 0; flex: 1; }
+.dup-rec-info { min-width: 0; }
+.dup-rec-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.95rem; }
+.dup-rec-top .dim { color: var(--text-dim); font-weight: 400; font-size: 0.85rem; }
+.dup-flag { font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; }
+.dup-flag.ok { background: #e6f4ec; color: #12a150; }
+.dup-flag.none { background: #f1f3f5; color: #8a94a3; }
+.dup-flag.role { background: #f0ecf8; color: #6E2B7B; }
+.dup-rec-sub { font-size: 0.8rem; color: var(--text-dim); margin-top: 2px; }
+.dup-use { margin-top: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dup-usebadge { font-size: 0.76rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+.dup-usebadge.used { background: #fbf1df; color: #B7791F; }
+.dup-usebadge.safe { background: #e6f4ec; color: #1F8A5B; }
+.dup-det { margin-top: 9px; border-left: 2px solid var(--border); padding-left: 12px; }
+.dup-det-conf { margin-bottom: 8px; }
+.dup-det-conf-t { font-size: 0.76rem; font-weight: 700; color: var(--text-dim); margin-bottom: 3px; }
+.dup-det-row { font-size: 0.82rem; padding: 2px 0; }
+.dup-role { font-size: 0.68rem; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-right: 6px; }
+.dup-role-speakers { background: rgba(47,111,237,0.10); color: var(--primary); }
+.dup-role-moderator { background: #f0ecf8; color: #6E2B7B; }
+.dup-rec-actions { display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; align-items: stretch; }
+@media (max-width: 640px) {
+  .dup-rec { flex-direction: column; }
+  .dup-rec-actions { flex-direction: row; }
+}
