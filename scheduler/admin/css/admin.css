@@ -1408,3 +1408,22 @@ tr.lec-dup-row > td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
     .lec-subtitle, .lec-speaker, .lec-product { font-size: 0.86rem; }
     .lec-speaker { line-height: 1.7; }
 }
+
+/* ============================================================
+   모바일 사이드바: 가로 넘침 차단 + 배경 스크롤 잠금 + 백드롭
+   ============================================================ */
+.sidebar-backdrop {
+    position: fixed; inset: 0; background: rgba(15, 20, 30, .45);
+    z-index: 1400; opacity: 0; pointer-events: none; touch-action: none;
+    transition: opacity .2s;
+}
+.sidebar-backdrop.show { opacity: 1; pointer-events: auto; }
+@media (min-width: 861px) { .sidebar-backdrop { display: none !important; } }
+@media (max-width: 860px) {
+    /* 루트에서 가로 스크롤(좌우 흔들림) 차단 — 오프캔버스 사이드바가 넘침을 만들지 못하게 */
+    html, body { overflow-x: hidden; max-width: 100%; }
+    /* 사이드바 열렸을 때 뒤 배경 스크롤 잠금 */
+    html.nav-open, body.nav-open { overflow: hidden; }
+    /* 드로어 자체는 내용이 길면 세로 스크롤 */
+    .sidebar { height: 100dvh; overflow-y: auto; }
+}

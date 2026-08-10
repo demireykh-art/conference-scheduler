@@ -514,4 +514,36 @@ document.addEventListener('click', function (e) {
     }
 });
 
+/* ------------------------------------------------------------
+   모바일 사이드바(드로어): 열림 시 배경 스크롤 잠금 + 백드롭(탭하면 닫힘)
+   사이드바는 페이지 스크립트가 #sidebarMount에 주입하므로 나타날 때까지 대기.
+   ------------------------------------------------------------ */
+(function () {
+    function getSidebar() { return document.getElementById('sidebar'); }
+    function backdrop() {
+        let b = document.getElementById('sidebarBackdrop');
+        if (!b) {
+            b = document.createElement('div');
+            b.id = 'sidebarBackdrop';
+            b.className = 'sidebar-backdrop';
+            b.addEventListener('click', function () { const s = getSidebar(); if (s) s.classList.remove('open'); });
+            document.body.appendChild(b);
+        }
+        return b;
+    }
+    function apply(open) {
+        document.documentElement.classList.toggle('nav-open', open);
+        document.body.classList.toggle('nav-open', open);
+        backdrop().classList.toggle('show', open);
+    }
+    let tries = 0;
+    (function attach() {
+        const s = getSidebar();
+        if (!s) { if (tries++ < 60) setTimeout(attach, 100); return; }
+        new MutationObserver(function () { apply(s.classList.contains('open')); })
+            .observe(s, { attributes: true, attributeFilter: ['class'] });
+        apply(s.classList.contains('open'));
+    })();
+})();
+
 console.log('✅ admin-common.js 로드 완료');
