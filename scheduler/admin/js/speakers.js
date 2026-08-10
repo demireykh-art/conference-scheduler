@@ -125,12 +125,12 @@ function renderSpeakers() {
     }
     body.innerHTML = list.map(s => `
         <tr>
-            <td><div style="display:flex;align-items:center;gap:9px">${speakerAvatar(s, 32)}<b>${escapeHtml(s.nameKo || '')}</b></div></td>
-            <td class="en">${escapeHtml(s.nameEn || '-')}</td>
-            <td>${escapeHtml(s.affiliationKo || '-')}</td>
-            <td class="en">${escapeHtml(s.affiliationEn || '-')}</td>
-            <td>${aslsBadges(s) || '<span style="color:var(--text-dim)">-</span>'}</td>
-            <td>
+            <td data-label="연자"><div style="display:flex;align-items:center;gap:9px">${speakerAvatar(s, 32)}<b>${escapeHtml(s.nameKo || '')}</b></div></td>
+            <td data-label="영문명" class="en">${escapeHtml(s.nameEn || '-')}</td>
+            <td data-label="소속">${escapeHtml(s.affiliationKo || '-')}</td>
+            <td data-label="소속(영문)" class="en">${escapeHtml(s.affiliationEn || '-')}</td>
+            <td data-label="구분">${aslsBadges(s) || '<span style="color:var(--text-dim)">-</span>'}</td>
+            <td data-label="관리">
                 <div class="row-actions">
                     <button class="btn btn-sm" onclick="editSpeaker('${s.id}')">수정</button>
                     <button class="btn btn-sm btn-danger-ghost" onclick="deleteSpeaker('${s.id}')">삭제</button>
