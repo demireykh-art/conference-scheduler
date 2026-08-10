@@ -1464,3 +1464,13 @@ tr.lec-dup-row > td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
     .pool-table td[colspan] { text-align: center !important; padding: 30px 10px !important; }
     .pool-table td[colspan]::before { display: none; }
 }
+
+/* 툴바(검색+버튼) 모바일: 줄바꿈 + 전체폭으로 버튼 잘림 방지 */
+@media (max-width: 640px) {
+    .toolbar-row { flex-wrap: wrap; align-items: stretch; }
+    .toolbar-row > div { flex: 1 1 100%; min-width: 0; }
+    .toolbar-row > div:last-child { justify-content: flex-start; flex-wrap: wrap; }
+    .toolbar-row > div:last-child .btn { flex: 1 1 auto; }
+    .toolbar-row #spkSearch { width: 100% !important; flex: 1 1 100%; }
+    .toolbar-row select { flex: 1 1 auto; }
+}
