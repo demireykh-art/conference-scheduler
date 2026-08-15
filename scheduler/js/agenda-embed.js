@@ -111,11 +111,17 @@
         const lang = effLang(room, s);
         const time = `${fmt(s._start)}–${fmt(s._end)}`;
         let mod = '';
-        const m = s.moderator;
-        if (m && (m.nameKo || m.nameEn)) {
-            const nm = pick(lang, m.nameKo, m.nameEn);
-            const aff = m.affiliationKo || m.affiliationEn ? ` (${esc(pick(lang, m.affiliationKo, m.affiliationEn))})` : '';
-            mod = `<span class="ag-mod">좌장: ${esc(nm)}${aff}</span>`;
+        const mods = Array.isArray(s.moderators)
+            ? s.moderators.filter(x => x && (x.id || x.nameKo || x.nameEn)).slice(0, 2)
+            : (s.moderator && (s.moderator.nameKo || s.moderator.nameEn || s.moderator.id) ? [s.moderator] : []);
+        if (mods.length) {
+            const label = lang === 'en' ? 'Moderator' : '좌장';
+            const txt = mods.map(x => {
+                const nm = pick(lang, x.nameKo, x.nameEn);
+                const aff = (x.affiliationKo || x.affiliationEn) ? ` (${esc(pick(lang, x.affiliationKo, x.affiliationEn))})` : '';
+                return esc(nm) + aff;
+            }).join(', ');
+            mod = `<span class="ag-mod">${label}: ${txt}</span>`;
         }
         const rows = s.lectures.map(lec => renderLecture(lec, lang)).join('') ||
             `<div class="ag-empty">강의가 없습니다.</div>`;

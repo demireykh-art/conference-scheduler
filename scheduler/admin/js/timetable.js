@@ -480,7 +480,8 @@ window.duplicateRoom = function () {
     };
     toOrderedArray(room.sessions).forEach((s, si) => {
         const sc = { name: s.name || '', order: si };
-        if (s.moderator) sc.moderator = { ...s.moderator };
+        const scMods = sessionModArr(s);
+        if (scMods.length) sc.moderators = scMods.map(m => ({ ...m }));
         if (s.lang) sc.lang = s.lang;
         if (s.langExcluded) sc.langExcluded = true;
         const lects = toOrderedArray(s.lectures);
@@ -707,16 +708,19 @@ function renderSessionBlock(roomId, s) {
     const lang = effectiveLang(room, s);
     const range = `${formatTime(s._start)} - ${formatTime(s._end)}`;
     const lectures = s.lectures.map(lec => renderLectureRow(roomId, s.id, lec, lang)).join('');
-    const mod = s.moderator;
+    const mods = sessionModArr(s);
     let modHtml = '';
-    if (mod && (mod.id || mod.nameKo)) {
-        const master = mod.id ? Masters.speaker(mod.id) : null;
-        const m = master || mod;
-        const nm = escapeHtml(pickLang(lang, (master && master.nameKo) || mod.nameKo, (master && master.nameEn) || mod.nameEn));
-        const affv = pickLang(lang, (master && master.affiliationKo) || mod.affiliationKo, (master && master.affiliationEn) || mod.affiliationEn);
-        const aff = affv ? ` <span class="mod-aff">(${escapeHtml(affv)})</span>` : '';
-        const dup = CONFLICT_IDS.has('mod:' + s.id) ? conflictBadge('mod:' + s.id) : '';
-        modHtml = `<div class="session-mod"><span class="mod-inline">${speakerAvatar(m, 20)}사회자: ${nm}${aff}</span>${dup}</div>`;
+    if (mods.length) {
+        const parts = mods.map((mod, i) => {
+            const master = mod.id ? Masters.speaker(mod.id) : null;
+            const m = master || mod;
+            const nm = escapeHtml(pickLang(lang, (master && master.nameKo) || mod.nameKo, (master && master.nameEn) || mod.nameEn));
+            const affv = pickLang(lang, (master && master.affiliationKo) || mod.affiliationKo, (master && master.affiliationEn) || mod.affiliationEn);
+            const aff = affv ? ` <span class="mod-aff">(${escapeHtml(affv)})</span>` : '';
+            const dup = CONFLICT_IDS.has('mod:' + s.id + ':' + i) ? conflictBadge('mod:' + s.id + ':' + i) : '';
+            return `<span class="mod-inline">${speakerAvatar(m, 20)}${nm}${aff}</span>${dup}`;
+        }).join('<span class="mod-sep"> · </span>');
+        modHtml = `<div class="session-mod"><span class="mod-label">사회자:</span> ${parts}</div>`;
     }
     // 세션 언어 개별설정 (전체 적용에서 제외)
     const excluded = !!s.langExcluded;
@@ -906,7 +910,15 @@ function normalizeLecture(lec) {
 /* ============================================================
    세션 모달 + 사회자(Moderator)
    ============================================================ */
-let moderatorDraft = null;   // { id, nameKo, nameEn, affiliationKo }
+let moderatorDrafts = [];   // [{ id, nameKo, nameEn, affiliationKo }] — 최대 2명
+
+// 세션의 사회자(좌장) 목록 정규화 — 신형 moderators[] 우선, 구형 moderator{} 호환. (최대 2명)
+function sessionModArr(sess) {
+    if (!sess) return [];
+    if (Array.isArray(sess.moderators)) return sess.moderators.filter(m => m && (m.id || m.nameKo || m.nameEn)).slice(0, 2);
+    if (sess.moderator && (sess.moderator.id || sess.moderator.nameKo || sess.moderator.nameEn)) return [sess.moderator];
+    return [];
+}
 
 // 연자를 이 행사 연자/사회자 목록(confSpeakers)에 없으면 추가
 function ensureConfSpeaker(id, role) {
@@ -917,18 +929,27 @@ function ensureConfSpeaker(id, role) {
     }).catch(() => { });
 }
 
-function setModerator(s) {
-    moderatorDraft = { id: s.id || '', nameKo: s.nameKo || '', nameEn: s.nameEn || '', affiliationKo: s.affiliationKo || '' };
+function addModerator(s) {
+    if (moderatorDrafts.length >= 2) { Toast.info('사회자(좌장)는 최대 2명까지 지정할 수 있습니다.'); return; }
+    if (s.id && moderatorDrafts.some(d => d.id === s.id)) { Toast.info('이미 추가된 사회자입니다.'); return; }
+    moderatorDrafts.push({ id: s.id || '', nameKo: s.nameKo || '', nameEn: s.nameEn || '', affiliationKo: s.affiliationKo || '' });
     renderModChosen();
 }
-window.clearModerator = function () { moderatorDraft = null; renderModChosen(); };
+window.removeModerator = function (i) { moderatorDrafts.splice(i, 1); renderModChosen(); };
 function renderModChosen() {
     const el = document.getElementById('modChosen');
     if (!el) return;
-    if (!moderatorDraft) { el.innerHTML = ''; return; }
-    const m = (moderatorDraft.id && Masters.speaker(moderatorDraft.id)) || moderatorDraft;
-    const aff = moderatorDraft.affiliationKo ? ` (${escapeHtml(moderatorDraft.affiliationKo)})` : '';
-    el.innerHTML = `<span class="chip">${speakerAvatar(m, 20)} ${escapeHtml(moderatorDraft.nameKo || moderatorDraft.nameEn)}${aff}<span class="x" onclick="clearModerator()">×</span></span>`;
+    el.innerHTML = moderatorDrafts.map((d, i) => {
+        const m = (d.id && Masters.speaker(d.id)) || d;
+        const aff = d.affiliationKo ? ` (${escapeHtml(d.affiliationKo)})` : '';
+        return `<span class="chip">${speakerAvatar(m, 20)} ${escapeHtml(d.nameKo || d.nameEn)}${aff}<span class="x" onclick="removeModerator(${i})">×</span></span>`;
+    }).join('');
+    const input = document.getElementById('modInput');
+    if (input) {
+        const full = moderatorDrafts.length >= 2;
+        input.disabled = full;
+        input.placeholder = full ? '최대 2명까지 지정되었습니다' : '🔍 연자 이름·소속 검색 후 선택… (최대 2명)';
+    }
 }
 
 // ASLS 관계자(임원·고문·엠베서더) 또는 좌장 지정된 연자
@@ -972,8 +993,10 @@ function modCountMap() {
     const m = {};
     orderedRooms().forEach(room => {
         Object.values((CONF.rooms[room.id] || {}).sessions || {}).forEach(sess => {
-            const mod = sess.moderator, k = mod && (mod.id || mod.nameKo);
-            if (k) m[String(k).trim()] = (m[String(k).trim()] || 0) + 1;
+            sessionModArr(sess).forEach(mod => {
+                const k = mod && (mod.id || mod.nameKo);
+                if (k) m[String(k).trim()] = (m[String(k).trim()] || 0) + 1;
+            });
         });
     });
     return m;
@@ -1042,7 +1065,7 @@ setupAutocomplete(
                 try { await database.ref('/adminSpeakers/' + s.id + '/roleModerator').set(true); }
                 catch (e) { Toast.error('지정 실패: ' + e.message); return; }
             }
-            setModerator(s);
+            addModerator(s);
             return;
         }
         // 새 연자로 등록 (좌장) — 기존에 같은 이름이 없을 때만 도달
@@ -1051,7 +1074,7 @@ setupAutocomplete(
         if (!ok) return;
         const id = uuid();
         database.ref('/adminSpeakers/' + id).set({ nameKo: name, nameEn: '', affiliationKo: '', affiliationEn: '', roleModerator: true, order: Masters.speakers.length, createdAt: firebase.database.ServerValue.TIMESTAMP })
-            .then(() => { setModerator({ id, nameKo: name }); Toast.success(`"${name}" 등록 · 좌장으로 지정했습니다.`); })
+            .then(() => { addModerator({ id, nameKo: name }); Toast.success(`"${name}" 등록 · 좌장으로 지정했습니다.`); })
             .catch(e => Toast.error('등록 실패: ' + e.message));
     }
 );
@@ -1062,7 +1085,7 @@ window.openSessionModal = function () {
     document.getElementById('sessionModalTitle').textContent = '세션 추가';
     document.getElementById('sessionName').value = '';
     document.getElementById('modInput').value = '';
-    moderatorDraft = null; renderModChosen();
+    moderatorDrafts = []; renderModChosen();
     MOD_SCOPE = 'all'; MOD_AVAIL = false; syncModFilters();
     document.getElementById('sessionModal').classList.add('open');
 };
@@ -1073,9 +1096,7 @@ window.editSession = function (roomId, sessionId) {
     document.getElementById('sessionModalTitle').textContent = '세션 수정';
     document.getElementById('sessionName').value = s.name || '';
     document.getElementById('modInput').value = '';
-    moderatorDraft = (s.moderator && (s.moderator.id || s.moderator.nameKo))
-        ? { id: s.moderator.id || '', nameKo: s.moderator.nameKo || '', nameEn: s.moderator.nameEn || '', affiliationKo: s.moderator.affiliationKo || '' }
-        : null;
+    moderatorDrafts = sessionModArr(s).map(m => ({ id: m.id || '', nameKo: m.nameKo || '', nameEn: m.nameEn || '', affiliationKo: m.affiliationKo || '' }));
     renderModChosen();
     MOD_SCOPE = 'all'; MOD_AVAIL = false; syncModFilters();
     document.getElementById('sessionModal').classList.add('open');
@@ -1091,29 +1112,30 @@ window.saveSession = function () {
     const name = document.getElementById('sessionName').value.trim();
     if (!name) { Toast.warning('세션 이름을 입력하세요.'); return; }
     const { roomId, sessionId } = editingSession;
-    const mod = moderatorDraft ? {
-        id: moderatorDraft.id || '', nameKo: moderatorDraft.nameKo || '',
-        nameEn: moderatorDraft.nameEn || '', affiliationKo: moderatorDraft.affiliationKo || ''
-    } : null;
+    const mods = (moderatorDrafts || []).filter(Boolean).slice(0, 2).map(d => ({
+        id: d.id || '', nameKo: d.nameKo || '', nameEn: d.nameEn || '', affiliationKo: d.affiliationKo || ''
+    }));
+    const modSummary = mods.length ? ` (사회자: ${mods.map(m => m.nameKo || m.nameEn).join(', ')})` : '';
     if (sessionId) {
         const updates = {};
         updates[`rooms/${roomId}/sessions/${sessionId}/name`] = name;
-        updates[`rooms/${roomId}/sessions/${sessionId}/moderator`] = mod;   // null이면 제거
+        updates[`rooms/${roomId}/sessions/${sessionId}/moderators`] = mods.length ? mods : null;   // null이면 제거
+        updates[`rooms/${roomId}/sessions/${sessionId}/moderator`] = null;   // 구 단일 필드 제거(호환)
         confRef().update(updates)
             .then(() => {
-                if (mod && mod.id) ensureConfSpeaker(mod.id, '사회자');
-                logActivity('update', 'session', `세션 "${name}" 수정${mod ? ` (사회자: ${mod.nameKo})` : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: sessionId });
+                mods.forEach(m => { if (m.id) ensureConfSpeaker(m.id, '사회자'); });
+                logActivity('update', 'session', `세션 "${name}" 수정${modSummary}`, { confId: CONF_ID, confTitle: ctitle(), entityId: sessionId });
                 Toast.success('저장되었습니다.'); closeSessionModal();
             });
     } else {
         const sessions = toOrderedArray(CONF.rooms[roomId].sessions);
         const id = uuid();
         const data = { name, order: sessions.length };
-        if (mod) data.moderator = mod;
+        if (mods.length) data.moderators = mods;
         confRef().child(`rooms/${roomId}/sessions/${id}`).set(data)
             .then(() => {
-                if (mod && mod.id) ensureConfSpeaker(mod.id, '사회자');
-                logActivity('create', 'session', `세션 "${name}" 추가${mod ? ` (사회자: ${mod.nameKo})` : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
+                mods.forEach(m => { if (m.id) ensureConfSpeaker(m.id, '사회자'); });
+                logActivity('create', 'session', `세션 "${name}" 추가${modSummary}`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
                 Toast.success('세션이 추가되었습니다.'); closeSessionModal();
             });
     }
@@ -1279,17 +1301,17 @@ function collectOccupancy() {
                     start: lec._start, end: lec._end, keys
                 });
             });
-            const mod = session.moderator;
-            const modKey = mod && (mod.id || mod.nameKo);
-            if (modKey) {
+            sessionModArr(session).forEach((mod, i) => {
+                const modKey = mod && (mod.id || mod.nameKo);
+                if (!modKey) return;
                 out.push({
                     kind: 'moderator', roomId: room.id, sessionId: session.id, date: room.date || '',
-                    refId: 'mod:' + session.id, lecId: '', roomName: room.name || '(룸)', sessionName: session.name || '',
+                    refId: 'mod:' + session.id + ':' + i, lecId: '', roomName: room.name || '(룸)', sessionName: session.name || '',
                     title: '사회자 ' + (mod.nameKo || mod.nameEn || ''),
                     start: session._start, end: session._end,
                     keys: [String(modKey).trim()].filter(Boolean)
                 });
-            }
+            });
         });
     });
     return out;
@@ -1657,9 +1679,12 @@ function exportExcelRooms(rooms, suffix) {
     const spkName = (x, lang) => { const m = x.id && Masters.speaker(x.id); return pickLang(lang, (m && m.nameKo) || x.nameKo, (m && m.nameEn) || x.nameEn); };
     const spkAff = (x, lang) => { const m = x.id && Masters.speaker(x.id); return pickLang(lang, (m && m.affiliationKo) || x.affiliationKo, (m && m.affiliationEn) || x.affiliationEn); };
     const modInfo = (s, lang) => {
-        const mod = s.moderator;
-        if (!mod || !(mod.id || mod.nameKo || mod.nameEn)) return { name: '', aff: '' };
-        return { name: spkName(mod, lang), aff: spkAff(mod, lang) };
+        const arr = sessionModArr(s);
+        if (!arr.length) return { name: '', aff: '' };
+        return {
+            name: arr.map(m => spkName(m, lang)).filter(Boolean).join(', '),
+            aff: arr.map(m => spkAff(m, lang)).filter(Boolean).join(' / ')
+        };
     };
     rooms.forEach(r => {
         computeRoom(r).forEach(s => {
@@ -1806,8 +1831,8 @@ function agendaRoomHtml(room) {
         const cat = sessionCategory(s.name);
         if (cat === 'regular') {
             sno++;
-            const mod = s.moderator;
-            const modName = mod && (mod.nameEn || mod.nameKo) ? `${modLabel}<br><b>${pdfEsc(pickLang(lang, mod.nameKo, mod.nameEn))}</b>` : '';
+            const mods = sessionModArr(s);
+            const modName = mods.length ? `${modLabel}<br><b>${mods.map(mm => pdfEsc(pickLang(lang, mm.nameKo, mm.nameEn))).filter(Boolean).join(', ')}</b>` : '';
             html += `<tr class="ses-head"><td class="time"></td><td class="title"><span class="sno">Session #${sno}</span> <b>${pdfEsc(s.name || '')}</b></td><td></td><td class="mod">${modName}</td></tr>`;
         } else {
             // 개회/휴식/점심/폐회/등록 세션 자체를 색상 밴드로

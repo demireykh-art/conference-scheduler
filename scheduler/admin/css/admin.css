@@ -1498,3 +1498,8 @@ tr.lec-dup-row > td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
 /* 모달 열림 시 배경 스크롤 잠금 + 스크롤 체이닝 차단(모달 안에서 스크롤해도 뒤 배경 안 움직임) */
 html.modal-open, body.modal-open { overflow: hidden; }
 .modal-overlay, .modal { overscroll-behavior: contain; }
+
+/* 세션 사회자(좌장) — 최대 2명 표시 */
+.session-mod { flex-wrap: wrap; }
+.mod-label { font-size: 0.8rem; font-weight: 600; color: var(--text); }
+.mod-sep { color: var(--text-dim); }
