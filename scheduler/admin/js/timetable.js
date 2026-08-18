@@ -480,6 +480,7 @@ window.duplicateRoom = function () {
     };
     toOrderedArray(room.sessions).forEach((s, si) => {
         const sc = { name: s.name || '', order: si };
+        if (s.nameEn) sc.nameEn = s.nameEn;
         const scMods = sessionModArr(s);
         if (scMods.length) sc.moderators = scMods.map(m => ({ ...m }));
         if (s.lang) sc.lang = s.lang;
@@ -1084,6 +1085,7 @@ window.openSessionModal = function () {
     editingSession = { roomId: CURRENT_ROOM };
     document.getElementById('sessionModalTitle').textContent = '세션 추가';
     document.getElementById('sessionName').value = '';
+    document.getElementById('sessionNameEn').value = '';
     document.getElementById('modInput').value = '';
     moderatorDrafts = []; renderModChosen();
     MOD_SCOPE = 'all'; MOD_AVAIL = false; syncModFilters();
@@ -1095,6 +1097,7 @@ window.editSession = function (roomId, sessionId) {
     editingSession = { roomId, sessionId };
     document.getElementById('sessionModalTitle').textContent = '세션 수정';
     document.getElementById('sessionName').value = s.name || '';
+    document.getElementById('sessionNameEn').value = s.nameEn || '';
     document.getElementById('modInput').value = '';
     moderatorDrafts = sessionModArr(s).map(m => ({ id: m.id || '', nameKo: m.nameKo || '', nameEn: m.nameEn || '', affiliationKo: m.affiliationKo || '' }));
     renderModChosen();
@@ -1111,6 +1114,7 @@ window.saveSession = function () {
     if (!AdminAuth.requireEdit()) return;
     const name = document.getElementById('sessionName').value.trim();
     if (!name) { Toast.warning('세션 이름을 입력하세요.'); return; }
+    const nameEn = document.getElementById('sessionNameEn').value.trim();
     const { roomId, sessionId } = editingSession;
     const mods = (moderatorDrafts || []).filter(Boolean).slice(0, 2).map(d => ({
         id: d.id || '', nameKo: d.nameKo || '', nameEn: d.nameEn || '', affiliationKo: d.affiliationKo || ''
@@ -1119,6 +1123,7 @@ window.saveSession = function () {
     if (sessionId) {
         const updates = {};
         updates[`rooms/${roomId}/sessions/${sessionId}/name`] = name;
+        updates[`rooms/${roomId}/sessions/${sessionId}/nameEn`] = nameEn || null;
         updates[`rooms/${roomId}/sessions/${sessionId}/moderators`] = mods.length ? mods : null;   // null이면 제거
         updates[`rooms/${roomId}/sessions/${sessionId}/moderator`] = null;   // 구 단일 필드 제거(호환)
         confRef().update(updates)
@@ -1131,6 +1136,7 @@ window.saveSession = function () {
         const sessions = toOrderedArray(CONF.rooms[roomId].sessions);
         const id = uuid();
         const data = { name, order: sessions.length };
+        if (nameEn) data.nameEn = nameEn;
         if (mods.length) data.moderators = mods;
         confRef().child(`rooms/${roomId}/sessions/${id}`).set(data)
             .then(() => {
@@ -1697,7 +1703,7 @@ function exportExcelRooms(rooms, suffix) {
             s.lectures.forEach(lec => {
                 const n = normalizeLecture(lec);
                 rows.push([
-                    r.name, r.date || '', s.name, '',
+                    r.name, r.date || '', s.name, s.nameEn || '',
                     mod.nameKo, mod.nameEn, mod.affKo, mod.affEn,
                     lang === 'en' ? '영어' : '한글',
                     formatTime(lec._start), formatTime(lec._end), lec.duration || 0,
@@ -1712,7 +1718,7 @@ function exportExcelRooms(rooms, suffix) {
             });
             // 강의 없이 좌장만 지정된 세션도 좌장 정보 포함
             if (!s.lectures.length && mod.nameKo) {
-                rows.push([r.name, r.date || '', s.name, '',
+                rows.push([r.name, r.date || '', s.name, s.nameEn || '',
                     mod.nameKo, mod.nameEn, mod.affKo, mod.affEn,
                     lang === 'en' ? '영어' : '한글',
                     formatTime(s._start), formatTime(s._end), '', '(좌장만 지정된 세션)', '', '', '', '', '', '', '', '', '']);
@@ -1851,7 +1857,7 @@ function agendaRoomHtml(room) {
             sno++;
             const mods = sessionModArr(s);
             const modName = mods.length ? `${modLabel}<br><b>${mods.map(mm => pdfEsc(pickLang(lang, mm.nameKo, mm.nameEn))).filter(Boolean).join(', ')}</b>` : '';
-            html += `<tr class="ses-head"><td class="time"></td><td class="title"><span class="sno">Session #${sno}</span> <b>${pdfEsc(s.name || '')}</b></td><td></td><td class="mod">${modName}</td></tr>`;
+            html += `<tr class="ses-head"><td class="time"></td><td class="title"><span class="sno">Session #${sno}</span> <b>${pdfEsc(pickLang(lang, s.name, s.nameEn) || '')}</b></td><td></td><td class="mod">${modName}</td></tr>`;
         } else {
             // 개회/휴식/점심/폐회/등록 세션 자체를 색상 밴드로
             html += `<tr class="cat-${cat}"><td class="time">${s._start != null ? formatTime(s._start) + ' ~ ' + formatTime(s._end) : ''}</td><td class="title" colspan="3"><b>${pdfEsc(s.name || '')}</b></td></tr>`;

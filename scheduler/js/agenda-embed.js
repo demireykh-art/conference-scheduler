@@ -127,7 +127,7 @@
             `<div class="ag-empty">강의가 없습니다.</div>`;
         return `<div class="ag-session">
             <div class="ag-session-head">
-                <span class="ag-session-name">${esc(s.name || '세션')}</span>
+                <span class="ag-session-name">${esc(pick(lang, s.name, s.nameEn) || '세션')}</span>
                 <span class="ag-session-time">${time}</span>
                 ${mod}
             </div>
