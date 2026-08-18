@@ -1109,6 +1109,15 @@ window.setSessionName = function (v) {
     const el = document.getElementById('sessionName');
     if (el) { el.value = v; el.focus(); }
 };
+// 국문 세션명을 영문칸에 그대로 복사
+window.copySessionNameToEn = function () {
+    const ko = document.getElementById('sessionName');
+    const en = document.getElementById('sessionNameEn');
+    if (!ko || !en) return;
+    en.value = ko.value;
+    en.focus();
+    if (window.Toast) Toast.info('세션 이름을 영문칸에 복사했습니다.');
+};
 window.closeSessionModal = function () { document.getElementById('sessionModal').classList.remove('open'); };
 window.saveSession = function () {
     if (!AdminAuth.requireEdit()) return;
