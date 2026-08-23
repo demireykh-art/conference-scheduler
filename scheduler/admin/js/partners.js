@@ -324,12 +324,13 @@ function renderPartners() {
         const contactCell = hasConf
             ? `<button class="btn btn-sm" onclick="openContactModal('${p.id}')">👤 ${contacts.length ? contacts.length + '명' : '추가'}</button>${contacts.length ? `<div class="dim" style="font-size:0.75rem;margin-top:3px">${escapeHtml(contacts.map(c => c.name || c.phone || c.email).filter(Boolean).join(', '))}</div>` : ''}`
             : '<span class="dim">-</span>';
+        // '등급 (이 행사)'는 이 행사에 참가한 회사만 표시. 미참가/신청전은 타 행사·마스터 등급을 표시하지 않고 '-'.
         const gradeCell = joined
             ? `<select class="row-grade" onchange="setPartnerGrade('${p.id}', this.value)">
                     <option value="">(등급 없음)</option>
                     ${BOOTH.grades.map(g => `<option value="${escapeHtml(g)}" ${g === grade ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}
                </select>`
-            : (grade ? `<span class="grade-badge" style="opacity:.5" title="참가 후 이 행사 등급을 지정하세요">${escapeHtml(grade)}</span>` : '<span class="dim">-</span>');
+            : '<span class="dim">-</span>';
         return `
         <tr class="${joined ? 'row-joined' : isPre ? 'row-pre' : ''}">
             <td>
@@ -347,7 +348,7 @@ function renderPartners() {
             <td><span class="count-pill">${prods.length}</span> <span style="color:var(--text-dim);font-size:0.82rem">${prodText}</span></td>
             <td>${gradeCell}</td>
             <td>${contactCell}</td>
-            <td>${tags || '<span class="dim">-</span>'}</td>
+            <td>${joined ? (tags || '<span class="dim">-</span>') : '<span class="dim">-</span>'}</td>
             <td>
                 <div class="row-actions">
                     <button class="btn btn-sm" onclick="editPartner('${p.id}')">수정</button>
