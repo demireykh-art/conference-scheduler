@@ -109,6 +109,12 @@
 
     function renderSession(room, s) {
         const lang = effLang(room, s);
+        // 오픈렉처(세션없음): 세션 헤더(이름·시간·좌장) 없이 강의만 나열
+        if (room && room.sessionless) {
+            const rows = s.lectures.map(lec => renderLecture(lec, lang)).join('') ||
+                `<div class="ag-empty">강의가 없습니다.</div>`;
+            return `<div class="ag-session ag-sessionless">${rows}</div>`;
+        }
         const time = `${fmt(s._start)}–${fmt(s._end)}`;
         let mod = '';
         const mods = Array.isArray(s.moderators)
