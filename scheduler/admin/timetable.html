@@ -229,6 +229,18 @@
         </div>
     </div>
 
+    <!-- ================= 룸 휴지통 (삭제 룸 복원) ================= -->
+    <div class="modal-overlay" id="trashModal">
+        <div class="modal" style="max-width:520px">
+            <h3>🗑 룸 휴지통</h3>
+            <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px">삭제한 룸이 여기 보관됩니다. <b>복원</b>하면 세션·강의·좌장이 그대로 되살아납니다. (완전삭제는 되돌릴 수 없습니다.)</div>
+            <div id="trashList"></div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeTrashModal()">닫기</button>
+            </div>
+        </div>
+    </div>
+
     <script src="../js/config.js"></script>
     <script src="js/admin-common.js"></script>
     <script src="js/version.js"></script>

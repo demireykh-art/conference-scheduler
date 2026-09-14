@@ -282,7 +282,9 @@ function renderRoomTabs(rooms) {
         return `<div class="room-tab-row">${label}<div class="room-tab-scroll">${g.rooms.map(tabBtn).join('')}</div></div>`;
     }).join('');
 
-    box.innerHTML = rowsHtml + `<div class="room-tab-row addrow"><button class="room-tab add-tab" onclick="openRoomModal()">+ 룸 추가</button></div>`;
+    const trashCount = (CONF && CONF.roomTrash) ? Object.keys(CONF.roomTrash).length : 0;
+    const trashBtn = trashCount ? `<button class="room-tab trash-tab" onclick="openTrashModal()" title="삭제된 룸 복원">🗑 휴지통 ${trashCount}</button>` : '';
+    box.innerHTML = rowsHtml + `<div class="room-tab-row addrow"><button class="room-tab add-tab" onclick="openRoomModal()">+ 룸 추가</button>${trashBtn}</div>`;
 
     // 각 날짜(줄) 스크롤 컨테이너 안에서만 드래그 정렬 (줄 간 이동은 자연 차단) — 순서는 전역으로 저장
     box.querySelectorAll('.room-tab-scroll').forEach(sc => {
@@ -648,13 +650,92 @@ window.saveNewRoom = function () {
 window.deleteRoom = async function (id) {
     if (!AdminAuth.requireEdit()) return;
     const r = getRoom(id);
-    const ok = await confirmDialog(`"${r ? r.name : ''}" 룸을 삭제할까요?\n포함된 세션·강의가 모두 삭제됩니다.`, { danger: true, okText: '삭제' });
+    const ok = await confirmDialog(`"${r ? r.name : ''}" 룸을 삭제할까요?\n포함된 세션·강의가 함께 삭제됩니다.\n(휴지통으로 이동되어 나중에 복원할 수 있습니다.)`, { danger: true, okText: '삭제' });
     if (!ok) return;
     CURRENT_ROOM = null;
-    confRef().child('rooms/' + id).remove().then(() => {
-        logActivity('delete', 'room', `룸 "${r ? r.name : ''}" 삭제`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
-        Toast.success('삭제되었습니다.');
-    });
+    const roomData = (CONF.rooms && CONF.rooms[id]) || {};   // 원본 데이터(id 키 제외)
+    const u = (window.AdminAuth && AdminAuth.user) || {};
+    const updates = {};
+    updates['roomTrash/' + id] = {
+        room: roomData,
+        roomName: (r && r.name) || '',
+        date: (r && r.date) || '',
+        deletedAt: firebase.database.ServerValue.TIMESTAMP,
+        deletedByUid: u.uid || '',
+        deletedByName: u.displayName || u.email || ''
+    };
+    updates['rooms/' + id] = null;
+    confRef().update(updates).then(() => {
+        logActivity('delete', 'room', `룸 "${r ? r.name : ''}" 삭제(휴지통 이동)`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
+        Toast.success('휴지통으로 옮겼습니다. 휴지통에서 복원할 수 있습니다.');
+    }).catch(e => Toast.error('삭제 실패: ' + e.message));
+};
+
+/* ---------- 룸 휴지통 (삭제 룸 복원/완전삭제) ---------- */
+window.openTrashModal = function () {
+    renderTrashList();
+    document.getElementById('trashModal').classList.add('open');
+};
+window.closeTrashModal = function () { document.getElementById('trashModal').classList.remove('open'); };
+function fmtTrashTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts); if (isNaN(d)) return '';
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function renderTrashList() {
+    const box = document.getElementById('trashList');
+    if (!box) return;
+    const trash = (CONF && CONF.roomTrash) || {};
+    const items = Object.entries(trash).map(([id, t]) => ({ id, ...t }))
+        .sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
+    if (!items.length) {
+        box.innerHTML = '<div class="empty-state" style="padding:24px">휴지통이 비어 있습니다. 삭제한 룸이 여기로 옮겨집니다.</div>';
+        return;
+    }
+    box.innerHTML = items.map(t => {
+        const room = t.room || {};
+        const sessCnt = room.sessions ? Object.keys(room.sessions).length : 0;
+        let lecCnt = 0;
+        if (room.sessions) Object.values(room.sessions).forEach(s => { if (s.lectures) lecCnt += Object.keys(s.lectures).length; });
+        return `<div class="trash-row">
+            <div class="trash-info">
+                <div class="trash-name">${escapeHtml(t.roomName || room.name || '(이름 없음)')}${t.date ? ` <span class="dim">· ${escapeHtml(t.date)}</span>` : ''}</div>
+                <div class="dim" style="font-size:0.8rem">세션 ${sessCnt} · 강의 ${lecCnt} · 삭제: ${escapeHtml(t.deletedByName || '알 수 없음')} · ${fmtTrashTime(t.deletedAt)}</div>
+            </div>
+            <div class="trash-actions">
+                <button class="btn btn-sm btn-primary" onclick="restoreRoom('${t.id}')">복원</button>
+                <button class="btn btn-sm btn-danger-ghost" onclick="purgeRoom('${t.id}')">완전삭제</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+window.restoreRoom = function (id) {
+    if (!AdminAuth.requireEdit()) return;
+    const t = ((CONF && CONF.roomTrash) || {})[id];
+    if (!t) { Toast.error('휴지통 항목을 찾을 수 없습니다.'); return; }
+    const room = Object.assign({}, t.room || {});
+    room.order = orderedRooms().length;   // 맨 뒤에 복원
+    const updates = {};
+    updates['rooms/' + id] = room;
+    updates['roomTrash/' + id] = null;
+    confRef().update(updates).then(() => {
+        logActivity('create', 'room', `룸 "${t.roomName || room.name || ''}" 휴지통에서 복원`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
+        Toast.success('복원되었습니다.');
+        CURRENT_ROOM = id;
+        renderTrashList();
+    }).catch(e => Toast.error('복원 실패: ' + e.message));
+};
+window.purgeRoom = async function (id) {
+    if (!AdminAuth.requireEdit()) return;
+    const t = ((CONF && CONF.roomTrash) || {})[id];
+    const ok = await confirmDialog(`"${t ? (t.roomName || '') : ''}" 룸을 휴지통에서 완전히 삭제할까요?\n이 작업은 되돌릴 수 없습니다.`, { danger: true, okText: '완전 삭제' });
+    if (!ok) return;
+    confRef().child('roomTrash/' + id).remove().then(() => {
+        logActivity('delete', 'room', `룸 "${t ? (t.roomName || '') : ''}" 휴지통에서 완전 삭제`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
+        Toast.success('완전히 삭제되었습니다.');
+        renderTrashList();
+    }).catch(e => Toast.error('삭제 실패: ' + e.message));
 };
 
 function persistRoomOrder(ids) {

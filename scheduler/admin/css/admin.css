@@ -1503,3 +1503,13 @@ html.modal-open, body.modal-open { overflow: hidden; }
 .session-mod { flex-wrap: wrap; }
 .mod-label { font-size: 0.8rem; font-weight: 600; color: var(--text); }
 .mod-sep { color: var(--text-dim); }
+
+/* 룸 휴지통 */
+.room-tab.trash-tab { color: #b7791f; font-weight: 600; }
+.room-tab.trash-tab:hover { background: #fbf1df; }
+#trashList { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; }
+.trash-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 13px; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+.trash-info { min-width: 0; }
+.trash-name { font-weight: 700; font-size: 0.92rem; }
+.trash-name .dim { font-weight: 400; color: var(--text-dim); }
+.trash-actions { display: flex; gap: 6px; flex-shrink: 0; }
