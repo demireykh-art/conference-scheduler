@@ -507,9 +507,33 @@ window.duplicateRoom = function () {
         .catch(e => Toast.error('복제 실패: ' + e.message));
 };
 
+// 룸 설정 변경 이력용 — 항목명/표시값
+const ROOM_FIELD_LABEL = { name: '이름', topic: '주제', date: '날짜', startTime: '시작시간', lang: '표시언어', kmaSubmit: '의협제출', agendaOwner: '아젠다담당', visible: '표시여부' };
+function roomFieldDisp(field, v) {
+    if (field === 'date') return v ? dayLabel(v) : '날짜미정';
+    if (field === 'lang') return v === 'en' ? '영어(EN)' : '한글';
+    if (field === 'kmaSubmit') return v ? 'ON' : 'OFF';
+    if (field === 'visible') return v === false ? '숨김' : '표시';
+    const s = (v == null ? '' : String(v)).trim();
+    return s === '' ? '(비어있음)' : s;
+}
+
 window.updateRoom = function (field, value) {
     if (!AdminAuth.requireEdit()) { renderRoomSettings(); return; }
-    confRef().child('rooms/' + CURRENT_ROOM + '/' + field).set(value)
+    const room = getRoom(CURRENT_ROOM);
+    const roomId = CURRENT_ROOM;
+    const before = room ? room[field] : undefined;
+    confRef().child('rooms/' + roomId + '/' + field).set(value)
+        .then(() => {
+            // 사람이 보는 값이 실제로 바뀐 경우에만 변경이력 기록 (이전값 → 새값)
+            if (!room) return;
+            const b = roomFieldDisp(field, before), a = roomFieldDisp(field, value);
+            if (b === a) return;
+            const rn = room.name || '룸';
+            logActivity('update', 'room',
+                `룸 "${rn}" ${ROOM_FIELD_LABEL[field] || field} 변경: ${b} → ${a}`,
+                { confId: CONF_ID, confTitle: ctitle(), entityId: roomId });
+        })
         .catch(e => Toast.error('저장 실패: ' + e.message));
 };
 
