@@ -1524,3 +1524,10 @@ html.modal-open, body.modal-open { overflow: hidden; }
 .import-sess { margin: 4px 0 0; padding-left: 18px; }
 .import-sess li { font-size: 0.84rem; padding: 1px 0; }
 .import-sess .dim { color: var(--text-dim); }
+
+/* 엑셀 가져오기 — 룸 선택 */
+.import-room-head { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.import-room-head input[type="checkbox"] { width: auto; flex: 0 0 auto; }
+.import-room.imp-dup { opacity: 0.7; }
+.imp-exists { font-size: 0.68rem; font-weight: 700; color: #b7791f; background: #fbf1df; padding: 2px 7px; border-radius: 999px; }
+.imp-new { font-size: 0.68rem; font-weight: 700; color: #1F8A5B; background: #e6f4ec; padding: 2px 7px; border-radius: 999px; }

@@ -875,6 +875,14 @@ window.handleImportFile = function (input) {
     };
     reader.readAsArrayBuffer(f);
 };
+function roomExistsInConf(pr) {
+    return orderedRooms().some(r => (r.name || '').trim() === (pr.name || '').trim() && (r.date || '') === (pr.date || ''));
+}
+function updateImportBtn() {
+    const n = document.querySelectorAll('.imp-pick:checked').length;
+    const btn = document.getElementById('importDoBtn');
+    if (btn) { btn.disabled = n === 0; btn.textContent = n ? `가져오기 — ${n}개 룸 생성` : '가져오기(생성)'; }
+}
 function renderImportPreview() {
     const box = document.getElementById('importPreview');
     const btn = document.getElementById('importDoBtn');
@@ -883,7 +891,8 @@ function renderImportPreview() {
         if (btn) btn.disabled = true; return;
     }
     const unSpk = new Set(), unPtr = new Set();
-    const html = IMPORT_PARSED.map(pr => {
+    const html = IMPORT_PARSED.map((pr, idx) => {
+        const exists = roomExistsInConf(pr);
         let lecCnt = 0;
         const sess = pr.sessions.map(s => {
             lecCnt += s.lectures.length;
@@ -895,24 +904,32 @@ function renderImportPreview() {
             const mod = (s.moderators || []).map(m => m.nameKo).filter(Boolean).join(', ');
             return `<li>${escapeHtml(s.name || '(세션)')} <span class="dim">— 강의 ${s.lectures.length}${mod ? ` · 좌장 ${escapeHtml(mod)}` : ''}</span></li>`;
         }).join('');
-        return `<div class="import-room"><div class="import-room-head"><b>${escapeHtml(pr.name)}</b> <span class="dim">· ${escapeHtml(pr.date || '')} · 세션 ${pr.sessions.length} · 강의 ${lecCnt}</span></div><ul class="import-sess">${sess}</ul></div>`;
+        return `<div class="import-room ${exists ? 'imp-dup' : ''}">
+            <label class="import-room-head">
+                <input type="checkbox" class="imp-pick" data-i="${idx}" ${exists ? '' : 'checked'}>
+                <b>${escapeHtml(pr.name)}</b> <span class="dim">· ${escapeHtml(pr.date || '')} · 세션 ${pr.sessions.length} · 강의 ${lecCnt}</span>
+                ${exists ? '<span class="imp-exists">이미 있음</span>' : '<span class="imp-new">복원 대상</span>'}
+            </label>
+            <ul class="import-sess">${sess}</ul></div>`;
     }).join('');
     const warn = (unSpk.size || unPtr.size)
-        ? `<div class="import-warn">⚠️ 마스터에 없는 이름은 <b>텍스트로만</b> 저장됩니다(사진·최신 연동 없음). 미매칭 연자 ${unSpk.size}명, 파트너 ${unPtr.size}곳. 연자/파트너 관리에 먼저 등록하면 자동 연결됩니다.</div>`
-        : `<div class="dim" style="font-size:0.82rem;margin-bottom:8px">✅ 모든 연자·파트너가 마스터와 연결됩니다.</div>`;
-    box.innerHTML = warn + html;
-    if (btn) btn.disabled = false;
+        ? `<div class="import-warn">⚠️ 마스터에 없는 이름은 <b>텍스트로만</b> 저장됩니다(사진·최신 연동 없음). 미매칭 연자 ${unSpk.size}명, 파트너 ${unPtr.size}곳. 연자/파트너 관리에 먼저 등록하면 자동 연결됩니다.</div>` : '';
+    box.innerHTML = `<div class="dim" style="font-size:0.82rem;margin-bottom:8px">가져올(복원할) 룸만 체크하세요. <b>이미 있음</b>으로 표시된 룸을 체크하면 같은 이름 룸이 하나 더 생깁니다(중복). 기본값은 <b>없는 룸만</b> 체크되어 있습니다.</div>` + warn + html;
+    box.querySelectorAll('.imp-pick').forEach(c => c.addEventListener('change', updateImportBtn));
+    updateImportBtn();
 }
 window.doImport = function () {
     if (!AdminAuth.requireEdit()) return;
     if (!CONF_ID) { Toast.error('행사를 먼저 선택하세요.'); return; }
     if (!IMPORT_PARSED || !IMPORT_PARSED.length) { Toast.warning('가져올 데이터가 없습니다.'); return; }
+    const picks = [...document.querySelectorAll('.imp-pick:checked')].map(c => Number(c.dataset.i));
+    if (!picks.length) { Toast.warning('가져올 룸을 선택하세요.'); return; }
     const base = orderedRooms().length;
     const updates = {};
-    IMPORT_PARSED.forEach((pr, i) => { updates['rooms/' + uuid()] = buildImportRoom(pr, base + i); });
+    picks.forEach((i, k) => { updates['rooms/' + uuid()] = buildImportRoom(IMPORT_PARSED[i], base + k); });
     confRef().update(updates).then(() => {
-        IMPORT_PARSED.forEach(pr => logActivity('create', 'room', `룸 "${pr.name}" 엑셀 가져오기로 생성/복원`, { confId: CONF_ID, confTitle: ctitle() }));
-        Toast.success(`가져오기 완료 — 룸 ${IMPORT_PARSED.length}개 생성`);
+        picks.forEach(i => logActivity('create', 'room', `룸 "${IMPORT_PARSED[i].name}" 엑셀 가져오기로 생성/복원`, { confId: CONF_ID, confTitle: ctitle() }));
+        Toast.success(`가져오기 완료 — 룸 ${picks.length}개 생성`);
         closeImportModal();
     }).catch(e => Toast.error('가져오기 실패: ' + e.message));
 };
