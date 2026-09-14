@@ -284,7 +284,8 @@ function renderRoomTabs(rooms) {
 
     const trashCount = (CONF && CONF.roomTrash) ? Object.keys(CONF.roomTrash).length : 0;
     const trashBtn = trashCount ? `<button class="room-tab trash-tab" onclick="openTrashModal()" title="삭제된 룸 복원">🗑 휴지통 ${trashCount}</button>` : '';
-    box.innerHTML = rowsHtml + `<div class="room-tab-row addrow"><button class="room-tab add-tab" onclick="openRoomModal()">+ 룸 추가</button>${trashBtn}</div>`;
+    const importBtn = `<button class="room-tab import-tab" onclick="openImportModal()" title="전체강의 엑셀 파일로 룸 가져오기/복원">📥 엑셀 가져오기</button>`;
+    box.innerHTML = rowsHtml + `<div class="room-tab-row addrow"><button class="room-tab add-tab" onclick="openRoomModal()">+ 룸 추가</button>${importBtn}${trashBtn}</div>`;
 
     // 각 날짜(줄) 스크롤 컨테이너 안에서만 드래그 정렬 (줄 간 이동은 자연 차단) — 순서는 전역으로 저장
     box.querySelectorAll('.room-tab-scroll').forEach(sc => {
@@ -736,6 +737,201 @@ window.purgeRoom = async function (id) {
         Toast.success('완전히 삭제되었습니다.');
         renderTrashList();
     }).catch(e => Toast.error('삭제 실패: ' + e.message));
+};
+
+/* ============================================================
+   엑셀로 룸 가져오기 (전체강의 엑셀 22열 형식 → 룸 생성/복원)
+   하드코딩이 아니라 파일을 파싱해 데이터로 넣는다.
+   ============================================================ */
+let IMPORT_PARSED = null;
+function impMatchSpeaker(nameKo) {
+    const n = (nameKo || '').trim(); if (!n) return null;
+    return (Masters.speakers || []).find(s => (s.nameKo || '').trim() === n) || null;
+}
+function impMatchPartner(nameKo) {
+    const n = (nameKo || '').trim(); if (!n) return null;
+    return (Masters.partners || []).find(p => (p.nameKo || '').trim() === n) || null;
+}
+function impClassify(titleKo, titleEn, hasSpeaker, partner) {
+    const t = ((titleKo || '') + ' ' + (titleEn || '')).toLowerCase();
+    if (/q&a|panel|패널/.test(t)) return 'panel';
+    if (!hasSpeaker && !partner && /coffee break|\bbreak\b|휴식|점심|lunch|opening|closing|개회|폐회|registration|등록|welcome|networking|리셉션|reception/.test(t)) return 'break';
+    return 'lecture';
+}
+function impParseMods(ko, en, affKo, affEn) {
+    if (!ko) return [];
+    const names = ko.split(/\s*,\s*/).filter(Boolean);
+    const ens = (en || '').split(/\s*,\s*/);
+    const affs = (affKo || '').split(/\s*\/\s*|\s*,\s*/);
+    const affEns = (affEn || '').split(/\s*\/\s*|\s*,\s*/);
+    return names.slice(0, 2).map((nm, i) => {
+        const m = impMatchSpeaker(nm);
+        return {
+            id: m ? m.id : '', nameKo: nm.trim(),
+            nameEn: (ens[i] || '').trim() || (m ? (m.nameEn || '') : ''),
+            affiliationKo: (affs[i] || '').trim() || (m ? (m.affiliationKo || '') : ''),
+            affiliationEn: (affEns[i] || '').trim() || (m ? (m.affiliationEn || '') : '')
+        };
+    });
+}
+function impParseSpeakers(ko, en, affKo, affEn) {
+    const names = (ko || '').split(/\s*[;,]\s*/).map(x => x.trim()).filter(Boolean);
+    const ens = (en || '').split(/\s*[;,]\s*/);
+    const affs = (affKo || '').split(/\s*[;,]\s*/);
+    const affEns = (affEn || '').split(/\s*[;,]\s*/);
+    if (!names.length) { if ((en || '').trim()) names.push(''); else return []; }
+    return names.map((nm, i) => {
+        const m = impMatchSpeaker(nm);
+        return {
+            id: m ? m.id : '', nameKo: nm,
+            nameEn: (ens[i] || '').trim() || (m ? (m.nameEn || '') : ''),
+            affiliationKo: (affs[i] || '').trim() || (m ? (m.affiliationKo || '') : ''),
+            affiliationEn: (affEns[i] || '').trim() || (m ? (m.affiliationEn || '') : '')
+        };
+    });
+}
+function parseImportRows(aoa) {
+    const cell = (r, i) => String((r && r[i] != null) ? r[i] : '').trim();
+    let start = 0;
+    if (aoa.length && cell(aoa[0], 0) === '룸') start = 1;
+    const rows = aoa.slice(start).filter(r => r && r.some(c => String(c || '').trim() !== ''));
+    const rooms = []; let curRoom = null, curSession = null, lastRoomKey = null, lastSessName = null;
+    rows.forEach(r => {
+        const roomName = cell(r, 0), date = cell(r, 1);
+        if (!roomName) return;
+        const roomKey = roomName + '||' + date;
+        const sessName = cell(r, 2), sessEn = cell(r, 3);
+        const lang = (cell(r, 8) === '영어' || /^en/i.test(cell(r, 8))) ? 'en' : 'ko';
+        const startT = cell(r, 9);
+        const dur = parseInt(cell(r, 11), 10);
+        const titleKo = cell(r, 12), titleEn = cell(r, 13);
+        if (roomKey !== lastRoomKey) {
+            curRoom = { name: roomName, date, startTime: startT || '09:00', lang, sessions: [] };
+            rooms.push(curRoom); lastRoomKey = roomKey; lastSessName = null; curSession = null;
+        }
+        if (sessName !== lastSessName || !curSession) {
+            curSession = { name: sessName, nameEn: sessEn, lang, moderators: impParseMods(cell(r, 4), cell(r, 5), cell(r, 6), cell(r, 7)), lectures: [] };
+            curRoom.sessions.push(curSession); lastSessName = sessName;
+        } else if ((!curSession.moderators || !curSession.moderators.length) && cell(r, 4)) {
+            curSession.moderators = impParseMods(cell(r, 4), cell(r, 5), cell(r, 6), cell(r, 7));
+        }
+        if (titleKo === '(좌장만 지정된 세션)') return;
+        if (!titleKo && !titleEn && (isNaN(dur) || !dur)) return;
+        const hasSpk = !!cell(r, 14), partner = cell(r, 18);
+        const kind = impClassify(titleKo, titleEn, hasSpk, partner);
+        const lec = { duration: isNaN(dur) ? 0 : dur, titleKo, titleEn };
+        if (kind === 'break') lec.isBreak = true;
+        else if (kind === 'panel') lec.isPanel = true;
+        else {
+            lec.speakers = impParseSpeakers(cell(r, 14), cell(r, 15), cell(r, 16), cell(r, 17));
+            const pm = impMatchPartner(partner);
+            lec.partnerId = pm ? pm.id : '';
+            lec.partnerKo = partner;
+            lec.partnerEn = pm ? (pm.nameEn || '') : '';
+            lec.productKo = cell(r, 19);
+            lec.productCategory = cell(r, 20);
+            lec.productDesc = cell(r, 21);
+        }
+        curSession.lectures.push(lec);
+    });
+    return rooms;
+}
+function buildImportRoom(pr, orderIndex) {
+    const room = { name: pr.name, date: pr.date || '', startTime: pr.startTime || '09:00', order: orderIndex, sessions: {} };
+    if (pr.lang === 'en') room.lang = 'en';
+    pr.sessions.forEach((s, si) => {
+        const sess = { name: s.name || '', order: si };
+        if (s.nameEn) sess.nameEn = s.nameEn;
+        if (s.moderators && s.moderators.length) sess.moderators = s.moderators;
+        if ((s.lang || 'ko') !== (pr.lang || 'ko')) { sess.lang = s.lang; sess.langExcluded = true; }
+        sess.lectures = {};
+        s.lectures.forEach((l, li) => { sess.lectures[uuid()] = Object.assign({ order: li }, l); });
+        room.sessions[uuid()] = sess;
+    });
+    return room;
+}
+window.openImportModal = function () {
+    if (!AdminAuth.requireEdit()) return;
+    IMPORT_PARSED = null;
+    const inp = document.getElementById('importFile'); if (inp) inp.value = '';
+    const box = document.getElementById('importPreview');
+    if (box) box.innerHTML = '<div class="dim" style="padding:16px">‘전체강의 엑셀’로 받은 파일(.xlsx)을 선택하면 미리보기가 표시됩니다.</div>';
+    const btn = document.getElementById('importDoBtn'); if (btn) btn.disabled = true;
+    document.getElementById('importModal').classList.add('open');
+};
+window.closeImportModal = function () { document.getElementById('importModal').classList.remove('open'); };
+window.handleImportFile = function (input) {
+    const f = input.files && input.files[0]; if (!f) return;
+    if (typeof XLSX === 'undefined') { Toast.error('엑셀 모듈을 불러오지 못했습니다.'); return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' });
+            IMPORT_PARSED = parseImportRows(aoa);
+            renderImportPreview();
+        } catch (x) { Toast.error('엑셀 파싱 실패: ' + x.message); }
+    };
+    reader.readAsArrayBuffer(f);
+};
+function roomExistsInConf(pr) {
+    return orderedRooms().some(r => (r.name || '').trim() === (pr.name || '').trim() && (r.date || '') === (pr.date || ''));
+}
+function updateImportBtn() {
+    const n = document.querySelectorAll('.imp-pick:checked').length;
+    const btn = document.getElementById('importDoBtn');
+    if (btn) { btn.disabled = n === 0; btn.textContent = n ? `가져오기 — ${n}개 룸 생성` : '가져오기(생성)'; }
+}
+function renderImportPreview() {
+    const box = document.getElementById('importPreview');
+    const btn = document.getElementById('importDoBtn');
+    if (!IMPORT_PARSED || !IMPORT_PARSED.length) {
+        box.innerHTML = '<div class="empty-state" style="padding:20px">인식된 데이터가 없습니다. ‘전체강의 엑셀’ 형식(룸·날짜·세션…제목…) 파일인지 확인하세요.</div>';
+        if (btn) btn.disabled = true; return;
+    }
+    const unSpk = new Set(), unPtr = new Set();
+    const html = IMPORT_PARSED.map((pr, idx) => {
+        const exists = roomExistsInConf(pr);
+        let lecCnt = 0;
+        const sess = pr.sessions.map(s => {
+            lecCnt += s.lectures.length;
+            s.lectures.forEach(l => {
+                (l.speakers || []).forEach(sp => { if (sp.nameKo && !sp.id) unSpk.add(sp.nameKo); });
+                if (l.partnerKo && !l.partnerId) unPtr.add(l.partnerKo);
+            });
+            (s.moderators || []).forEach(m => { if (m.nameKo && !m.id) unSpk.add(m.nameKo); });
+            const mod = (s.moderators || []).map(m => m.nameKo).filter(Boolean).join(', ');
+            return `<li>${escapeHtml(s.name || '(세션)')} <span class="dim">— 강의 ${s.lectures.length}${mod ? ` · 좌장 ${escapeHtml(mod)}` : ''}</span></li>`;
+        }).join('');
+        return `<div class="import-room ${exists ? 'imp-dup' : ''}">
+            <label class="import-room-head">
+                <input type="checkbox" class="imp-pick" data-i="${idx}" ${exists ? '' : 'checked'}>
+                <b>${escapeHtml(pr.name)}</b> <span class="dim">· ${escapeHtml(pr.date || '')} · 세션 ${pr.sessions.length} · 강의 ${lecCnt}</span>
+                ${exists ? '<span class="imp-exists">이미 있음</span>' : '<span class="imp-new">복원 대상</span>'}
+            </label>
+            <ul class="import-sess">${sess}</ul></div>`;
+    }).join('');
+    const warn = (unSpk.size || unPtr.size)
+        ? `<div class="import-warn">⚠️ 마스터에 없는 이름은 <b>텍스트로만</b> 저장됩니다(사진·최신 연동 없음). 미매칭 연자 ${unSpk.size}명, 파트너 ${unPtr.size}곳. 연자/파트너 관리에 먼저 등록하면 자동 연결됩니다.</div>` : '';
+    box.innerHTML = `<div class="dim" style="font-size:0.82rem;margin-bottom:8px">가져올(복원할) 룸만 체크하세요. <b>이미 있음</b>으로 표시된 룸을 체크하면 같은 이름 룸이 하나 더 생깁니다(중복). 기본값은 <b>없는 룸만</b> 체크되어 있습니다.</div>` + warn + html;
+    box.querySelectorAll('.imp-pick').forEach(c => c.addEventListener('change', updateImportBtn));
+    updateImportBtn();
+}
+window.doImport = function () {
+    if (!AdminAuth.requireEdit()) return;
+    if (!CONF_ID) { Toast.error('행사를 먼저 선택하세요.'); return; }
+    if (!IMPORT_PARSED || !IMPORT_PARSED.length) { Toast.warning('가져올 데이터가 없습니다.'); return; }
+    const picks = [...document.querySelectorAll('.imp-pick:checked')].map(c => Number(c.dataset.i));
+    if (!picks.length) { Toast.warning('가져올 룸을 선택하세요.'); return; }
+    const base = orderedRooms().length;
+    const updates = {};
+    picks.forEach((i, k) => { updates['rooms/' + uuid()] = buildImportRoom(IMPORT_PARSED[i], base + k); });
+    confRef().update(updates).then(() => {
+        picks.forEach(i => logActivity('create', 'room', `룸 "${IMPORT_PARSED[i].name}" 엑셀 가져오기로 생성/복원`, { confId: CONF_ID, confTitle: ctitle() }));
+        Toast.success(`가져오기 완료 — 룸 ${picks.length}개 생성`);
+        closeImportModal();
+    }).catch(e => Toast.error('가져오기 실패: ' + e.message));
 };
 
 function persistRoomOrder(ids) {
