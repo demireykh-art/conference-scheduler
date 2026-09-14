@@ -257,6 +257,7 @@ function renderPool() {
         const cats = (l.categories || []).map(c => `<span class="chip cat">${escapeHtml(c)}</span>`).join('');
         const tags = (l.tags || []).map(t => `<span class="chip tag">${escapeHtml(t)}</span>`).join('');
         const types = (l.types || []).map(t => `<span class="chip type">${escapeHtml(t)}</span>`).join('');
+        const memoHtml = l.memo ? `<div class="lec-memo" title="메모">📝 ${escapeHtml(l.memo)}</div>` : '';
         const spk = (l.speakers || []).map(s => escapeHtml(s.nameKo || s.nameEn)).join(', ') || '<span class="dim">-</span>';
         const pp = [l.partnerKo, l.productKo].filter(Boolean).map(escapeHtml).join(' · ') || '<span class="dim">-</span>';
         const spots = placedMap[l.id] || [];
@@ -268,7 +269,7 @@ function renderPool() {
         return `
         <tr class="${isDup ? 'lec-dup-row' : ''}">
             <td data-label="제목"><b>${escapeHtml(l.titleKo || '(제목 없음)')}</b>${l.titleEn ? `<div class="dim" style="font-size:0.8rem">${escapeHtml(l.titleEn)}</div>` : ''}</td>
-            <td data-label="분류·태그"><div class="chips" style="margin:0">${types || ''}${cats || ''}${tags || ''}</div></td>
+            <td data-label="분류·태그"><div class="chips" style="margin:0">${types || ''}${cats || ''}${tags || ''}</div>${memoHtml}</td>
             <td data-label="연자">${spk}</td>
             <td data-label="파트너·제품" class="dim" style="font-size:0.82rem">${pp}</td>
             <td data-label="시간" style="text-align:center">${l.duration || 0}분</td>
@@ -493,6 +494,7 @@ window.openLectureModal = function () {
     populateMasterSelects();
     document.getElementById('lecTitleKo').value = '';
     document.getElementById('lecTitleEn').value = '';
+    document.getElementById('lecMemo').value = '';
     document.getElementById('lecDuration').value = 20;
     catDraft = []; tagDraft = []; spkDraft = []; partnerDraft = null;
     setTypes([]);
@@ -514,6 +516,7 @@ window.editLecture = function (id) {
     populateMasterSelects();
     document.getElementById('lecTitleKo').value = l.titleKo || '';
     document.getElementById('lecTitleEn').value = l.titleEn || '';
+    document.getElementById('lecMemo').value = l.memo || '';
     document.getElementById('lecDuration').value = l.duration ?? 20;
     catDraft = [...(l.categories || [])];
     tagDraft = [...(l.tags || [])];
@@ -556,6 +559,7 @@ function buildLectureData() {
     return {
         titleKo: document.getElementById('lecTitleKo').value.trim(),
         titleEn: document.getElementById('lecTitleEn').value.trim(),
+        memo: document.getElementById('lecMemo').value.trim(),
         duration: Number(document.getElementById('lecDuration').value) || 0,
         categories: [...catDraft],
         tags: [...tagDraft],

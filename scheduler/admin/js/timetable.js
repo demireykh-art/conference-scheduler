@@ -1148,6 +1148,8 @@ function renderLectureRow(roomId, sessionId, lec, lang) {
     }
     // 제목도 강의 풀(최신)에서 우선 조회 후 사본으로 폴백
     const pool = lec.lectureId ? POOL.find(p => p.id === lec.lectureId) : null;
+    const memoVal = (pool && pool.memo) || lec.memo || '';
+    const memoHtml = memoVal ? `<div class="lec-memo" title="메모">📝 ${escapeHtml(memoVal)}</div>` : '';
     const titleKo = (pool && pool.titleKo) || n.titleKo;
     const titleEn = (pool && pool.titleEn) || n.titleEn;
     const title = escapeHtml(pickLang(lang, titleKo, titleEn) || '(제목 없음)');
@@ -1168,6 +1170,7 @@ function renderLectureRow(roomId, sessionId, lec, lang) {
             ${subtitle ? `<div class="lec-subtitle">${escapeHtml(subtitle)}</div>` : ''}
             <div class="lec-speaker">연자: ${speakers}</div>
             ${product}
+            ${memoHtml}
         </div>
         <div class="lec-actions">
             <button class="txt-btn" onclick="openMoveModal('${roomId}','${sessionId}','${lec.id}')">이동</button>
@@ -1552,6 +1555,7 @@ window.placeLecture = async function (poolId) {
     const data = {
         lectureId: pool.id,
         titleKo: pool.titleKo || '', titleEn: pool.titleEn || '',
+        memo: pool.memo || '',
         duration: Number(pool.duration) || 0,
         categories: pool.categories || [], tags: pool.tags || [], types: pool.types || [],
         speakers: (pool.speakers || []).map(s => ({ ...s })),
