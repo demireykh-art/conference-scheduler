@@ -167,12 +167,14 @@
             partner ? `<span class="ag-partner">🏢 ${esc(partner)}</span>` : '',
             product ? `<span class="ag-product">💊 ${esc(product)}</span>` : ''
         ].filter(Boolean).join('');
+        const memo = lec.memo ? `<div class="ag-memo">📝 ${esc(lec.memo)}</div>` : '';
         return `<div class="ag-lec">
             <div class="ag-time">${time}</div>
             <div class="ag-lec-main">
                 <div class="ag-lec-title">${title}</div>
                 ${spkHtml ? `<div class="ag-lec-spk">${spkHtml}</div>` : ''}
                 ${meta ? `<div class="ag-lec-meta">${meta}</div>` : ''}
+                ${memo}
             </div>
         </div>`;
     }
