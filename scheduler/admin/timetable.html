@@ -229,6 +229,21 @@
         </div>
     </div>
 
+    <!-- ================= 엑셀로 룸 가져오기 ================= -->
+    <div class="modal-overlay" id="importModal">
+        <div class="modal" style="max-width:560px">
+            <h3>📥 엑셀로 룸 가져오기</h3>
+            <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px">‘강의 목록 다운 → 전체강의 엑셀’로 받은 파일(.xlsx)을 선택하면, 그 안의 <b>룸·세션·강의·좌장·연자·파트너·제품</b>을 이 행사에 그대로 <b>생성(복원)</b>합니다. 연자·파트너는 이름으로 마스터와 자동 연결됩니다.</div>
+            <input type="file" id="importFile" accept=".xlsx,.xls,.csv" onchange="handleImportFile(this)"
+                style="display:block;margin-bottom:12px;font-size:0.86rem">
+            <div id="importPreview" style="max-height:52vh;overflow-y:auto"></div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeImportModal()">취소</button>
+                <button class="btn btn-primary" id="importDoBtn" onclick="doImport()" disabled>가져오기(생성)</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ================= 룸 휴지통 (삭제 룸 복원) ================= -->
     <div class="modal-overlay" id="trashModal">
         <div class="modal" style="max-width:520px">

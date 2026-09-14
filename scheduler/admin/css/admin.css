@@ -1513,3 +1513,14 @@ html.modal-open, body.modal-open { overflow: hidden; }
 .trash-name { font-weight: 700; font-size: 0.92rem; }
 .trash-name .dim { font-weight: 400; color: var(--text-dim); }
 .trash-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* 엑셀 가져오기 */
+.room-tab.import-tab { color: var(--primary); font-weight: 600; }
+.room-tab.import-tab:hover { background: var(--primary-soft, #eef2ff); }
+.import-warn { background: #fbf1df; color: #8a5a00; border: 1px solid #f0d3a0; border-radius: 8px; padding: 8px 11px; font-size: 0.82rem; margin-bottom: 10px; }
+.import-room { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: #fff; }
+.import-room-head { font-size: 0.92rem; margin-bottom: 4px; }
+.import-room-head .dim { color: var(--text-dim); font-weight: 400; }
+.import-sess { margin: 4px 0 0; padding-left: 18px; }
+.import-sess li { font-size: 0.84rem; padding: 1px 0; }
+.import-sess .dim { color: var(--text-dim); }
