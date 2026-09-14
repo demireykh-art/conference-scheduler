@@ -11,6 +11,7 @@ const ctitle = () => (CONF && CONF.title) || '';   // 변경이력 기록용 행
 
 let CONF = null;              // 전체 행사 객체
 let CURRENT_ROOM = null;      // 현재 선택된 룸 id
+let ROOM_TAB_CENTER = false;  // 다음 룸탭 렌더에서 선택된 탭을 가로 중앙으로 스크롤할지
 let editingSession = null;    // { roomId, sessionId } | { roomId }(신규)
 let movingLecture = null;     // { roomId, sessionId, lecId }
 let placingTarget = null;     // { roomId, sessionId } (배치 대상 세션)
@@ -255,6 +256,13 @@ function renderAll() {
 function renderRoomTabs(rooms) {
     const box = document.getElementById('roomTabs');
 
+    // 재렌더 전, 날짜별 줄의 가로 스크롤 위치 저장 (데이터 갱신 시 좌측으로 튀는 것 방지)
+    const prevScroll = {};
+    box.querySelectorAll('.room-tab-row[data-date]').forEach(row => {
+        const sc = row.querySelector('.room-tab-scroll');
+        if (sc) prevScroll[row.getAttribute('data-date')] = sc.scrollLeft;
+    });
+
     // 날짜별 그룹화 (전역 order 유지) → 날짜 오름차순, 날짜미정은 마지막
     const groups = [], byDate = {};
     rooms.forEach(r => {
@@ -279,7 +287,7 @@ function renderRoomTabs(rooms) {
         const label = g.date
             ? `<span class="room-tab-daterow">${escapeHtml(dayLabel(g.date))}</span>`
             : `<span class="room-tab-daterow nodate">날짜미정</span>`;
-        return `<div class="room-tab-row">${label}<div class="room-tab-scroll">${g.rooms.map(tabBtn).join('')}</div></div>`;
+        return `<div class="room-tab-row" data-date="${escapeHtml(g.date || '')}">${label}<div class="room-tab-scroll">${g.rooms.map(tabBtn).join('')}</div></div>`;
     }).join('');
 
     const trashCount = (CONF && CONF.roomTrash) ? Object.keys(CONF.roomTrash).length : 0;
@@ -287,10 +295,31 @@ function renderRoomTabs(rooms) {
     const importBtn = `<button class="room-tab import-tab" onclick="openImportModal()" title="전체강의 엑셀 파일로 룸 가져오기/복원">📥 엑셀 가져오기</button>`;
     box.innerHTML = rowsHtml + `<div class="room-tab-row addrow"><button class="room-tab add-tab" onclick="openRoomModal()">+ 룸 추가</button>${importBtn}${trashBtn}</div>`;
 
+    // 재렌더 전 가로 스크롤 위치 복원 (선택/데이터 갱신 시 좌측으로 튀지 않게)
+    box.querySelectorAll('.room-tab-row[data-date]').forEach(row => {
+        const sc = row.querySelector('.room-tab-scroll');
+        const prev = prevScroll[row.getAttribute('data-date')];
+        if (sc && prev != null) sc.scrollLeft = prev;
+    });
+    // 선택으로 렌더된 경우, 선택된 룸 탭을 가로 중앙으로 고정
+    if (ROOM_TAB_CENTER) { ROOM_TAB_CENTER = false; centerActiveRoomTab(); }
+
     // 각 날짜(줄) 스크롤 컨테이너 안에서만 드래그 정렬 (줄 간 이동은 자연 차단) — 순서는 전역으로 저장
     box.querySelectorAll('.room-tab-scroll').forEach(sc => {
         enableSort(sc, '.room-tab[data-room]', 'data-room', () => persistRoomOrderFromDom(), 'room');
     });
+}
+
+// 선택된 룸 탭을 그 날짜줄 가로 스크롤 컨테이너의 중앙으로 이동
+function centerActiveRoomTab() {
+    const box = document.getElementById('roomTabs');
+    const active = box && box.querySelector('.room-tab.active');
+    if (!active) return;
+    const scroller = active.parentElement;
+    if (!scroller || !scroller.classList.contains('room-tab-scroll')) return;
+    const a = active.getBoundingClientRect(), s = scroller.getBoundingClientRect();
+    const delta = (a.left - s.left) - (s.width - a.width) / 2;
+    scroller.scrollLeft += delta;
 }
 
 // 화면(날짜별 그룹) DOM 순서대로 전역 룸 order 저장
@@ -301,6 +330,7 @@ function persistRoomOrderFromDom() {
 
 window.selectRoom = function (id) {
     setRoomSeen(id);   // 이 룸을 보면 변경 배지 해제 기준 갱신
+    ROOM_TAB_CENTER = true;   // 선택한 룸 탭을 화면 중앙으로 고정
     CURRENT_ROOM = id; renderRoomTabs(orderedRooms()); renderRoomSettings(); renderSessions();
 };
 
