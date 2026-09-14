@@ -422,7 +422,7 @@ function renderRoomSettings() {
     const room = getRoom(CURRENT_ROOM);
     if (!room) { el.style.display = 'none'; addRow.style.display = 'none'; return; }
     el.style.display = 'flex';
-    addRow.style.display = 'flex';
+    addRow.style.display = room.sessionless ? 'none' : 'flex';   // 오픈렉처는 세션 추가 불가
 
     el.innerHTML = `
         <div class="field grow">
@@ -481,6 +481,7 @@ window.duplicateRoom = function () {
         order: orderedRooms().length,
         sessions: {}
     };
+    if (room.sessionless) copy.sessionless = true;   // 오픈렉처 속성 유지
     toOrderedArray(room.sessions).forEach((s, si) => {
         const sc = { name: s.name || '', order: si };
         if (s.nameEn) sc.nameEn = s.nameEn;
@@ -646,6 +647,7 @@ window.openRoomModal = function () {
     if (!days.length) { Toast.warning('먼저 행사설정에서 행사 기간(시작일·종료일)을 입력하세요.'); return; }
     newRoomDate = days.length === 1 ? days[0] : '';   // 하루 행사면 자동 선택
     document.getElementById('newRoomName').value = `룸 ${orderedRooms().length + 1}`;
+    const slChk = document.getElementById('newRoomSessionless'); if (slChk) slChk.checked = false;
     renderNewRoomDayButtons();
     document.getElementById('roomModal').classList.add('open');
     setTimeout(() => document.getElementById('newRoomName').focus(), 50);
@@ -662,11 +664,18 @@ window.saveNewRoom = function () {
     if (!AdminAuth.requireEdit()) return;
     if (!newRoomDate) { Toast.warning('날짜를 선택하세요. (필수)'); return; }
     const name = document.getElementById('newRoomName').value.trim() || `룸 ${orderedRooms().length + 1}`;
+    const sessionless = !!(document.getElementById('newRoomSessionless') || {}).checked;
     const id = uuid();
-    confRef().child('rooms/' + id).set({
+    const roomData = {
         name, topic: '', date: newRoomDate, startTime: '09:00', visible: true, kmaSubmit: false, order: orderedRooms().length
-    }).then(() => {
-        logActivity('create', 'room', `룸 "${name}" 추가`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
+    };
+    // 오픈렉처: 세션 구분 없이 강의만 배치 — 내부적으로 숨김 세션 1개를 자동 생성해 강의를 담는다.
+    if (sessionless) {
+        roomData.sessionless = true;
+        roomData.sessions = { [uuid()]: { name: '', order: 0, lectures: {} } };
+    }
+    confRef().child('rooms/' + id).set(roomData).then(() => {
+        logActivity('create', 'room', `룸 "${name}" 추가${sessionless ? ' (오픈렉처·세션없음)' : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
         CURRENT_ROOM = id; closeRoomModal(); Toast.success('룸이 추가되었습니다.');
     })
         .catch(e => Toast.error(e.message));
@@ -1010,6 +1019,26 @@ function renderSessionBlock(roomId, s) {
     const lang = effectiveLang(room, s);
     const range = `${formatTime(s._start)} - ${formatTime(s._end)}`;
     const lectures = s.lectures.map(lec => renderLectureRow(roomId, s.id, lec, lang)).join('');
+
+    // 오픈렉처(세션없음) — 세션 껍데기(이름·사회자·언어·수정/삭제) 없이 강의 목록만
+    if (room && room.sessionless) {
+        return `
+        <div class="session-block sessionless" data-session="${s.id}">
+            <div class="session-head">
+                <div>
+                    <h3 class="session-title">📋 강의 목록</h3>
+                    <div class="session-sub">${range} · ${s._count}건 · 총 ${s._total}분</div>
+                </div>
+                <div class="spacer"></div>
+                <button class="btn btn-primary btn-sm" onclick="openPlaceModal('${roomId}','${s.id}')">+ 강의 배치</button>
+                <button class="btn btn-sm" onclick="openBreakModal('${roomId}','${s.id}')">+ 개폐회/점심/브레이크</button>
+            </div>
+            <div class="lecture-list" data-session="${s.id}">
+                ${lectures || '<div style="padding:16px 18px;color:var(--text-dim);font-size:0.84rem">강의가 없습니다. <b>+ 강의 배치</b>로 추가하세요.</div>'}
+            </div>
+        </div>`;
+    }
+
     const mods = sessionModArr(s);
     let modHtml = '';
     if (mods.length) {
