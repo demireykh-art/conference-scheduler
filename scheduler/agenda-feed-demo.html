@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASLS 시간표 연동 데모 (메드소프트 참고용)</title>
+<!--
+  이 페이지는 "공개 데이터 피드(asls-agenda-public.js)"를 받아 홈페이지 표 디자인으로
+  그리는 방법을 보여주는 참고 예시입니다. 메드소프트는 아래 render() 부분만
+  자사 홈페이지 디자인에 맞게 바꾸면 됩니다. (데이터 가져오기·시간계산은 라이브러리가 처리)
+
+  주소:  agenda-feed-demo.html?id=<행사ID>[&lang=ko|en]
+-->
+<style>
+  :root { --p: #6b1f7a; --p2: #3f1147; --line: #e7e2ea; --dim: #7a7580; --text: #222; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Malgun Gothic", "Noto Sans KR", sans-serif; color: var(--text); background: #fff; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 60px; }
+  .hint { background: #faf5fc; border: 1px solid #ecdbf2; color: #5a3a66; font-size: 0.82rem; border-radius: 10px; padding: 10px 14px; margin-bottom: 18px; }
+  .day-h { font-size: 1.15rem; font-weight: 800; color: var(--p2); margin: 26px 0 12px; }
+  .room { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin-bottom: 22px; }
+  .room-name { font-weight: 800; padding: 12px 18px; background: #f6f1f8; color: var(--p2); border-bottom: 1px solid var(--line); }
+  .sess-head { background: linear-gradient(90deg, var(--p), var(--p2)); color: #fff; padding: 14px 20px; }
+  .sess-name { font-size: 1.15rem; font-weight: 800; letter-spacing: .2px; }
+  .sess-time { font-size: 0.85rem; opacity: .92; margin-top: 2px; }
+  .sess-mod { font-size: 0.82rem; opacity: .95; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; font-size: 0.9rem; color: var(--p2); background: #f3ebf6; padding: 12px 20px; border-bottom: 1px solid var(--line); }
+  tbody td { padding: 14px 20px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 0.92rem; }
+  tbody tr:last-child td { border-bottom: 0; }
+  .l-title { font-weight: 700; line-height: 1.4; }
+  .l-sub { color: var(--dim); font-size: 0.84rem; margin-top: 2px; }
+  .l-meta { color: var(--dim); font-size: 0.82rem; margin-top: 4px; }
+  .l-memo { display: inline-block; margin-top: 5px; font-size: 0.8rem; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 2px 8px; }
+  .spk { color: var(--p); font-weight: 600; }
+  .aff { color: var(--dim); }
+  .break-row td { background: #faf7fb; color: var(--dim); font-weight: 600; }
+  .col-time { width: 120px; white-space: nowrap; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .col-spk { width: 220px; }
+  .col-aff { width: 200px; }
+  .msg { padding: 48px 16px; text-align: center; color: var(--dim); }
+  .seg { display: inline-flex; gap: 6px; margin-left: 10px; }
+  .seg a { font-size: 0.8rem; text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; color: var(--p2); }
+  .seg a.on { background: var(--p); color: #fff; border-color: var(--p); }
+  @media (max-width: 760px) {
+    .col-spk, .col-aff, .col-time { width: auto; }
+    thead { display: none; }
+    tbody td { display: block; border: 0; padding: 4px 18px; }
+    tbody tr { border-bottom: 1px solid var(--line); display: block; padding: 10px 0; }
+    .col-time { padding-top: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hint">
+    <b>메드소프트 참고용 데모</b> — 이 페이지는 공개 데이터 피드를 받아 표로 그리는 예시입니다.
+    데이터 가져오기·시간계산은 <code>asls-agenda-public.js</code>가 처리하며, 홈페이지는 아래
+    <code>render()</code>만 자사 디자인으로 바꾸면 됩니다.
+    <span class="seg" id="langSeg"></span>
+  </div>
+  <div id="app"><div class="msg">불러오는 중…</div></div>
+</div>
+
+<script src="js/asls-agenda-public.js"></script>
+<script>
+  var params = new URLSearchParams(location.search);
+  var CONF_ID = params.get('id') || '';
+  var LANG = params.get('lang') === 'en' ? 'en' : 'ko';
+
+  function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+  function pick(ko, en) { return LANG === 'en' ? (en || ko || '') : (ko || en || ''); }
+  function fmtDay(d) {
+    if (!d) return '';
+    var wd = ['일', '월', '화', '수', '목', '금', '토'];
+    var dt = new Date(d + 'T00:00:00'); if (isNaN(dt)) return d;
+    return LANG === 'en'
+      ? d
+      : dt.getFullYear() + '. ' + (dt.getMonth() + 1) + '. ' + dt.getDate() + ' (' + wd[dt.getDay()] + ')';
+  }
+
+  /* ====== 이 render()만 홈페이지 디자인에 맞게 교체하면 됩니다 ====== */
+  function render(feed) {
+    var app = document.getElementById('app');
+    document.getElementById('langSeg').innerHTML =
+      '<a href="?id=' + esc(CONF_ID) + '&lang=ko" class="' + (LANG === 'ko' ? 'on' : '') + '">국문</a>' +
+      '<a href="?id=' + esc(CONF_ID) + '&lang=en" class="' + (LANG === 'en' ? 'on' : '') + '">EN</a>';
+
+    if (!feed.days.length) { app.innerHTML = '<div class="msg">등록된 프로그램이 없습니다.</div>'; return; }
+    var html = '';
+    feed.days.forEach(function (day) {
+      html += '<div class="day-h">' + esc(fmtDay(day.date)) + '</div>';
+      day.rooms.forEach(function (room) {
+        html += '<div class="room"><div class="room-name">' + esc(pick(room.name, room.nameEn)) + '</div>';
+        room.sessions.forEach(function (s) {
+          if (!room.sessionless) {
+            var mod = s.moderators.length
+              ? '<div class="sess-mod">' + (LANG === 'en' ? 'Moderator' : '좌장') + ': ' +
+                s.moderators.map(function (m) {
+                  var aff = pick(m.affiliation, m.affiliationEn);
+                  return esc(pick(m.name, m.nameEn)) + (aff ? ' (' + esc(aff) + ')' : '');
+                }).join(', ') + '</div>' : '';
+            html += '<div class="sess-head"><div class="sess-name">' + esc(pick(s.name, s.nameEn) || (LANG === 'en' ? 'Session' : '세션')) +
+              '</div><div class="sess-time">' + s.start + ' - ' + s.end + '</div>' + mod + '</div>';
+          }
+          html += '<table><thead><tr>' +
+            '<th class="col-time">' + (LANG === 'en' ? 'Time' : '시간') + '</th>' +
+            '<th>' + (LANG === 'en' ? 'Lecture Title' : '강의 제목') + '</th>' +
+            '<th class="col-spk">' + (LANG === 'en' ? 'Speaker' : '연자') + '</th>' +
+            '<th class="col-aff">' + (LANG === 'en' ? 'Affiliation' : '소속') + '</th>' +
+            '</tr></thead><tbody>';
+          s.lectures.forEach(function (lec) {
+            if (lec.type !== 'lecture') {
+              html += '<tr class="break-row"><td class="col-time">' + lec.start + ' - ' + lec.end + '</td>' +
+                '<td colspan="3">' + esc(pick(lec.title, lec.titleEn) || (lec.type === 'panel' ? 'Panel Discussion' : 'Break')) + '</td></tr>';
+              return;
+            }
+            var subtitle = LANG === 'en' ? lec.title : lec.titleEn;
+            var meta = [lec.partner ? '🏢 ' + esc(pick(lec.partner, lec.partnerEn)) : '', lec.product ? '💊 ' + esc(pick(lec.product, lec.productEn)) : ''].filter(Boolean).join(' · ');
+            var spk = lec.speakers.map(function (x) { return '<span class="spk">' + esc(pick(x.name, x.nameEn)) + '</span>'; }).join(', ') || '-';
+            var aff = lec.speakers.map(function (x) { return esc(pick(x.affiliation, x.affiliationEn)); }).filter(Boolean).join(', ') || '-';
+            html += '<tr><td class="col-time">' + lec.start + ' - ' + lec.end + '</td>' +
+              '<td><div class="l-title">' + esc(pick(lec.title, lec.titleEn)) + '</div>' +
+              (subtitle ? '<div class="l-sub">' + esc(subtitle) + '</div>' : '') +
+              (meta ? '<div class="l-meta">' + meta + '</div>' : '') +
+              (lec.memo ? '<div class="l-memo">📝 ' + esc(lec.memo) + '</div>' : '') + '</td>' +
+              '<td class="col-spk">' + spk + '</td>' +
+              '<td class="col-aff"><span class="aff">' + aff + '</span></td></tr>';
+          });
+          html += '</tbody></table>';
+        });
+        html += '</div>';
+      });
+    });
+    app.innerHTML = html;
+  }
+  /* ================================================================= */
+
+  if (!CONF_ID) {
+    document.getElementById('app').innerHTML = '<div class="msg">주소에 <code>?id=행사ID</code>가 필요합니다.</div>';
+  } else {
+    AslsAgenda.load(CONF_ID)
+      .then(render)
+      .catch(function (e) {
+        document.getElementById('app').innerHTML = '<div class="msg">데이터를 불러오지 못했습니다.<br>' + esc(e.message) + '</div>';
+      });
+  }
+</script>
+</body>
+</html>
