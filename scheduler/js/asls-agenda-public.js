@@ -112,7 +112,8 @@
     /* ---------- 전체 행사 → 날짜별 그룹 피드 ---------- */
     function build(conf) {
         conf = conf || {};
-        var rooms = toArr(conf.rooms).map(buildRoom);
+        // 홈페이지 공개(publicOpen=true)로 설정한 룸만 노출 (임시·작업용 룸 자동 제외)
+        var rooms = toArr(conf.rooms).filter(function (r) { return r.publicOpen === true; }).map(buildRoom);
         var byDate = {}, order = [];
         rooms.forEach(function (r) {
             var d = r.date || '';

@@ -278,6 +278,7 @@ function renderRoomTabs(rooms) {
         <button class="room-tab ${r.id === CURRENT_ROOM ? 'active' : ''}" data-room="${r.id}"
             onclick="selectRoom('${r.id}')">
             <span class="grip" title="드래그하여 순서 변경">⋮⋮</span>${escapeHtml(r.name || '(이름 없음)')}
+            ${r.publicOpen ? '<span class="room-tab-pub" title="홈페이지 공개 중">🌐</span>' : ''}
             ${r.kmaSubmit ? '<span class="room-tab-kma" title="의협제출 대상">의협</span>' : ''}
             ${alerts ? `<span class="room-tab-alert" title="이 룸에서 최근 이동/삭제된 강의 ${alerts}건">🔔${alerts}</span>` : ''}
         </button>`;
@@ -483,13 +484,21 @@ function renderRoomSettings() {
             <input type="text" list="agendaOwnerList" value="${escapeHtml(room.agendaOwner || '')}" placeholder="연자 이름 선택/입력" onchange="updateRoom('agendaOwner', this.value.trim())">
             <datalist id="agendaOwnerList">${agendaOwnerOptions()}</datalist>
         </div>
+        <div class="field" style="min-width:160px">
+            <label>홈페이지 공개</label>
+            <button type="button" class="pub-toggle ${room.publicOpen ? 'on' : ''}"
+                onclick="updateRoom('publicOpen', ${room.publicOpen ? 'false' : 'true'})"
+                title="켜면 홈페이지(공개 시간표)에 이 룸이 표시됩니다">
+                ${room.publicOpen ? '🌐 공개 중' : '⛔ 비공개'}
+            </button>
+        </div>
         <label class="check-inline">
             <input type="checkbox" ${room.kmaSubmit ? 'checked' : ''} onchange="updateRoom('kmaSubmit', this.checked)">
             의협제출
         </label>
         <button class="btn btn-sm" onclick="duplicateRoom()">📑 다른 날짜로 복제</button>
         <button class="btn btn-danger-ghost btn-sm" onclick="deleteRoom('${room.id}')">룸 삭제</button>
-        <div class="settings-hint"><b>의협제출</b> 체크 시, 나중에 의협 제출용 프린트에 이 룸의 강의만 추려서 출력합니다. · ‘다른 날짜로 복제’는 이 룸(세션·강의 포함)을 그대로 복사한 <b>독립된 새 룸</b>을 만듭니다.</div>
+        <div class="settings-hint"><b>홈페이지 공개</b>를 켠 룸만 홈페이지 시간표에 나옵니다(기본값: 비공개). 임시·작업용 룸은 꺼두세요. · <b>의협제출</b> 체크 시, 의협 제출용 프린트에 이 룸의 강의만 추려서 출력합니다. · ‘다른 날짜로 복제’는 이 룸을 그대로 복사한 <b>독립된 새 룸</b>을 만듭니다.</div>
     `;
 }
 
@@ -539,11 +548,12 @@ window.duplicateRoom = function () {
 };
 
 // 룸 설정 변경 이력용 — 항목명/표시값
-const ROOM_FIELD_LABEL = { name: '이름', topic: '주제', date: '날짜', startTime: '시작시간', lang: '표시언어', kmaSubmit: '의협제출', agendaOwner: '아젠다담당', visible: '표시여부' };
+const ROOM_FIELD_LABEL = { name: '이름', topic: '주제', date: '날짜', startTime: '시작시간', lang: '표시언어', kmaSubmit: '의협제출', agendaOwner: '아젠다담당', visible: '표시여부', publicOpen: '홈페이지 공개' };
 function roomFieldDisp(field, v) {
     if (field === 'date') return v ? dayLabel(v) : '날짜미정';
     if (field === 'lang') return v === 'en' ? '영어(EN)' : '한글';
     if (field === 'kmaSubmit') return v ? 'ON' : 'OFF';
+    if (field === 'publicOpen') return v ? '공개' : '비공개';
     if (field === 'visible') return v === false ? '숨김' : '표시';
     const s = (v == null ? '' : String(v)).trim();
     return s === '' ? '(비어있음)' : s;
