@@ -50,7 +50,8 @@
 
     /* ---------- 렌더 ---------- */
     function orderedRooms() {
-        return toArr(CONF.rooms).sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.order == null ? 0 : a.order) - (b.order == null ? 0 : b.order));
+        // 홈페이지 공개(publicOpen=true)로 설정한 룸만 노출 (임시·작업용 룸 자동 제외)
+        return toArr(CONF.rooms).filter(r => r.publicOpen === true).sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.order == null ? 0 : a.order) - (b.order == null ? 0 : b.order));
     }
     function allDates() {
         return [...new Set(orderedRooms().map(r => r.date).filter(Boolean))].sort();

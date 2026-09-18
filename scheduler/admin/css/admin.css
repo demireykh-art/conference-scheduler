@@ -700,6 +700,15 @@ a { color: inherit; }
     font-size: 0.68rem; font-weight: 700; color: #12a150;
     background: #e6f7ee; border-radius: 5px; padding: 1px 6px;
 }
+.room-tab-pub { font-size: 0.72rem; }
+
+/* 홈페이지 공개 토글 (룸 설정) */
+.pub-toggle {
+    padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px;
+    background: #f3f4f6; color: #6b7280; font-size: 0.85rem; font-weight: 700;
+    cursor: pointer; white-space: nowrap;
+}
+.pub-toggle.on { background: #e6f7ee; border-color: #12a150; color: #0d7a3c; }
 
 /* ASLS Week 진행상황 보드 */
 .aw-table { min-width: 1200px; }
