@@ -431,7 +431,7 @@ const SIDE_MENU = [
         group: '관리', items: [
             { key: 'cvinbox', label: '📥 CV 제출함', href: 'cv-inbox.html' },
             { key: 'activity', label: '🕘 변경이력', href: 'activity.html' },
-            { key: 'users', label: '👥 사용자 관리', href: 'users.html' },
+            { key: 'users', label: '👥 사용자 관리', href: 'users.html', adminOnly: true },
             { key: 'guide', label: '📘 스케쥴러 사용방법', href: 'https://app.notion.com/p/3a28bb6212958047bfc7cdff64b732bf', external: true }
         ]
     }
@@ -451,7 +451,10 @@ window.renderSidebar = function (activeKey) {
             const active = it.key === activeKey ? ' active' : '';
             const href = it.key === 'timetable' ? timetableHref : it.href;
             const ext = it.external ? ' target="_blank" rel="noopener"' : '';
-            return `<a class="side-link${active}" href="${href}"${ext}>${escapeHtml(it.label)}</a>`;
+            // 관리자 전용 링크는 기본 숨김 → 관리자 확인 시 노출 (applyAdminOnlyLinks)
+            const adm = it.adminOnly ? ' admin-only' : '';
+            const hide = it.adminOnly ? ' style="display:none"' : '';
+            return `<a class="side-link${active}${adm}" href="${href}"${ext}${hide}>${escapeHtml(it.label)}</a>`;
         }).join('');
         return `<div class="side-group-label">${escapeHtml(g.group)}</div>${items}`;
     }).join('');
@@ -467,6 +470,14 @@ window.renderSidebar = function (activeKey) {
             <div class="sidebar-footer" id="sideLogout">로그아웃</div>
         </aside>`;
 };
+
+// 관리자 전용 사이드바 링크(사용자 관리 등) 표시 제어 — 관리자만 노출
+window.applyAdminOnlyLinks = function () {
+    const isAdmin = !!(window.AdminAuth && AdminAuth.isAdmin && AdminAuth.isAdmin());
+    document.querySelectorAll('.side-link.admin-only').forEach(a => { a.style.display = isAdmin ? '' : 'none'; });
+};
+document.addEventListener('admin-auth-change', window.applyAdminOnlyLinks);
+if (window.AdminAuth && AdminAuth.onReady) AdminAuth.onReady(window.applyAdminOnlyLinks);
 
 /* ------------------------------------------------------------
    제품 분류 (하드코딩) — 파트너사 제품 등록/강의에서 공용

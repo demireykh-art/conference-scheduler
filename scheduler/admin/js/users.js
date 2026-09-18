@@ -86,7 +86,7 @@ function renderUsers() {
 
     const body = document.getElementById('userBody');
     if (!list.length) {
-        body.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:40px">사용자가 없습니다.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:40px">사용자가 없습니다.</td></tr>`;
         return;
     }
     body.innerHTML = list.map(u => {
@@ -107,12 +107,19 @@ function renderUsers() {
                     <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>관리자</option>
                </select>`;
         const delBtn = locked ? '' : `<button class="btn btn-sm btn-danger-ghost" onclick="deleteUser('${u.uid}')">삭제</button>`;
+        // 홈페이지 연결 권한 — 관리자는 자동 허용, 편집자는 지정 가능, 그 외 해당 없음
+        const pubCell = (u.role === 'admin')
+            ? `<span class="dim" style="font-size:0.76rem" title="관리자는 항상 홈페이지 공개를 조작할 수 있습니다">자동 허용</span>`
+            : (u.role === 'editor')
+                ? `<button class="btn btn-sm ${u.canPublish ? 'btn-success' : ''}" onclick="setCanPublish('${u.uid}', ${u.canPublish ? 'false' : 'true'})" title="홈페이지 공개 버튼 조작 권한">${u.canPublish ? '🌐 허용됨' : '허용하기'}</button>`
+                : `<span class="dim">-</span>`;
 
         return `
         <tr${u.role === 'pending' ? ' style="background:#fff8f2"' : ''}>
             <td><div style="display:flex;align-items:center;gap:9px">${photo}<b>${escapeHtml(u.displayName || '(이름 없음)')}</b></div></td>
             <td class="dim" style="font-size:0.85rem">${escapeHtml(u.email || '-')}</td>
             <td style="text-align:center"><span class="badge ${ROLE_BADGE[u.role] || ''}">${ROLE_LABEL[u.role] || u.role || '-'}</span></td>
+            <td style="text-align:center">${pubCell}</td>
             <td class="dim" style="font-size:0.82rem">${fmtTime(u.lastLogin)}</td>
             <td>
                 <div class="row-actions">${approveBtn}${roleSelect}${delBtn}</div>
@@ -120,6 +127,18 @@ function renderUsers() {
         </tr>`;
     }).join('');
 }
+
+// 홈페이지 연결(공개 버튼) 권한 부여/해제 — 관리자만 가능
+window.setCanPublish = function (uid, val) {
+    if (!AdminAuth.isAdmin()) { Toast.error('권한이 없습니다.'); return; }
+    const tu = USERS.find(x => x.uid === uid);
+    database.ref('/users/' + uid + '/canPublish').set(val === true)
+        .then(() => {
+            logActivity('update', 'user', `사용자 "${tu ? (tu.displayName || tu.email) : uid}" 홈페이지 연결 권한 ${val ? '부여' : '해제'}`, { entityId: uid });
+            Toast.success(val ? '홈페이지 연결 권한을 부여했습니다.' : '홈페이지 연결 권한을 해제했습니다.');
+        })
+        .catch(e => Toast.error('변경 실패: ' + e.message));
+};
 
 window.setRole = function (uid, role) {
     if (!AdminAuth.isAdmin()) { Toast.error('권한이 없습니다.'); return; }

@@ -486,11 +486,16 @@ function renderRoomSettings() {
         </div>
         <div class="field" style="min-width:160px">
             <label>홈페이지 공개</label>
-            <button type="button" class="pub-toggle ${room.publicOpen ? 'on' : ''}"
-                onclick="updateRoom('publicOpen', ${room.publicOpen ? 'false' : 'true'})"
-                title="켜면 홈페이지(공개 시간표)에 이 룸이 표시됩니다">
-                ${room.publicOpen ? '🌐 공개 중' : '⛔ 비공개'}
-            </button>
+            ${(AdminAuth.canPublish && AdminAuth.canPublish())
+            ? `<button type="button" class="pub-toggle ${room.publicOpen ? 'on' : ''}"
+                    onclick="updateRoom('publicOpen', ${room.publicOpen ? 'false' : 'true'})"
+                    title="켜면 홈페이지(공개 시간표)에 이 룸이 표시됩니다">
+                    ${room.publicOpen ? '🌐 공개 중' : '⛔ 비공개'}
+                </button>`
+            : `<button type="button" class="pub-toggle locked ${room.publicOpen ? 'on' : ''}" disabled
+                    title="홈페이지 공개 권한이 있는 계정만 변경할 수 있습니다">
+                    ${room.publicOpen ? '🌐 공개 중' : '⛔ 비공개'} 🔒
+                </button>`}
         </div>
         <label class="check-inline">
             <input type="checkbox" ${room.kmaSubmit ? 'checked' : ''} onchange="updateRoom('kmaSubmit', this.checked)">
@@ -501,6 +506,9 @@ function renderRoomSettings() {
         <div class="settings-hint"><b>홈페이지 공개</b>를 켠 룸만 홈페이지 시간표에 나옵니다(기본값: 비공개). 임시·작업용 룸은 꺼두세요. · <b>의협제출</b> 체크 시, 의협 제출용 프린트에 이 룸의 강의만 추려서 출력합니다. · ‘다른 날짜로 복제’는 이 룸을 그대로 복사한 <b>독립된 새 룸</b>을 만듭니다.</div>
     `;
 }
+
+// 권한(홈페이지 공개 등) 로딩·변경 시 룸 설정을 다시 그려 공개 토글 활성/비활성 반영
+document.addEventListener('admin-auth-change', () => { if (CURRENT_ROOM && CONF && CONF.rooms) renderRoomSettings(); });
 
 // 이 룸을 독립된 새 룸으로 복제 (룸·세션·강의 모두 새 id → 서로 영향 없음). 날짜는 복제 후 지정.
 window.duplicateRoom = function () {
@@ -561,6 +569,12 @@ function roomFieldDisp(field, v) {
 
 window.updateRoom = function (field, value) {
     if (!AdminAuth.requireEdit()) { renderRoomSettings(); return; }
+    // 홈페이지 공개(publicOpen)는 지정 권한 계정만 조작 가능
+    if (field === 'publicOpen' && !(AdminAuth.canPublish && AdminAuth.canPublish())) {
+        Toast.info('홈페이지 공개 권한이 있는 계정만 변경할 수 있습니다. (관리자에게 요청하세요)');
+        renderRoomSettings();
+        return;
+    }
     const room = getRoom(CURRENT_ROOM);
     const roomId = CURRENT_ROOM;
     const before = room ? room[field] : undefined;
