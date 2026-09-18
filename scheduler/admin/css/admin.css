@@ -709,6 +709,7 @@ a { color: inherit; }
     cursor: pointer; white-space: nowrap;
 }
 .pub-toggle.on { background: #e6f7ee; border-color: #12a150; color: #0d7a3c; }
+.pub-toggle.locked { cursor: not-allowed; opacity: 0.6; }
 
 /* ASLS Week 진행상황 보드 */
 .aw-table { min-width: 1200px; }

@@ -8,6 +8,7 @@
 window.AdminAuth = {
     user: null,
     role: null,        // 'admin' | 'editor' | 'pending' | null
+    canPublishFlag: false,   // /users/<uid>/canPublish — 홈페이지 공개 조작 권한
     _ready: false,
     _cbs: [],
 
@@ -23,6 +24,14 @@ window.AdminAuth = {
     },
 
     isAdmin() { return this.role === 'admin'; },
+
+    /** 홈페이지 공개(연결) 버튼을 조작할 수 있는가 — 관리자이거나 권한 부여된 계정 */
+    canPublish() {
+        if (!this.user) return false;
+        if (this.role === 'pending') return false;
+        if (this.isAdmin()) return true;
+        return this.canPublishFlag === true;
+    },
 
     /** 편집 시도 시 게이트 */
     requireEdit() {
@@ -150,8 +159,13 @@ auth.onAuthStateChanged(user => {
             updateSidebarUser();
             document.dispatchEvent(new CustomEvent('admin-auth-change'));
         });
+        database.ref(`/users/${user.uid}/canPublish`).on('value', snap => {
+            AdminAuth.canPublishFlag = snap.val() === true;
+            document.dispatchEvent(new CustomEvent('admin-auth-change'));
+        });
     } else {
         AdminAuth.role = null;
+        AdminAuth.canPublishFlag = false;
         updateSidebarUser();
         document.dispatchEvent(new CustomEvent('admin-auth-change'));
     }
