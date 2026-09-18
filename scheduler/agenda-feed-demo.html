@@ -6,18 +6,16 @@
 <title>ASLS 시간표 연동 데모 (메드소프트 참고용)</title>
 <!--
   이 페이지는 "공개 데이터 피드(asls-agenda-public.js)"를 받아 홈페이지 표 디자인으로
-  그리는 방법을 보여주는 참고 예시입니다. 메드소프트는 아래 render()/openSpeaker()
+  그리는 방법을 보여주는 참고 예시입니다. 메드소프트는 아래 draw()/openSpeaker()
   부분만 자사 홈페이지 디자인에 맞게 바꾸면 됩니다.
   (데이터 가져오기·시간계산·국문영문·연자 사진/국적 처리는 라이브러리가 담당)
 
   주소:  agenda-feed-demo.html?id=<행사ID>[&lang=ko|en]
 
-  포함 시연:
-   - 룸 이름(헤더) + 주제(부제) 분리 표시
-   - 국문/영문 버튼 (영문 없으면 국문 자동 폴백)
-   - 연자 사진(이름 좌측) + 소속/국적
-   - 파트너사·제품 미표시(공개 피드에서 제외)
-   - 연자 이름 클릭 → 해당 연자의 강의목록 표시
+  구조: [날짜 탭] → [룸 탭] → 선택한 룸의 (주제 제목 + 세션들)
+   - 룸은 탭으로 전환, 룸 이름은 탭에 있으므로 본문엔 반복하지 않음
+   - 주제(예: Contour)를 본문 큰 제목으로 표시
+   - 파트너·제품 미표시, 연자 사진(이름 좌측)·국적, 연자 클릭 → 강의목록
 -->
 <style>
   :root { --p: #6b1f7a; --p2: #3f1147; --line: #e7e2ea; --dim: #7a7580; --text: #222; }
@@ -26,15 +24,16 @@
   .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 60px; }
   .hint { background: #faf5fc; border: 1px solid #ecdbf2; color: #5a3a66; font-size: 0.82rem; border-radius: 10px; padding: 10px 14px; margin-bottom: 18px; }
   .seg { display: inline-flex; gap: 6px; margin-left: 10px; }
-  .seg a { font-size: 0.8rem; text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; color: var(--p2); }
+  .seg a { font-size: 0.8rem; text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; color: var(--p2); cursor: pointer; }
   .seg a.on { background: var(--p); color: #fff; border-color: var(--p); }
-  .day-h { font-size: 1.15rem; font-weight: 800; color: var(--p2); margin: 26px 0 12px; }
-  /* 룸은 박스 밖으로 꺼낸 '제목' 형태 — 세션과 혼동되지 않게 */
-  .room { margin-bottom: 34px; }
-  .room-head { padding: 4px 2px 12px; margin-bottom: 14px; border-bottom: 2px solid var(--p); }
-  .room-name { font-size: 1.55rem; font-weight: 800; color: var(--p2); letter-spacing: .2px; }
-  .room-topic { font-size: 1.2rem; font-weight: 700; color: var(--p); margin-top: 3px; }
-  /* 세션은 진한 보라 헤더의 카드 (룸 안에 여러 개) */
+  /* 탭 (날짜 / 룸) */
+  .tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+  .tab { border: 1px solid var(--line); border-radius: 999px; padding: 9px 18px; font-weight: 700; color: var(--p2); background: #fff; cursor: pointer; font-size: 0.95rem; }
+  .tab.on { background: var(--p2); color: #fff; border-color: var(--p2); }
+  .tabs.rooms .tab { padding: 8px 16px; }
+  .divider { border: 0; border-top: 1px solid var(--line); margin: 14px 0 18px; }
+  /* 선택된 룸: 주제(제목) + 세션들 */
+  .room-topic { font-size: 1.55rem; font-weight: 800; color: var(--p2); letter-spacing: .2px; margin: 4px 0 16px; }
   .sess { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
   .sess-head { background: linear-gradient(90deg, var(--p), var(--p2)); color: #fff; padding: 13px 20px; font-weight: 800; font-size: 1.02rem; }
   .sess-time { font-weight: 600; color: rgba(255,255,255,.9); font-size: 0.85rem; margin-left: 8px; }
@@ -81,8 +80,8 @@
 <div class="wrap">
   <div class="hint">
     <b>메드소프트 참고용 데모</b> — 공개 데이터 피드를 받아 표로 그리는 예시입니다.
-    데이터 가져오기·시간계산·국문영문·연자 사진/국적 처리는 <code>asls-agenda-public.js</code>가 담당하며,
-    홈페이지는 <code>render()</code>만 자사 디자인으로 바꾸면 됩니다.
+    <b>날짜·룸을 탭으로</b> 선택하면 그 룸의 (주제 + 세션)이 표시됩니다.
+    데이터 처리(시간·국문영문·연자 사진/국적)는 <code>asls-agenda-public.js</code>가 담당하며, 홈페이지는 <code>draw()</code>만 자사 디자인으로 바꾸면 됩니다.
     <span class="seg" id="langSeg"></span>
   </div>
   <div id="app"><div class="msg">불러오는 중…</div></div>
@@ -97,7 +96,8 @@
   var params = new URLSearchParams(location.search);
   var CONF_ID = params.get('id') || '';
   var LANG = params.get('lang') === 'en' ? 'en' : 'ko';
-  var SPK_INDEX = {};   // 연자 이름 → 강의목록 (연자 클릭용)
+  var FEED = null, SPK_INDEX = {};
+  var SEL = { day: 0, room: 0 };
 
   function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
   // 영문 버튼이어도 영문 값이 없으면 국문으로 자동 폴백
@@ -110,81 +110,94 @@
   }
   function avatar(photo, name, cls) {
     if (photo) return '<img src="' + esc(photo) + '" alt="" class="' + (cls || '') + '">';
-    var ch = (name || '?').charAt(0);
-    return '<span class="noimg ' + (cls || '') + '">' + esc(ch) + '</span>';
+    return '<span class="noimg ' + (cls || '') + '">' + esc((name || '?').charAt(0)) + '</span>';
   }
 
-  /* ====== 이 render()만 홈페이지 디자인에 맞게 교체하면 됩니다 ====== */
-  function render(feed) {
-    var app = document.getElementById('app');
-    document.getElementById('langSeg').innerHTML =
-      '<a href="?id=' + esc(CONF_ID) + '&lang=ko" class="' + (LANG === 'ko' ? 'on' : '') + '">국문</a>' +
-      '<a href="?id=' + esc(CONF_ID) + '&lang=en" class="' + (LANG === 'en' ? 'on' : '') + '">EN</a>';
+  window.setLang = function (l) { LANG = l; draw(); };
+  window.selDay = function (i) { SEL.day = i; SEL.room = 0; draw(); };
+  window.selRoom = function (i) { SEL.room = i; draw(); };
 
-    // 연자 클릭용 인덱스 구성
+  function render(feed) {
+    FEED = feed;
     SPK_INDEX = {};
     AslsAgenda.speakerIndex(feed).forEach(function (s) {
       SPK_INDEX[(s.name || s.nameEn || '').trim()] = s;
       if (s.nameEn) SPK_INDEX[s.nameEn.trim()] = s;
     });
+    draw();
+  }
 
-    if (!feed.days.length) { app.innerHTML = '<div class="msg">등록된 프로그램이 없습니다.</div>'; return; }
-    var html = '';
-    feed.days.forEach(function (day) {
-      html += '<div class="day-h">' + esc(fmtDay(day.date)) + '</div>';
-      day.rooms.forEach(function (room) {
-        var topic = pick(room.topic, room.topicEn);
-        html += '<div class="room"><div class="room-head">' +
-          '<div class="room-name">' + esc(pick(room.name, room.nameEn)) + '</div>' +
-          (topic ? '<div class="room-topic">' + esc(topic) + '</div>' : '') + '</div>';
-        room.sessions.forEach(function (s) {
-          html += '<div class="sess">';
-          if (!room.sessionless) {
-            var mod = s.moderators.length
-              ? '<div class="sess-mod">' + (LANG === 'en' ? 'Moderator' : '좌장') + ': ' +
-                s.moderators.map(function (m) {
-                  var aff = pick(m.affiliation, m.affiliationEn);
-                  return esc(pick(m.name, m.nameEn)) + (aff ? ' (' + esc(aff) + ')' : '');
-                }).join(', ') + '</div>' : '';
-            html += '<div class="sess-head">' + esc(pick(s.name, s.nameEn) || (LANG === 'en' ? 'Session' : '세션')) +
-              '<span class="sess-time">' + s.start + ' - ' + s.end + '</span>' + mod + '</div>';
-          }
-          html += '<table><thead><tr>' +
-            '<th class="col-time">' + (LANG === 'en' ? 'Time' : '시간') + '</th>' +
-            '<th>' + (LANG === 'en' ? 'Lecture Title' : '강의 제목') + '</th>' +
-            '<th class="col-spk">' + (LANG === 'en' ? 'Speaker' : '연자') + '</th>' +
-            '<th class="col-aff">' + (LANG === 'en' ? 'Affiliation' : '소속') + '</th>' +
-            '</tr></thead><tbody>';
-          s.lectures.forEach(function (lec) {
-            if (lec.type !== 'lecture') {
-              html += '<tr class="break-row"><td class="col-time">' + lec.start + ' - ' + lec.end + '</td>' +
-                '<td colspan="3">' + esc(pick(lec.title, lec.titleEn) || (lec.type === 'panel' ? 'Panel Discussion' : 'Break')) + '</td></tr>';
-              return;
-            }
-            var subtitle = LANG === 'en' ? lec.title : lec.titleEn;
-            var spk = lec.speakers.map(function (x) {
-              var nm = esc(pick(x.name, x.nameEn));
-              return '<span class="spk">' + avatar(x.photo, pick(x.name, x.nameEn)) +
-                '<span class="spk-name" onclick="openSpeaker(\'' + esc((x.name || x.nameEn || '').replace(/'/g, "\\'")) + '\')">' + nm + '</span></span>';
-            }).join('<br>') || '-';
-            var aff = lec.speakers.map(function (x) { return esc(pick(x.affiliation, x.affiliationEn)); }).filter(Boolean).join(', ') || '-';
-            html += '<tr><td class="col-time">' + lec.start + ' - ' + lec.end + '</td>' +
-              '<td><div class="l-title">' + esc(pick(lec.title, lec.titleEn)) + '</div>' +
-              (subtitle ? '<div class="l-sub">' + esc(subtitle) + '</div>' : '') +
-              (lec.memo ? '<div class="l-memo">📝 ' + esc(lec.memo) + '</div>' : '') + '</td>' +
-              '<td class="col-spk">' + spk + '</td>' +
-              '<td class="col-aff"><span class="aff">' + aff + '</span></td></tr>';
-          });
-          html += '</tbody></table>';
-          html += '</div>';
-        });
-        html += '</div>';
+  /* ====== 이 draw()만 홈페이지 디자인에 맞게 교체하면 됩니다 ====== */
+  function draw() {
+    document.getElementById('langSeg').innerHTML =
+      '<a class="' + (LANG === 'ko' ? 'on' : '') + '" onclick="setLang(\'ko\')">국문</a>' +
+      '<a class="' + (LANG === 'en' ? 'on' : '') + '" onclick="setLang(\'en\')">EN</a>';
+
+    var app = document.getElementById('app');
+    if (!FEED || !FEED.days.length) { app.innerHTML = '<div class="msg">등록된 프로그램이 없습니다.</div>'; return; }
+    if (SEL.day >= FEED.days.length) SEL.day = 0;
+    var day = FEED.days[SEL.day];
+    if (SEL.room >= day.rooms.length) SEL.room = 0;
+    var room = day.rooms[SEL.room];
+
+    // 날짜 탭
+    var html = '<div class="tabs days">' + FEED.days.map(function (d, i) {
+      return '<button class="tab ' + (i === SEL.day ? 'on' : '') + '" onclick="selDay(' + i + ')">' + esc(fmtDay(d.date)) + '</button>';
+    }).join('') + '</div>';
+
+    // 룸 탭 (룸 이름 — 본문엔 반복 안 함)
+    html += '<div class="tabs rooms">' + day.rooms.map(function (r, i) {
+      return '<button class="tab ' + (i === SEL.room ? 'on' : '') + '" onclick="selRoom(' + i + ')">' + esc(pick(r.name, r.nameEn)) + '</button>';
+    }).join('') + '</div><hr class="divider">';
+
+    // 선택된 룸: 주제(큰 제목) + 세션들
+    var topic = pick(room.topic, room.topicEn);
+    if (topic) html += '<div class="room-topic">' + esc(topic) + '</div>';
+
+    room.sessions.forEach(function (s) {
+      html += '<div class="sess">';
+      if (!room.sessionless) {
+        var mod = s.moderators.length
+          ? '<div class="sess-mod">' + (LANG === 'en' ? 'Moderator' : '좌장') + ': ' +
+            s.moderators.map(function (m) {
+              var aff = pick(m.affiliation, m.affiliationEn);
+              return esc(pick(m.name, m.nameEn)) + (aff ? ' (' + esc(aff) + ')' : '');
+            }).join(', ') + '</div>' : '';
+        html += '<div class="sess-head">' + esc(pick(s.name, s.nameEn) || (LANG === 'en' ? 'Session' : '세션')) +
+          '<span class="sess-time">' + s.start + ' - ' + s.end + '</span>' + mod + '</div>';
+      }
+      html += '<table><thead><tr>' +
+        '<th class="col-time">' + (LANG === 'en' ? 'Time' : '시간') + '</th>' +
+        '<th>' + (LANG === 'en' ? 'Lecture Title' : '강의 제목') + '</th>' +
+        '<th class="col-spk">' + (LANG === 'en' ? 'Speaker' : '연자') + '</th>' +
+        '<th class="col-aff">' + (LANG === 'en' ? 'Affiliation' : '소속') + '</th>' +
+        '</tr></thead><tbody>';
+      s.lectures.forEach(function (lec) {
+        if (lec.type !== 'lecture') {
+          html += '<tr class="break-row"><td class="col-time">' + lec.start + ' - ' + lec.end + '</td>' +
+            '<td colspan="3">' + esc(pick(lec.title, lec.titleEn) || (lec.type === 'panel' ? 'Panel Discussion' : 'Break')) + '</td></tr>';
+          return;
+        }
+        var subtitle = LANG === 'en' ? lec.title : lec.titleEn;
+        var spk = lec.speakers.map(function (x) {
+          return '<span class="spk">' + avatar(x.photo, pick(x.name, x.nameEn)) +
+            '<span class="spk-name" onclick="openSpeaker(\'' + esc((x.name || x.nameEn || '').replace(/'/g, "\\'")) + '\')">' + esc(pick(x.name, x.nameEn)) + '</span></span>';
+        }).join('<br>') || '-';
+        var aff = lec.speakers.map(function (x) { return esc(pick(x.affiliation, x.affiliationEn)); }).filter(Boolean).join(', ') || '-';
+        html += '<tr><td class="col-time">' + lec.start + ' - ' + lec.end + '</td>' +
+          '<td><div class="l-title">' + esc(pick(lec.title, lec.titleEn)) + '</div>' +
+          (subtitle ? '<div class="l-sub">' + esc(subtitle) + '</div>' : '') +
+          (lec.memo ? '<div class="l-memo">📝 ' + esc(lec.memo) + '</div>' : '') + '</td>' +
+          '<td class="col-spk">' + spk + '</td>' +
+          '<td class="col-aff"><span class="aff">' + aff + '</span></td></tr>';
       });
+      html += '</tbody></table></div>';
     });
+
     app.innerHTML = html;
   }
 
-  /* ====== 연자 클릭 → 해당 연자의 강의목록 (이 부분도 홈페이지 디자인으로 교체 가능) ====== */
+  /* ====== 연자 클릭 → 해당 연자의 강의목록 ====== */
   window.openSpeaker = function (name) {
     var s = SPK_INDEX[(name || '').trim()];
     if (!s) return;
