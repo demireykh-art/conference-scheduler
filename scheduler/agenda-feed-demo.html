@@ -29,13 +29,16 @@
   .seg a { font-size: 0.8rem; text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; color: var(--p2); }
   .seg a.on { background: var(--p); color: #fff; border-color: var(--p); }
   .day-h { font-size: 1.15rem; font-weight: 800; color: var(--p2); margin: 26px 0 12px; }
-  .room { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin-bottom: 22px; }
-  .room-head { background: linear-gradient(90deg, var(--p), var(--p2)); color: #fff; padding: 14px 20px; }
-  .room-name { font-size: 1.2rem; font-weight: 800; }
-  .room-topic { font-size: 0.9rem; opacity: .92; margin-top: 2px; }
-  .sess-head { background: #f6f1f8; color: var(--p2); padding: 10px 20px; font-weight: 700; border-bottom: 1px solid var(--line); }
-  .sess-time { font-weight: 500; color: var(--dim); font-size: 0.85rem; margin-left: 8px; }
-  .sess-mod { font-weight: 500; color: var(--dim); font-size: 0.82rem; margin-top: 2px; }
+  /* 룸은 박스 밖으로 꺼낸 '제목' 형태 — 세션과 혼동되지 않게 */
+  .room { margin-bottom: 34px; }
+  .room-head { padding: 4px 2px 12px; margin-bottom: 14px; border-bottom: 2px solid var(--p); }
+  .room-name { font-size: 1.55rem; font-weight: 800; color: var(--p2); letter-spacing: .2px; }
+  .room-topic { font-size: 1.2rem; font-weight: 700; color: var(--p); margin-top: 3px; }
+  /* 세션은 진한 보라 헤더의 카드 (룸 안에 여러 개) */
+  .sess { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
+  .sess-head { background: linear-gradient(90deg, var(--p), var(--p2)); color: #fff; padding: 13px 20px; font-weight: 800; font-size: 1.02rem; }
+  .sess-time { font-weight: 600; color: rgba(255,255,255,.9); font-size: 0.85rem; margin-left: 8px; }
+  .sess-mod { font-weight: 500; color: rgba(255,255,255,.92); font-size: 0.82rem; margin-top: 3px; }
   table { width: 100%; border-collapse: collapse; }
   thead th { text-align: left; font-size: 0.9rem; color: var(--p2); background: #f3ebf6; padding: 12px 20px; border-bottom: 1px solid var(--line); }
   tbody td { padding: 14px 20px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 0.92rem; }
@@ -135,6 +138,7 @@
           '<div class="room-name">' + esc(pick(room.name, room.nameEn)) + '</div>' +
           (topic ? '<div class="room-topic">' + esc(topic) + '</div>' : '') + '</div>';
         room.sessions.forEach(function (s) {
+          html += '<div class="sess">';
           if (!room.sessionless) {
             var mod = s.moderators.length
               ? '<div class="sess-mod">' + (LANG === 'en' ? 'Moderator' : '좌장') + ': ' +
@@ -172,6 +176,7 @@
               '<td class="col-aff"><span class="aff">' + aff + '</span></td></tr>';
           });
           html += '</tbody></table>';
+          html += '</div>';
         });
         html += '</div>';
       });
