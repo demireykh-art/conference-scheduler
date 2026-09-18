@@ -804,6 +804,7 @@ window.restoreRoom = function (id) {
     if (!t) { Toast.error('휴지통 항목을 찾을 수 없습니다.'); return; }
     const room = Object.assign({}, t.room || {});
     room.order = orderedRooms().length;   // 맨 뒤에 복원
+    delete room.publicOpen;   // 복원된 룸은 항상 비공개로 시작(재공개는 권한자가 다시 켬)
     const updates = {};
     updates['rooms/' + id] = room;
     updates['roomTrash/' + id] = null;
