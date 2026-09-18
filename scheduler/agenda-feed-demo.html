@@ -134,7 +134,17 @@
       '<a class="' + (LANG === 'en' ? 'on' : '') + '" onclick="setLang(\'en\')">EN</a>';
 
     var app = document.getElementById('app');
-    if (!FEED || !FEED.days.length) { app.innerHTML = '<div class="msg">등록된 프로그램이 없습니다.</div>'; return; }
+    if (!FEED || !FEED.days.length) {
+        var why;
+        if (!FEED || FEED._roomsTotal === 0) {
+            why = '이 행사에 룸이 없거나 데이터를 읽지 못했습니다.<br>행사ID가 맞는지 확인하세요.';
+        } else {
+            why = '<b>홈페이지에 공개된 룸이 없습니다.</b><br>스케줄러에서 각 룸의 <b>‘홈페이지 공개’ 버튼(🌐)</b>을 켜야 여기에 표시됩니다.' +
+                  '<br><span style="font-size:0.85rem">(이 행사 전체 룸 ' + FEED._roomsTotal + '개 · 공개 ' + FEED._roomsPublic + '개)</span>';
+        }
+        app.innerHTML = '<div class="msg">' + why + '</div>';
+        return;
+    }
     if (SEL.day >= FEED.days.length) SEL.day = 0;
     var day = FEED.days[SEL.day];
     if (SEL.room >= day.rooms.length) SEL.room = 0;
@@ -220,7 +230,8 @@
     document.getElementById('app').innerHTML = '<div class="msg">주소에 <code>?id=행사ID</code>가 필요합니다.</div>';
   } else {
     AslsAgenda.load(CONF_ID).then(render).catch(function (e) {
-      document.getElementById('app').innerHTML = '<div class="msg">데이터를 불러오지 못했습니다.<br>' + esc(e.message) + '</div>';
+      document.getElementById('app').innerHTML = '<div class="msg"><b>데이터를 불러오지 못했습니다 (연결/권한 문제).</b>' +
+        '<br>브라우저 개발자도구(F12)의 콘솔/네트워크에서 오류를 확인해 주세요.<br><span style="font-size:0.85rem">' + esc(e.message) + '</span></div>';
     });
   }
 </script>
