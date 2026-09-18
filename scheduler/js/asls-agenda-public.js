@@ -136,11 +136,14 @@
         });
         order.sort(function (a, b) { return (!a ? 1 : !b ? -1 : String(a).localeCompare(String(b))); });
         var days = order.map(function (d) { return { date: d, rooms: byDate[d] }; });
+        var allRooms = toArr(conf.rooms);
         return {
             id: conf.id || '',
             title: conf.title || '', titleEn: conf.titleEn || '',
             startDate: conf.startDate || '', endDate: conf.endDate || '',
-            days: days
+            days: days,
+            _roomsTotal: allRooms.length,          // 진단용: 행사의 전체 룸 수
+            _roomsPublic: rooms.length             // 진단용: 홈페이지 공개(publicOpen)로 켠 룸 수
         };
     }
 
@@ -176,27 +179,30 @@
     }
 
     /* ---------- Firebase REST 읽기 ---------- */
-    function jget(path) {
+    // 엄격: 실패(권한·CORS·네트워크)하면 예외를 던져 호출측 .catch로 전달
+    function jgetStrict(path) {
         return fetch(DB + path + '?_=' + Date.now(), { cache: 'no-store' })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .catch(function () { return null; });
+            .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status + ' @ ' + path); return r.json(); });
     }
+    // 관대: 실패해도 null (부가 데이터용 — 없어도 렌더 가능)
+    function jgetSoft(path) { return jgetStrict(path).catch(function () { return null; }); }
 
     /**
      * load(confId) → Promise<feed>
      * 필요한 필드만 부분 조회(내부 데이터 최소 노출) 후 정리해 반환.
      * 연자 사진·국적을 위해 공개 연자 목록(adminSpeakers)도 함께 조회.
+     * rooms 조회는 엄격 모드 — 읽기 실패 시 예외(=연결/권한 문제 구분).
      */
     function load(confId) {
         if (!confId) return Promise.reject(new Error('confId required'));
         var base = '/adminConferences/' + confId;
         return Promise.all([
-            jget(base + '/rooms.json'),
-            jget(base + '/title.json'),
-            jget(base + '/titleEn.json'),
-            jget(base + '/startDate.json'),
-            jget(base + '/endDate.json'),
-            jget('/adminSpeakers.json')
+            jgetStrict(base + '/rooms.json'),   // 핵심: 실패하면 전체 reject
+            jgetSoft(base + '/title.json'),
+            jgetSoft(base + '/titleEn.json'),
+            jgetSoft(base + '/startDate.json'),
+            jgetSoft(base + '/endDate.json'),
+            jgetSoft('/adminSpeakers.json')
         ]).then(function (res) {
             return build({
                 id: confId, rooms: res[0], title: res[1], titleEn: res[2],
