@@ -73,11 +73,14 @@
 
   function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
   function pick(ko, en) { return LANG === 'en' ? (en || ko || '') : (ko || en || ''); }
+  var WD_KO = ['일', '월', '화', '수', '목', '금', '토'];
+  var WD_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  var MON_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   function fmtDay(d) {
     if (!d) return '';
-    var wd = ['일', '월', '화', '수', '목', '금', '토'];
     var dt = new Date(d + 'T00:00:00'); if (isNaN(dt)) return d;
-    return LANG === 'en' ? d : (dt.getMonth() + 1) + '월 ' + dt.getDate() + '일 (' + wd[dt.getDay()] + ')';
+    if (LANG === 'en') return MON_EN[dt.getMonth()] + ' ' + dt.getDate() + ' (' + WD_EN[dt.getDay()] + ')';
+    return (dt.getMonth() + 1) + '월 ' + dt.getDate() + '일 (' + WD_KO[dt.getDay()] + ')';
   }
   function initials(name) {
     var n = (name || '').replace(/^(Dr\.?|Prof\.?|Professor|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
