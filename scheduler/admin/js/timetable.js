@@ -457,12 +457,20 @@ function renderRoomSettings() {
 
     el.innerHTML = `
         <div class="field grow">
-            <label>룸 이름</label>
-            <input type="text" value="${escapeHtml(room.name || '')}" onchange="updateRoom('name', this.value)">
+            <label>룸 이름 <span class="hint-i" title="홈페이지에 이 이름이 룸 제목(헤더)으로 표시됩니다. 예: A Room">ⓘ</span></label>
+            <input type="text" value="${escapeHtml(room.name || '')}" onchange="updateRoom('name', this.value)" placeholder="예: A Room">
         </div>
         <div class="field grow">
-            <label>주제</label>
-            <input type="text" value="${escapeHtml(room.topic || '')}" onchange="updateRoom('topic', this.value)">
+            <label>룸 이름(영문) <span class="hint-i" title="영어 버튼일 때 표시됩니다. 비우면 국문 이름이 그대로 표시됩니다.">ⓘ</span></label>
+            <input type="text" value="${escapeHtml(room.nameEn || '')}" onchange="updateRoom('nameEn', this.value)" placeholder="비우면 국문 그대로">
+        </div>
+        <div class="field grow">
+            <label>주제 <span class="hint-i" title="홈페이지에서 룸 이름 아래에 부제(카테고리)로 표시됩니다. 예: K-trend. 비워두면 표시되지 않습니다.">ⓘ</span></label>
+            <input type="text" value="${escapeHtml(room.topic || '')}" onchange="updateRoom('topic', this.value)" placeholder="예: K-trend (홈페이지 룸 아래 부제)">
+        </div>
+        <div class="field grow">
+            <label>주제(영문) <span class="hint-i" title="영어 버튼일 때 표시됩니다. 비우면 국문 주제가 그대로 표시됩니다.">ⓘ</span></label>
+            <input type="text" value="${escapeHtml(room.topicEn || '')}" onchange="updateRoom('topicEn', this.value)" placeholder="비우면 국문 그대로">
         </div>
         <div class="field" style="min-width:200px">
             <label>날짜 (연자 중복 체크 기준)</label>
@@ -477,6 +485,13 @@ function renderRoomSettings() {
             <div class="lang-btns">
                 <button type="button" class="lang-btn ${roomLang(room) === 'ko' ? 'active' : ''}" onclick="updateRoom('lang','ko')">한글</button>
                 <button type="button" class="lang-btn ${roomLang(room) === 'en' ? 'active' : ''}" onclick="updateRoom('lang','en')">영어(EN)</button>
+            </div>
+        </div>
+        <div class="field" style="min-width:150px">
+            <label>연자 소속 표시 <span class="hint-i" title="홈페이지에서 연자 옆에 병원명(소속) 대신 국적을 표시할지 선택합니다. 해외 연자 룸에 유용. 국적은 '연자 관리'에서 입력하세요.">ⓘ</span></label>
+            <div class="lang-btns">
+                <button type="button" class="lang-btn ${!room.showNationality ? 'active' : ''}" onclick="updateRoom('showNationality', false)">소속</button>
+                <button type="button" class="lang-btn ${room.showNationality ? 'active' : ''}" onclick="updateRoom('showNationality', true)">국적</button>
             </div>
         </div>
         <div class="field" style="min-width:150px">
@@ -503,7 +518,7 @@ function renderRoomSettings() {
         </label>
         <button class="btn btn-sm" onclick="duplicateRoom()">📑 다른 날짜로 복제</button>
         <button class="btn btn-danger-ghost btn-sm" onclick="deleteRoom('${room.id}')">룸 삭제</button>
-        <div class="settings-hint"><b>홈페이지 공개</b>를 켠 룸만 홈페이지 시간표에 나옵니다(기본값: 비공개). 임시·작업용 룸은 꺼두세요. · <b>의협제출</b> 체크 시, 의협 제출용 프린트에 이 룸의 강의만 추려서 출력합니다. · ‘다른 날짜로 복제’는 이 룸을 그대로 복사한 <b>독립된 새 룸</b>을 만듭니다.</div>
+        <div class="settings-hint"><b>홈페이지 표시</b>: <b>룸 이름</b>은 홈페이지 룸 제목으로, <b>주제</b>는 그 아래 부제(예: A Room / K-trend)로 나옵니다. 영문칸을 비우면 국문이 그대로 표시됩니다. · <b>연자 소속 표시</b>를 ‘국적’으로 하면 해외 연자 룸에서 병원명 대신 국적이 나옵니다. · <b>홈페이지 공개</b>를 켠 룸만 홈페이지에 나옵니다(기본값: 비공개). · <b>의협제출</b> 체크 시 의협 제출용 프린트에 이 룸 강의만 출력합니다.</div>
     `;
 }
 
@@ -556,12 +571,13 @@ window.duplicateRoom = function () {
 };
 
 // 룸 설정 변경 이력용 — 항목명/표시값
-const ROOM_FIELD_LABEL = { name: '이름', topic: '주제', date: '날짜', startTime: '시작시간', lang: '표시언어', kmaSubmit: '의협제출', agendaOwner: '아젠다담당', visible: '표시여부', publicOpen: '홈페이지 공개' };
+const ROOM_FIELD_LABEL = { name: '이름', nameEn: '이름(영문)', topic: '주제', topicEn: '주제(영문)', date: '날짜', startTime: '시작시간', lang: '표시언어', kmaSubmit: '의협제출', agendaOwner: '아젠다담당', visible: '표시여부', publicOpen: '홈페이지 공개', showNationality: '연자 소속 표시' };
 function roomFieldDisp(field, v) {
     if (field === 'date') return v ? dayLabel(v) : '날짜미정';
     if (field === 'lang') return v === 'en' ? '영어(EN)' : '한글';
     if (field === 'kmaSubmit') return v ? 'ON' : 'OFF';
     if (field === 'publicOpen') return v ? '공개' : '비공개';
+    if (field === 'showNationality') return v ? '국적' : '소속';
     if (field === 'visible') return v === false ? '숨김' : '표시';
     const s = (v == null ? '' : String(v)).trim();
     return s === '' ? '(비어있음)' : s;
