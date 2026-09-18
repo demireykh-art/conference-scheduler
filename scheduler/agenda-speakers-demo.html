@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASLS 연자 페이지 연동 데모 (메드소프트 참고용)</title>
+<!--
+  연자(Speaker) 페이지 참고 구현.
+  - 전체 연자를 그리드로(사진/이니셜·이름·국가·강의수 뱃지), 성(last name) 알파벳순
+  - 연자 클릭 → 아래 상세 영역에 그 연자의 강의목록 표시 + 자동 스크롤
+  - 데이터는 공개 피드(asls-agenda-public.js)의 AslsAgenda.speakerIndex(feed) 사용
+  메드소프트는 renderGrid()/renderDetail() 부분만 자사 디자인으로 바꾸면 됩니다.
+
+  주소:  agenda-speakers-demo.html?id=<행사ID>[&lang=ko|en]
+-->
+<style>
+  :root { --p: #6b1f7a; --p2: #3f1147; --line: #e7e2ea; --dim: #7a7580; --text: #222; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Malgun Gothic", "Noto Sans KR", sans-serif; color: var(--text); background: #fff; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 80px; }
+  .hint { background: #faf5fc; border: 1px solid #ecdbf2; color: #5a3a66; font-size: 0.82rem; border-radius: 10px; padding: 10px 14px; margin-bottom: 18px; }
+  .note { color: var(--dim); font-size: 0.86rem; margin: 4px 0; }
+  .seg { display: inline-flex; gap: 6px; margin-left: 10px; }
+  .seg a { font-size: 0.8rem; text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; color: var(--p2); cursor: pointer; }
+  .seg a.on { background: var(--p); color: #fff; border-color: var(--p); }
+  /* 연자 그리드 */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-top: 14px; }
+  .card { position: relative; border: 1px solid var(--line); border-radius: 12px; padding: 18px 12px 14px; text-align: center; cursor: pointer; transition: box-shadow .15s, transform .05s; background: #fff; }
+  .card:hover { box-shadow: 0 4px 16px rgba(107,31,122,.12); }
+  .card.sel { border-color: var(--p); box-shadow: 0 0 0 2px var(--p) inset; }
+  .card .badge { position: absolute; top: 10px; right: 10px; background: var(--p2); color: #fff; font-size: 0.72rem; font-weight: 700; min-width: 20px; height: 20px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; padding: 0 5px; }
+  .ava { width: 70px; height: 70px; border-radius: 50%; margin: 0 auto 10px; background: #ece7f0; color: var(--p2); font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .ava img { width: 100%; height: 100%; object-fit: cover; }
+  .card .nm { font-weight: 700; font-size: 0.92rem; line-height: 1.3; }
+  .card .ct { color: var(--dim); font-size: 0.82rem; margin-top: 3px; }
+  /* 상세 */
+  .detail { margin-top: 34px; scroll-margin-top: 16px; }
+  .d-head { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid var(--p); padding-bottom: 12px; margin-bottom: 16px; }
+  .d-head .ava { width: 64px; height: 64px; margin: 0; }
+  .d-name { font-size: 1.4rem; font-weight: 800; color: var(--p2); }
+  .d-ct { color: var(--dim); font-size: 0.9rem; }
+  .lec { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+  .lec-head { background: linear-gradient(90deg, var(--p), var(--p2)); color: #fff; padding: 12px 18px; font-weight: 800; font-size: 0.98rem; }
+  .lec-body { padding: 4px 0; }
+  .row { display: flex; border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: 0; }
+  .row .k { flex: 0 0 130px; padding: 11px 18px; color: var(--p2); font-weight: 700; font-size: 0.86rem; background: #faf7fb; }
+  .row .v { padding: 11px 18px; font-size: 0.9rem; }
+  .role { display: inline-block; background: var(--p); color: #fff; border-radius: 999px; padding: 3px 12px; font-size: 0.8rem; font-weight: 700; }
+  .msg { padding: 48px 16px; text-align: center; color: var(--dim); }
+  .backtop { display: inline-block; margin-top: 8px; color: var(--p); cursor: pointer; font-size: 0.86rem; font-weight: 700; }
+  @media (max-width: 560px) { .row { flex-direction: column; } .row .k { flex: none; background: none; padding-bottom: 0; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hint">
+    <b>메드소프트 참고용 — 연자 페이지</b>. 연자 카드를 클릭하면 아래로 스크롤되며 그 연자의 강의목록이 표시됩니다.
+    데이터는 <code>AslsAgenda.speakerIndex(feed)</code>를 사용하며, 홈페이지는 <code>renderGrid()/renderDetail()</code>만 자사 디자인으로 바꾸면 됩니다.
+    <span class="seg" id="langSeg"></span>
+  </div>
+  <div class="note">* 사진을 클릭하면 상세 프로그램 정보를 볼 수 있습니다. &nbsp; * 성(last name) 알파벳순.</div>
+  <div id="grid"><div class="msg">불러오는 중…</div></div>
+  <div class="detail" id="detail"></div>
+</div>
+
+<script src="js/asls-agenda-public.js"></script>
+<script>
+  var params = new URLSearchParams(location.search);
+  var CONF_ID = params.get('id') || '';
+  var LANG = params.get('lang') === 'en' ? 'en' : 'ko';
+  var SPEAKERS = [];
+
+  function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+  function pick(ko, en) { return LANG === 'en' ? (en || ko || '') : (ko || en || ''); }
+  function fmtDay(d) {
+    if (!d) return '';
+    var wd = ['일', '월', '화', '수', '목', '금', '토'];
+    var dt = new Date(d + 'T00:00:00'); if (isNaN(dt)) return d;
+    return LANG === 'en' ? d : (dt.getMonth() + 1) + '월 ' + dt.getDate() + '일 (' + wd[dt.getDay()] + ')';
+  }
+  function initials(name) {
+    var n = (name || '').replace(/^(Dr\.?|Prof\.?|Professor|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
+    var first = (name || '').replace(/^(Dr\.?|Prof\.?)\s+/i, '').charAt(0);
+    var p = n.split(/\s+/); var last = (p[p.length - 1] || '').charAt(0);
+    return ((first || '') + (last || '')).toUpperCase() || '?';
+  }
+  function avatar(sp) {
+    var nm = pick(sp.name, sp.nameEn);
+    return sp.photo ? '<img src="' + esc(sp.photo) + '" alt="">' : esc(initials(sp.nameEn || sp.name || nm));
+  }
+  function country(sp) { return pick(sp.nationality, sp.nationalityEn) || pick(sp.affiliation, sp.affiliationEn) || ''; }
+
+  window.setLang = function (l) { LANG = l; draw(); };
+
+  function render(feed) {
+    SPEAKERS = AslsAgenda.speakerIndex(feed);
+    draw();
+  }
+
+  function draw() {
+    document.getElementById('langSeg').innerHTML =
+      '<a class="' + (LANG === 'ko' ? 'on' : '') + '" onclick="setLang(\'ko\')">국문</a>' +
+      '<a class="' + (LANG === 'en' ? 'on' : '') + '" onclick="setLang(\'en\')">EN</a>';
+    renderGrid();
+    document.getElementById('detail').innerHTML = '';
+  }
+
+  /* ====== 연자 그리드 (이 부분을 홈페이지 디자인으로 교체) ====== */
+  function renderGrid() {
+    var g = document.getElementById('grid');
+    if (!SPEAKERS.length) { g.innerHTML = '<div class="msg">공개된 프로그램에 연자가 없습니다.</div>'; return; }
+    g.innerHTML = '<div class="grid">' + SPEAKERS.map(function (sp, i) {
+      return '<div class="card" id="card' + i + '" onclick="openSpeaker(' + i + ')">' +
+        '<div class="badge">' + sp.lectures.length + '</div>' +
+        '<div class="ava">' + avatar(sp) + '</div>' +
+        '<div class="nm">' + esc(pick(sp.name, sp.nameEn)) + '</div>' +
+        '<div class="ct">' + esc(country(sp)) + '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+  }
+
+  /* ====== 연자 상세: 강의목록 (이 부분을 홈페이지 디자인으로 교체) ====== */
+  window.openSpeaker = function (i) {
+    var sp = SPEAKERS[i]; if (!sp) return;
+    document.querySelectorAll('.card').forEach(function (c) { c.classList.remove('sel'); });
+    var card = document.getElementById('card' + i); if (card) card.classList.add('sel');
+
+    var html = '<div class="d-head"><div class="ava">' + avatar(sp) + '</div>' +
+      '<div><div class="d-name">' + esc(pick(sp.name, sp.nameEn)) + '</div>' +
+      '<div class="d-ct">' + esc(country(sp)) + ' · ' + (LANG === 'en' ? 'Lectures' : '강의') + ' ' + sp.lectures.length + '</div></div></div>';
+
+    html += sp.lectures.map(function (l) {
+      return '<div class="lec"><div class="lec-head">' + esc(pick(l.session, l.sessionEn) || (LANG === 'en' ? 'Session' : '세션')) + '</div>' +
+        '<div class="lec-body">' +
+          '<div class="row"><div class="k">Role</div><div class="v"><span class="role">' + (LANG === 'en' ? 'Speaker' : '연자') + '</span></div></div>' +
+          '<div class="row"><div class="k">Room</div><div class="v">' + esc(pick(l.room, l.roomEn)) + '</div></div>' +
+          '<div class="row"><div class="k">' + (LANG === 'en' ? 'Program Day' : '일정') + '</div><div class="v">' + esc(fmtDay(l.date)) + ' ' + (LANG === 'en' ? 'Program' : '프로그램') + ' · ' + l.start + ' - ' + l.end + '</div></div>' +
+          '<div class="row"><div class="k">' + (LANG === 'en' ? 'Lecture Title' : '강의 제목') + '</div><div class="v">' + esc(pick(l.title, l.titleEn)) + '</div></div>' +
+        '</div></div>';
+    }).join('');
+    html += '<div class="backtop" onclick="window.scrollTo({top:0,behavior:\'smooth\'})">▲ ' + (LANG === 'en' ? 'Back to all speakers' : '전체 연자 목록으로') + '</div>';
+
+    var d = document.getElementById('detail');
+    d.innerHTML = html;
+    // 아래로 자동 스크롤
+    setTimeout(function () { d.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30);
+  };
+
+  if (!CONF_ID) {
+    document.getElementById('grid').innerHTML = '<div class="msg">주소에 <code>?id=행사ID</code>가 필요합니다.</div>';
+  } else {
+    AslsAgenda.load(CONF_ID).then(render).catch(function (e) {
+      document.getElementById('grid').innerHTML = '<div class="msg"><b>데이터를 불러오지 못했습니다 (연결/권한 문제).</b><br><span style="font-size:0.85rem">' + esc(e.message) + '</span></div>';
+    });
+  }
+</script>
+</body>
+</html>

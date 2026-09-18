@@ -68,6 +68,9 @@
         return {
             name: nameKo, nameEn: nameEn,
             affiliation: affKo, affiliationEn: affEn,
+            // 국적(나라)은 룸 토글과 무관하게 항상 제공 — 연자 목록 페이지의 국가 표시용
+            nationality: (m && m.nationalityKo) || s.nationalityKo || '',
+            nationalityEn: (m && m.nationalityEn) || s.nationalityEn || '',
             photo: (m && (m.photo || m.photoURL)) || ''   // 연자 사진(마스터의 photo, base64 data URL)
         };
     }
@@ -147,6 +150,13 @@
         };
     }
 
+    /* ---------- 성(last name) 추출 (연자 목록 정렬용) ---------- */
+    function lastName(n) {
+        n = (n || '').replace(/^(Dr\.?|Prof\.?|Professor|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
+        var p = n.split(/\s+/);
+        return (p[p.length - 1] || n).toLowerCase();
+    }
+
     /* ---------- 연자별 강의목록 인덱스 (연자 클릭 → 강의 리스트용) ---------- */
     function speakerIndex(feed) {
         var map = {};
@@ -161,6 +171,7 @@
                             if (!map[key]) map[key] = {
                                 name: spk.name, nameEn: spk.nameEn, photo: spk.photo,
                                 affiliation: spk.affiliation, affiliationEn: spk.affiliationEn,
+                                nationality: spk.nationality, nationalityEn: spk.nationalityEn,
                                 lectures: []
                             };
                             map[key].lectures.push({
@@ -174,8 +185,12 @@
                 });
             });
         });
+        // 성(영문 기준) 알파벳순 — 영문명 없으면 국문명 기준
         return Object.keys(map).map(function (k) { return map[k]; })
-            .sort(function (a, b) { return (a.name || a.nameEn || '').localeCompare(b.name || b.nameEn || '', 'ko'); });
+            .sort(function (a, b) {
+                return lastName(a.nameEn || a.name).localeCompare(lastName(b.nameEn || b.name), 'en')
+                    || (a.nameEn || a.name || '').localeCompare(b.nameEn || b.name || '', 'en');
+            });
     }
 
     /* ---------- Firebase REST 읽기 ---------- */
