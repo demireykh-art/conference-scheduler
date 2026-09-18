@@ -102,8 +102,10 @@
         const sessions = computeRoom(room);
         const body = sessions.map(s => renderSession(room, s)).join('') ||
             `<div class="ag-empty">등록된 세션이 없습니다.</div>`;
+        const topic = pick(LANG === 'en' || LANG === 'ko' ? LANG : roomLang(room), room.topic, room.topicEn);
         return `<section class="ag-room">
             <div class="ag-room-name">${esc(room.name || '룸')}</div>
+            ${topic ? `<div class="ag-room-topic">${esc(topic)}</div>` : ''}
             ${body}
         </section>`;
     }
@@ -168,19 +170,13 @@
             const aff = (x.affiliationKo || x.affiliationEn) ? ` <span class="ag-aff">(${esc(pick(lang, x.affiliationKo, x.affiliationEn))})</span>` : '';
             return `<span class="ag-spk">${nm}${aff}</span>`;
         }).join('<span class="ag-sep">, </span>') : '';
-        const partner = pick(lang, lec.partnerKo != null ? lec.partnerKo : lec.partner, lec.partnerEn);
-        const product = pick(lang, lec.productKo, lec.productEn);
-        const meta = [
-            partner ? `<span class="ag-partner">🏢 ${esc(partner)}</span>` : '',
-            product ? `<span class="ag-product">💊 ${esc(product)}</span>` : ''
-        ].filter(Boolean).join('');
+        // 파트너사·제품은 공개 화면에서 제외 (내부 확인용 정보)
         const memo = lec.memo ? `<div class="ag-memo">📝 ${esc(lec.memo)}</div>` : '';
         return `<div class="ag-lec">
             <div class="ag-time">${time}</div>
             <div class="ag-lec-main">
                 <div class="ag-lec-title">${title}</div>
                 ${spkHtml ? `<div class="ag-lec-spk">${spkHtml}</div>` : ''}
-                ${meta ? `<div class="ag-lec-meta">${meta}</div>` : ''}
                 ${memo}
             </div>
         </div>`;

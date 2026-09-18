@@ -711,6 +711,14 @@ a { color: inherit; }
 .pub-toggle.on { background: #e6f7ee; border-color: #12a150; color: #0d7a3c; }
 .pub-toggle.locked { cursor: not-allowed; opacity: 0.6; }
 
+/* 라벨 옆 정보 아이콘 (호버 시 title 툴팁) */
+.hint-i {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: #4f7fe0; color: #fff; font-size: 10px; font-weight: 700;
+    cursor: help; vertical-align: middle; margin-left: 2px;
+}
+
 /* ASLS Week 진행상황 보드 */
 .aw-table { min-width: 1200px; }
 .aw-table th { white-space: nowrap; font-size: 0.76rem; }

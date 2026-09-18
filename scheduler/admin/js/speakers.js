@@ -119,7 +119,7 @@ function renderSpeakers() {
 
     const body = document.getElementById('spkBody');
     if (!list.length) {
-        body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:40px">
+        body.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-dim);padding:40px">
             ${SPEAKERS.length ? '검색 결과가 없습니다.' : '등록된 연자가 없습니다. <b>+ 연자 등록</b>으로 추가하세요.'}</td></tr>`;
         return;
     }
@@ -129,6 +129,7 @@ function renderSpeakers() {
             <td data-label="영문명" class="en">${escapeHtml(s.nameEn || '-')}</td>
             <td data-label="소속">${escapeHtml(s.affiliationKo || '-')}</td>
             <td data-label="소속(영문)" class="en">${escapeHtml(s.affiliationEn || '-')}</td>
+            <td data-label="국적">${escapeHtml(s.nationalityKo || s.nationalityEn || '-')}</td>
             <td data-label="구분">${aslsBadges(s) || '<span style="color:var(--text-dim)">-</span>'}</td>
             <td data-label="관리">
                 <div class="row-actions">
@@ -143,7 +144,7 @@ window.openSpeakerModal = function () {
     if (!AdminAuth.requireEdit()) return;
     SPK_EDIT_ID = null;
     document.getElementById('spkModalTitle').textContent = '연자 등록';
-    ['spkNameKo', 'spkNameEn', 'spkAffKo', 'spkAffEn', 'spkCv', 'spkEmail'].forEach(id => document.getElementById(id).value = '');
+    ['spkNameKo', 'spkNameEn', 'spkAffKo', 'spkAffEn', 'spkNatKo', 'spkNatEn', 'spkCv', 'spkEmail'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('spkRoleExec').checked = false;
     document.getElementById('spkRoleAdvisor').checked = false;
     document.getElementById('spkRoleAmb').checked = false;
@@ -165,6 +166,8 @@ window.editSpeaker = function (id) {
     document.getElementById('spkNameEn').value = s.nameEn || '';
     document.getElementById('spkAffKo').value = s.affiliationKo || '';
     document.getElementById('spkAffEn').value = s.affiliationEn || '';
+    document.getElementById('spkNatKo').value = s.nationalityKo || '';
+    document.getElementById('spkNatEn').value = s.nationalityEn || '';
     document.getElementById('spkCv').value = s.cv || '';
     document.getElementById('spkEmail').value = s.email || '';
     document.getElementById('spkRoleExec').checked = !!s.roleExec;
@@ -196,6 +199,8 @@ function doSaveSpeaker(closeAfter) {
         nameEn: document.getElementById('spkNameEn').value.trim(),
         affiliationKo: affKo,
         affiliationEn: document.getElementById('spkAffEn').value.trim(),
+        nationalityKo: document.getElementById('spkNatKo').value.trim(),
+        nationalityEn: document.getElementById('spkNatEn').value.trim(),
         cv: document.getElementById('spkCv').value.trim(),
         email: document.getElementById('spkEmail').value.trim(),
         roleExec: document.getElementById('spkRoleExec').checked,
