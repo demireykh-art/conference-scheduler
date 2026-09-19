@@ -11,7 +11,9 @@
  *   <script>
  *     AslsAgenda.load('<행사ID>').then(function (feed) {
  *       // feed.days[].rooms[].sessions[].lectures[] 를 홈페이지 디자인으로 렌더
+ *       // 각 강의에는 고유 id 있음: lec.id  (관심강의/내 스케줄 담기 저장용)
  *       // 연자별 강의목록:  var idx = AslsAgenda.speakerIndex(feed);
+ *       // 저장한 관심강의 렌더: AslsAgenda.findLectures(feed, ['<lec.id>', ...])
  *     });
  *   </script>
  *
@@ -98,6 +100,8 @@
                 cursor += (Number(lec.duration) || 0);
                 var type = lec.isBreak ? 'break' : (lec.isPanel ? 'panel' : 'lecture');
                 return {
+                    id: lec.id || '',              // 이 강의 슬롯의 고유 id (관심강의/내 스케줄 담기 저장용, 행사 내 유일)
+                    lectureId: lec.lectureId || '', // 강의 원본 id (같은 강의가 여러 곳 배치된 경우 그룹화용, 참고)
                     start: fmt(s), end: fmt(cursor), duration: Number(lec.duration) || 0,
                     type: type,   // 'lecture' | 'break' | 'panel'
                     title: lec.titleKo != null ? lec.titleKo : (lec.title || ''),
@@ -178,6 +182,7 @@
                             };
                             else if (!map[key].id && spk.id) map[key].id = spk.id;
                             map[key].lectures.push({
+                                id: lec.id || '', lectureId: lec.lectureId || '',
                                 date: day.date, room: room.name, roomEn: room.nameEn,
                                 session: s.name, sessionEn: s.nameEn,
                                 start: lec.start, end: lec.end,
@@ -194,6 +199,32 @@
                 return lastName(a.nameEn || a.name).localeCompare(lastName(b.nameEn || b.name), 'en')
                     || (a.nameEn || a.name || '').localeCompare(b.nameEn || b.name || '', 'en');
             });
+    }
+
+    /* ---------- 강의 id로 강의 찾기 (내 스케줄/관심강의 렌더용) ---------- */
+    // 저장해 둔 강의 id로 그 강의의 룸·세션·시간·제목 등을 다시 찾아 돌려준다.
+    function findLecture(feed, id) {
+        var out = null;
+        (feed && feed.days || []).forEach(function (day) {
+            day.rooms.forEach(function (room) {
+                room.sessions.forEach(function (s) {
+                    s.lectures.forEach(function (lec) {
+                        if (lec.id && lec.id === id) out = {
+                            date: day.date,
+                            room: room.name, roomEn: room.nameEn,
+                            topic: room.topic, topicEn: room.topicEn,
+                            session: s.name, sessionEn: s.nameEn,
+                            lecture: lec
+                        };
+                    });
+                });
+            });
+        });
+        return out;
+    }
+    // 여러 id를 한 번에 (입력 순서 유지, 못 찾은 id는 건너뜀)
+    function findLectures(feed, ids) {
+        return (ids || []).map(function (id) { return findLecture(feed, id); }).filter(Boolean);
     }
 
     /* ---------- Firebase REST 읽기 ---------- */
@@ -229,6 +260,10 @@
         });
     }
 
-    global.AslsAgenda = { DB: DB, load: load, speakerIndex: speakerIndex, _build: build };
+    global.AslsAgenda = {
+        DB: DB, load: load, speakerIndex: speakerIndex,
+        findLecture: findLecture, findLectures: findLectures,
+        _build: build
+    };
 
 })(typeof window !== 'undefined' ? window : this);
