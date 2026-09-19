@@ -23,13 +23,14 @@
             --ag-break: #f3eef6;
         }
         * { box-sizing: border-box; }
+        html { font-size: 17.5px; }   /* 전체 폰트 소폭 확대 (기본 16px → 17.5px) */
         html, body { margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
             color: var(--ag-ink); background: #fff; line-height: 1.5;
             -webkit-text-size-adjust: 100%;
         }
-        .ag-container { max-width: 920px; margin: 0 auto; padding: 20px 16px 40px; }
+        .ag-container { max-width: 100%; margin: 0 auto; padding: 20px 16px 40px; }
 
         .ag-head { margin-bottom: 18px; }
         .ag-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 4px; color: var(--ag-primary); }
