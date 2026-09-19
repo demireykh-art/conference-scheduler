@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASLS 내 스케줄 담기 데모 (메드소프트 참고용)</title>
+<!--
+  회원 '내 스케줄 담기(관심강의)' + 내보내기 참고 구현.
+   - 강의별 '담기' 버튼 (로그인한 회원만 — 비로그인 시 로그인 안내)
+   - 담은 강의를 모아 보여주고, 캘린더(.ics)/구글캘린더/이미지/메일/카톡으로 내보내기
+   - 데이터·id·캘린더 변환은 asls-agenda-public.js가 담당
+  메드소프트는 로그인/저장(회원시스템)만 연결하고, 아래 예시를 자사 디자인으로 바꾸면 됩니다.
+
+  주소: agenda-myschedule-demo.html?id=<행사ID>[&lang=ko|en]
+  ※ 이 데모는 로그인/저장을 브라우저(localStorage)로 흉내냅니다. 실제로는 회원 계정에 저장.
+-->
+<style>
+  :root { --p:#6b1f7a; --p2:#3f1147; --line:#e7e2ea; --dim:#7a7580; --ok:#12a150; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,"Malgun Gothic","Noto Sans KR",sans-serif; color:#222; background:#fff; }
+  .wrap { max-width:1100px; margin:0 auto; padding:18px 16px 120px; }
+  .hint { background:#faf5fc; border:1px solid #ecdbf2; color:#5a3a66; font-size:.82rem; border-radius:10px; padding:10px 14px; margin-bottom:14px; }
+  .bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .seg a { font-size:.8rem; text-decoration:none; border:1px solid var(--line); border-radius:999px; padding:4px 12px; color:var(--p2); cursor:pointer; }
+  .seg a.on { background:var(--p); color:#fff; border-color:var(--p); }
+  .login { margin-left:auto; font-size:.85rem; }
+  .login button { border:1px solid var(--line); background:#fff; border-radius:999px; padding:6px 14px; cursor:pointer; font-weight:700; }
+  .login button.in { background:#e6f7ee; border-color:var(--ok); color:#0d7a3c; }
+  .tabs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  .tab { border:1px solid var(--line); border-radius:999px; padding:7px 15px; font-weight:700; color:var(--p2); background:#fff; cursor:pointer; font-size:.9rem; }
+  .tab.on { background:var(--p2); color:#fff; border-color:var(--p2); }
+  hr { border:0; border-top:1px solid var(--line); margin:12px 0 16px; }
+  .room-topic { font-size:1.35rem; font-weight:800; color:var(--p2); margin:2px 0 14px; }
+  .sess { border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:14px; }
+  .sess-head { background:linear-gradient(90deg,var(--p),var(--p2)); color:#fff; padding:11px 18px; font-weight:800; }
+  .sess-time { color:rgba(255,255,255,.9); font-size:.82rem; margin-left:8px; font-weight:600; }
+  .lec { display:flex; gap:12px; align-items:flex-start; padding:12px 18px; border-bottom:1px solid var(--line); }
+  .lec:last-child { border-bottom:0; }
+  .lec-time { flex:0 0 100px; color:var(--dim); font-variant-numeric:tabular-nums; font-size:.86rem; }
+  .lec-main { flex:1; min-width:0; }
+  .lec-title { font-weight:700; line-height:1.4; }
+  .lec-sub { color:var(--dim); font-size:.83rem; margin-top:2px; }
+  .lec-spk { color:var(--p); font-size:.83rem; margin-top:3px; }
+  .add { flex:0 0 auto; border:1px solid var(--p); background:#fff; color:var(--p); border-radius:8px; padding:7px 12px; font-weight:700; cursor:pointer; white-space:nowrap; font-size:.85rem; }
+  .add.on { background:var(--p); color:#fff; }
+  .brk { color:var(--dim); font-weight:600; }
+  .msg { padding:44px 16px; text-align:center; color:var(--dim); }
+  /* 내 스케줄 플로팅 버튼 + 패널 */
+  .fab { position:fixed; right:18px; bottom:18px; background:var(--p); color:#fff; border:0; border-radius:999px; padding:14px 20px; font-weight:800; font-size:1rem; box-shadow:0 6px 20px rgba(107,31,122,.35); cursor:pointer; z-index:40; }
+  .ov { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:flex-end; justify-content:center; z-index:50; }
+  .ov.on { display:flex; }
+  .sheet { background:#fff; width:100%; max-width:640px; max-height:88vh; overflow:auto; border-radius:16px 16px 0 0; padding:18px; }
+  @media (min-width:640px){ .ov{align-items:center;} .sheet{border-radius:16px;} }
+  .sheet h3 { margin:0 0 10px; color:var(--p2); }
+  .exports { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 16px; }
+  .exp { border:1px solid var(--line); background:#fff; border-radius:10px; padding:10px 14px; font-weight:700; cursor:pointer; font-size:.9rem; }
+  .exp.primary { background:var(--p); color:#fff; border-color:var(--p); }
+  .myrow { display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-top:1px solid var(--line); }
+  .myrow .t { flex:0 0 92px; color:var(--dim); font-size:.82rem; }
+  .myrow .m { flex:1; }
+  .myrow .g { font-size:.78rem; color:var(--p); text-decoration:none; }
+  .myrow .x { border:0; background:#f0ecf3; border-radius:7px; padding:4px 9px; cursor:pointer; color:#b23; font-weight:700; }
+  .close { float:right; border:0; background:#f0ecf3; border-radius:8px; padding:6px 12px; cursor:pointer; font-weight:700; }
+  .empty { color:var(--dim); padding:20px 0; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hint">
+    <b>메드소프트 참고용 — 내 스케줄 담기(관심강의)</b>. 강의의 <b>담기</b>를 누르면 내 스케줄에 저장되고,
+    우측 하단 <b>🗓 내 스케줄</b>에서 <b>캘린더(.ics)·구글 캘린더·이미지·메일</b>로 내보낼 수 있습니다.
+    <b>로그인한 회원만</b> 담기가 가능합니다(비로그인 시 안내). 저장·로그인은 회원시스템(메드소프트), 데이터·캘린더 변환은 <code>asls-agenda-public.js</code>가 담당합니다.
+  </div>
+  <div class="bar">
+    <span class="seg" id="langSeg"></span>
+    <span class="login" id="loginBox"></span>
+  </div>
+  <div id="app"><div class="msg">불러오는 중…</div></div>
+</div>
+
+<button class="fab" id="fab" onclick="openSheet()">🗓 내 스케줄 (<span id="fabN">0</span>)</button>
+
+<div class="ov" id="ov" onclick="if(event.target===this)closeSheet()">
+  <div class="sheet">
+    <button class="close" onclick="closeSheet()">닫기 ✕</button>
+    <h3>내 스케줄</h3>
+    <div class="exports" id="exports"></div>
+    <div id="myContent"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="js/asls-agenda-public.js"></script>
+<script>
+  var params = new URLSearchParams(location.search);
+  var CONF_ID = params.get('id') || '';
+  var LANG = params.get('lang') === 'en' ? 'en' : 'ko';
+  var FEED = null, SEL = { day:0, room:0 };
+  var LKEY = 'asls_my_' + CONF_ID;                 // 담은 강의 id 저장(데모: localStorage)
+  var LOGIN_KEY = 'asls_demo_login';               // 로그인 흉내(데모용)
+
+  function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];}); }
+  function pick(ko,en){ return LANG==='en'?(en||ko||''):(ko||en||''); }
+  var WD_KO=['일','월','화','수','목','금','토'], WD_EN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], MON_EN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function fmtDay(d){ if(!d)return''; var dt=new Date(d+'T00:00:00'); if(isNaN(dt))return d;
+    return LANG==='en' ? (MON_EN[dt.getMonth()]+' '+dt.getDate()+' ('+WD_EN[dt.getDay()]+')') : ((dt.getMonth()+1)+'월 '+dt.getDate()+'일 ('+WD_KO[dt.getDay()]+')'); }
+
+  /* ---- 담기 상태(데모: localStorage) ---- */
+  function getMy(){ try{ return JSON.parse(localStorage.getItem(LKEY)||'[]'); }catch(e){ return []; } }
+  function setMy(a){ try{ localStorage.setItem(LKEY, JSON.stringify(a)); }catch(e){} }
+  function isLoggedIn(){ try{ return localStorage.getItem(LOGIN_KEY)==='1'; }catch(e){ return false; } }
+  function setLogin(v){ try{ localStorage.setItem(LOGIN_KEY, v?'1':'0'); }catch(e){} }
+
+  window.setLang=function(l){ LANG=l; draw(); };
+  window.selDay=function(i){ SEL.day=i; SEL.room=0; draw(); };
+  window.selRoom=function(i){ SEL.room=i; draw(); };
+  window.toggleLogin=function(){ setLogin(!isLoggedIn()); draw(); };
+
+  /* ---- 담기 토글 (로그인 필수) ---- */
+  window.toggleAdd=function(id){
+    if(!isLoggedIn()){ alert(LANG==='en'?'Please log in to add lectures to your schedule.':'로그인 후 이용하실 수 있습니다. (로그인한 회원만 담을 수 있어요)'); return; }
+    var a=getMy(), i=a.indexOf(id);
+    if(i>=0) a.splice(i,1); else a.push(id);
+    setMy(a); draw(); renderMy();
+  };
+  window.removeMy=function(id){ var a=getMy(), i=a.indexOf(id); if(i>=0){a.splice(i,1); setMy(a);} draw(); renderMy(); };
+
+  function render(feed){ FEED=feed; draw(); }
+
+  function draw(){
+    document.getElementById('langSeg').innerHTML =
+      '<a class="'+(LANG==='ko'?'on':'')+'" onclick="setLang(\'ko\')">국문</a>'+
+      '<a class="'+(LANG==='en'?'on':'')+'" onclick="setLang(\'en\')">EN</a>';
+    document.getElementById('loginBox').innerHTML = isLoggedIn()
+      ? '<button class="in" onclick="toggleLogin()">🔓 '+(LANG==='en'?'Logged in (demo)':'로그인됨(데모)')+'</button>'
+      : '<button onclick="toggleLogin()">🔒 '+(LANG==='en'?'Log in (demo)':'로그인하기(데모)')+'</button>';
+    document.getElementById('fabN').textContent = getMy().length;
+
+    var app=document.getElementById('app');
+    if(!FEED || !FEED.days.length){ app.innerHTML='<div class="msg">공개된 프로그램이 없습니다.</div>'; return; }
+    if(SEL.day>=FEED.days.length) SEL.day=0;
+    var day=FEED.days[SEL.day];
+    if(SEL.room>=day.rooms.length) SEL.room=0;
+    var room=day.rooms[SEL.room];
+    var my=getMy();
+
+    var html='<div class="tabs">'+FEED.days.map(function(d,i){ return '<button class="tab '+(i===SEL.day?'on':'')+'" onclick="selDay('+i+')">'+esc(fmtDay(d.date))+'</button>'; }).join('')+'</div>';
+    html+='<div class="tabs">'+day.rooms.map(function(r,i){ return '<button class="tab '+(i===SEL.room?'on':'')+'" onclick="selRoom('+i+')">'+esc(pick(r.name,r.nameEn))+'</button>'; }).join('')+'</div><hr>';
+    var topic=pick(room.topic,room.topicEn); if(topic) html+='<div class="room-topic">'+esc(topic)+'</div>';
+
+    room.sessions.forEach(function(s){
+      html+='<div class="sess"><div class="sess-head">'+esc(pick(s.name,s.nameEn)||'세션')+'<span class="sess-time">'+s.start+' - '+s.end+'</span></div>';
+      s.lectures.forEach(function(lec){
+        if(lec.type!=='lecture'){
+          html+='<div class="lec"><div class="lec-time">'+lec.start+' - '+lec.end+'</div><div class="lec-main brk">'+esc(pick(lec.title,lec.titleEn)||'Break')+'</div></div>';
+          return;
+        }
+        var added=my.indexOf(lec.id)>=0;
+        var sub=LANG==='en'?lec.title:lec.titleEn;
+        var spk=lec.speakers.map(function(x){return esc(pick(x.name,x.nameEn));}).filter(Boolean).join(', ');
+        html+='<div class="lec"><div class="lec-time">'+lec.start+' - '+lec.end+'</div>'+
+          '<div class="lec-main"><div class="lec-title">'+esc(pick(lec.title,lec.titleEn))+'</div>'+
+          (sub?'<div class="lec-sub">'+esc(sub)+'</div>':'')+
+          (spk?'<div class="lec-spk">'+(LANG==='en'?'Speaker':'연자')+': '+spk+'</div>':'')+'</div>'+
+          '<button class="add '+(added?'on':'')+'" onclick="toggleAdd(\''+esc(lec.id)+'\')">'+(added?(LANG==='en'?'✓ Added':'✓ 담김'):(LANG==='en'?'+ Add':'+ 담기'))+'</button></div>';
+      });
+      html+='</div>';
+    });
+    app.innerHTML=html;
+  }
+
+  /* ---- 내 스케줄 패널 + 내보내기 ---- */
+  window.openSheet=function(){ renderMy(); document.getElementById('ov').classList.add('on'); };
+  window.closeSheet=function(){ document.getElementById('ov').classList.remove('on'); };
+
+  function renderMy(){
+    var ids=getMy();
+    var items=AslsAgenda.findLectures(FEED, ids);
+    // 시간순 정렬
+    items.sort(function(a,b){ return (a.date+a.lecture.start).localeCompare(b.date+b.lecture.start); });
+    var exp=document.getElementById('exports');
+    var mc=document.getElementById('myContent');
+    if(!items.length){ exp.innerHTML=''; mc.innerHTML='<div class="empty">담은 강의가 없습니다. 강의의 <b>+ 담기</b>를 눌러 추가하세요.</div>'; return; }
+
+    exp.innerHTML =
+      '<button class="exp primary" onclick="expICS()">📅 '+(LANG==='en'?'Calendar (.ics)':'캘린더 저장(.ics)')+'</button>'+
+      '<button class="exp" onclick="expImage()">🖼 '+(LANG==='en'?'Save image':'이미지 저장')+'</button>'+
+      '<button class="exp" onclick="expMail()">✉ '+(LANG==='en'?'Email':'메일')+'</button>'+
+      '<button class="exp" onclick="expKakao()">💬 '+(LANG==='en'?'KakaoTalk':'카카오톡')+'</button>';
+
+    mc.innerHTML='<div id="myCap">'+items.map(function(e){
+      var lec=e.lecture, g=AslsAgenda.toGoogleCalendarUrl(FEED, lec.id, {lang:LANG});
+      return '<div class="myrow"><div class="t">'+esc(fmtDay(e.date))+'<br>'+lec.start+'-'+lec.end+'</div>'+
+        '<div class="m"><div style="font-weight:700">'+esc(pick(lec.title,lec.titleEn))+'</div>'+
+        '<div style="color:var(--dim);font-size:.82rem">'+esc(pick(e.room,e.roomEn))+' · '+esc(pick(e.session,e.sessionEn))+'</div>'+
+        '<a class="g" href="'+g+'" target="_blank" rel="noopener">＋ '+(LANG==='en'?'Google Calendar':'구글 캘린더 추가')+'</a></div>'+
+        '<button class="x" onclick="removeMy(\''+esc(lec.id)+'\')">✕</button></div>';
+    }).join('')+'</div>';
+  }
+
+  function download(name, text, mime){
+    var blob=new Blob([text], {type:mime||'text/plain;charset=utf-8'});
+    var url=URL.createObjectURL(blob), a=document.createElement('a');
+    a.href=url; a.download=name; document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+  }
+
+  window.expICS=function(){
+    var ics=AslsAgenda.toICS(FEED, getMy(), {lang:LANG, calendarName:'ASLS My Schedule'});
+    download('asls-my-schedule.ics', ics, 'text/calendar;charset=utf-8');
+  };
+  window.expMail=function(){
+    var items=AslsAgenda.findLectures(FEED, getMy());
+    items.sort(function(a,b){ return (a.date+a.lecture.start).localeCompare(b.date+b.lecture.start); });
+    var body=items.map(function(e){ var l=e.lecture; return '• '+fmtDay(e.date)+' '+l.start+'-'+l.end+'  ['+pick(e.room,e.roomEn)+']\n  '+pick(l.title,l.titleEn); }).join('\n\n');
+    location.href='mailto:?subject='+encodeURIComponent('[ASLS] '+(LANG==='en'?'My Schedule':'내 스케줄'))+'&body='+encodeURIComponent(body);
+  };
+  window.expImage=function(){
+    var el=document.getElementById('myCap'); if(!el) return;
+    if(typeof html2canvas!=='function'){ alert('이미지 라이브러리를 불러오지 못했습니다.'); return; }
+    html2canvas(el,{backgroundColor:'#fff',scale:2}).then(function(canvas){
+      canvas.toBlob(function(b){ download('asls-my-schedule.png', b, 'image/png'); });
+    });
+  };
+  window.expKakao=function(){
+    // 실제 적용: 카카오 JS SDK 필요 (Kakao.init(앱키) 후 Kakao.Share.sendDefault)
+    alert(LANG==='en'
+      ? 'KakaoTalk share requires the Kakao JavaScript SDK (Kakao.init + Kakao.Share). Please connect a Kakao app key on the homepage.'
+      : '카카오톡 공유는 카카오 JS SDK(앱키) 연결이 필요합니다.\n홈페이지에 Kakao.init(앱키) 후 Kakao.Share.sendDefault 로 연결하면 됩니다.');
+  };
+
+  if(!CONF_ID){ document.getElementById('app').innerHTML='<div class="msg">주소에 <code>?id=행사ID</code>가 필요합니다.</div>'; }
+  else{
+    AslsAgenda.load(CONF_ID).then(render).catch(function(e){
+      document.getElementById('app').innerHTML='<div class="msg"><b>데이터를 불러오지 못했습니다.</b><br><span style="font-size:.85rem">'+esc(e.message)+'</span></div>';
+    });
+  }
+</script>
+</body>
+</html>
