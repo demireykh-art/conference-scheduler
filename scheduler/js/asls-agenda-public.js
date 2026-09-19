@@ -227,6 +227,64 @@
         return (ids || []).map(function (id) { return findLecture(feed, id); }).filter(Boolean);
     }
 
+    /* ---------- 캘린더 내보내기 (.ics / 구글 캘린더) ---------- */
+    function pad2(n) { return (n < 10 ? '0' : '') + n; }
+    // 'YYYY-MM-DD' + 'HH:MM'(한국시간) → UTC 'YYYYMMDDTHHMMSSZ'
+    function toUTCStamp(date, hm) {
+        var p = String(date || '').split('-'), t = String(hm || '00:00').split(':');
+        var d = new Date(Date.UTC(Number(p[0]) || 1970, (Number(p[1]) || 1) - 1, Number(p[2]) || 1, Number(t[0]) || 0, Number(t[1]) || 0, 0));
+        d.setUTCHours(d.getUTCHours() - 9);   // KST(UTC+9) → UTC
+        return d.getUTCFullYear() + pad2(d.getUTCMonth() + 1) + pad2(d.getUTCDate())
+            + 'T' + pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()) + '00Z';
+    }
+    function nowStamp() {
+        var d = new Date();
+        return d.getUTCFullYear() + pad2(d.getUTCMonth() + 1) + pad2(d.getUTCDate())
+            + 'T' + pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()) + pad2(d.getUTCSeconds()) + 'Z';
+    }
+    function icsEsc(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
+    function titleFor(lec, lang) { return lang === 'en' ? (lec.titleEn || lec.title || '') : (lec.title || lec.titleEn || ''); }
+
+    // 구글 캘린더 '이벤트 추가' 링크 (강의 1개) — 클릭 시 구글 캘린더에 바로 추가
+    function toGoogleCalendarUrl(feed, id, opts) {
+        opts = opts || {};
+        var e = findLecture(feed, id); if (!e) return '';
+        var lang = opts.lang === 'en' ? 'en' : 'ko', lec = e.lecture;
+        var loc = lang === 'en' ? (e.roomEn || e.room || '') : (e.room || e.roomEn || '');
+        var sess = lang === 'en' ? (e.sessionEn || e.session || '') : (e.session || '');
+        var params = 'action=TEMPLATE'
+            + '&text=' + encodeURIComponent(titleFor(lec, lang))
+            + '&dates=' + toUTCStamp(e.date, lec.start) + '/' + toUTCStamp(e.date, lec.end)
+            + '&location=' + encodeURIComponent(loc)
+            + (sess ? '&details=' + encodeURIComponent(sess) : '');
+        return 'https://calendar.google.com/calendar/render?' + params;
+    }
+
+    // .ics 캘린더 파일 내용 (강의 여러 개) — 구글·네이버·애플·아웃룩 '가져오기'로 한 번에 등록
+    function toICS(feed, ids, opts) {
+        opts = opts || {};
+        var lang = opts.lang === 'en' ? 'en' : 'ko';
+        var name = opts.calendarName || (feed && (lang === 'en' ? feed.titleEn : feed.title)) || 'ASLS';
+        var out = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ASLS//Agenda//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:' + icsEsc(name)];
+        var stamp = nowStamp();
+        findLectures(feed, ids).forEach(function (e, i) {
+            var lec = e.lecture;
+            var loc = lang === 'en' ? (e.roomEn || e.room || '') : (e.room || e.roomEn || '');
+            var sess = lang === 'en' ? (e.sessionEn || e.session || '') : (e.session || '');
+            out.push('BEGIN:VEVENT');
+            out.push('UID:' + (lec.id || ('lec' + i)) + '@asls.kr');
+            out.push('DTSTAMP:' + stamp);
+            out.push('DTSTART:' + toUTCStamp(e.date, lec.start));
+            out.push('DTEND:' + toUTCStamp(e.date, lec.end));
+            out.push('SUMMARY:' + icsEsc(titleFor(lec, lang)));
+            if (loc) out.push('LOCATION:' + icsEsc(loc));
+            if (sess) out.push('DESCRIPTION:' + icsEsc(sess));
+            out.push('END:VEVENT');
+        });
+        out.push('END:VCALENDAR');
+        return out.join('\r\n');
+    }
+
     /* ---------- Firebase REST 읽기 ---------- */
     // 엄격: 실패(권한·CORS·네트워크)하면 예외를 던져 호출측 .catch로 전달
     function jgetStrict(path) {
@@ -263,6 +321,7 @@
     global.AslsAgenda = {
         DB: DB, load: load, speakerIndex: speakerIndex,
         findLecture: findLecture, findLectures: findLectures,
+        toICS: toICS, toGoogleCalendarUrl: toGoogleCalendarUrl,
         _build: build
     };
 
