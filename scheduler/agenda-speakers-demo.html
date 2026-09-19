@@ -70,6 +70,7 @@
   var CONF_ID = params.get('id') || '';
   var LANG = params.get('lang') === 'en' ? 'en' : 'ko';
   var SPEAKERS = [];
+  var OPEN = -1;   // 현재 열린 연자 인덱스 (언어 전환 시 유지)
 
   function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
   function pick(ko, en) { return LANG === 'en' ? (en || ko || '') : (ko || en || ''); }
@@ -98,7 +99,16 @@
 
   function render(feed) {
     SPEAKERS = AslsAgenda.speakerIndex(feed);
+    // ?spk=<id 또는 이름> 으로 진입하면 그 연자를 자동으로 연다 (시간표에서 연자 클릭 → 이 페이지)
+    var spk = params.get('spk');
+    if (spk) {
+      for (var i = 0; i < SPEAKERS.length; i++) {
+        var s = SPEAKERS[i];
+        if ((s.id && s.id === spk) || s.name === spk || s.nameEn === spk) { OPEN = i; break; }
+      }
+    }
     draw();
+    if (OPEN >= 0) setTimeout(function () { var d = document.getElementById('detail'); if (d) d.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
   }
 
   function draw() {
@@ -106,7 +116,7 @@
       '<a class="' + (LANG === 'ko' ? 'on' : '') + '" onclick="setLang(\'ko\')">국문</a>' +
       '<a class="' + (LANG === 'en' ? 'on' : '') + '" onclick="setLang(\'en\')">EN</a>';
     renderGrid();
-    document.getElementById('detail').innerHTML = '';
+    if (OPEN >= 0 && OPEN < SPEAKERS.length) fillDetail(OPEN); else document.getElementById('detail').innerHTML = '';
   }
 
   /* ====== 연자 그리드 (이 부분을 홈페이지 디자인으로 교체) ====== */
@@ -125,6 +135,12 @@
 
   /* ====== 연자 상세: 강의목록 (이 부분을 홈페이지 디자인으로 교체) ====== */
   window.openSpeaker = function (i) {
+    OPEN = i;
+    fillDetail(i);
+    var d = document.getElementById('detail');
+    setTimeout(function () { if (d) d.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30);
+  };
+  function fillDetail(i) {
     var sp = SPEAKERS[i]; if (!sp) return;
     document.querySelectorAll('.card').forEach(function (c) { c.classList.remove('sel'); });
     var card = document.getElementById('card' + i); if (card) card.classList.add('sel');
@@ -144,11 +160,8 @@
     }).join('');
     html += '<div class="backtop" onclick="window.scrollTo({top:0,behavior:\'smooth\'})">▲ ' + (LANG === 'en' ? 'Back to all speakers' : '전체 연자 목록으로') + '</div>';
 
-    var d = document.getElementById('detail');
-    d.innerHTML = html;
-    // 아래로 자동 스크롤
-    setTimeout(function () { d.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30);
-  };
+    document.getElementById('detail').innerHTML = html;
+  }
 
   if (!CONF_ID) {
     document.getElementById('grid').innerHTML = '<div class="msg">주소에 <code>?id=행사ID</code>가 필요합니다.</div>';

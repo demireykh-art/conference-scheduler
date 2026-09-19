@@ -66,6 +66,7 @@
             affEn = (m && m.affiliationEn) || s.affiliationEn || '';
         }
         return {
+            id: s.id || '',                 // 연자 고유 id(연자 페이지 링크·매칭용)
             name: nameKo, nameEn: nameEn,
             affiliation: affKo, affiliationEn: affEn,
             // 국적(나라)은 룸 토글과 무관하게 항상 제공 — 연자 목록 페이지의 국가 표시용
@@ -169,11 +170,13 @@
                             var key = (spk.name || spk.nameEn || '').trim();
                             if (!key) return;
                             if (!map[key]) map[key] = {
+                                id: spk.id || '',
                                 name: spk.name, nameEn: spk.nameEn, photo: spk.photo,
                                 affiliation: spk.affiliation, affiliationEn: spk.affiliationEn,
                                 nationality: spk.nationality, nationalityEn: spk.nationalityEn,
                                 lectures: []
                             };
+                            else if (!map[key].id && spk.id) map[key].id = spk.id;
                             map[key].lectures.push({
                                 date: day.date, room: room.name, roomEn: room.nameEn,
                                 session: s.name, sessionEn: s.nameEn,

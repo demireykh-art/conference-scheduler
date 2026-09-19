@@ -87,16 +87,12 @@
   <div id="app"><div class="msg">불러오는 중…</div></div>
 </div>
 
-<div class="ov" id="spkOverlay" onclick="if(event.target===this)closeSpeaker()">
-  <div class="ov-card" id="spkCard"></div>
-</div>
-
 <script src="js/asls-agenda-public.js"></script>
 <script>
   var params = new URLSearchParams(location.search);
   var CONF_ID = params.get('id') || '';
   var LANG = params.get('lang') === 'en' ? 'en' : 'ko';
-  var FEED = null, SPK_INDEX = {};
+  var FEED = null;
   var SEL = { day: 0, room: 0 };
 
   function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
@@ -122,11 +118,6 @@
 
   function render(feed) {
     FEED = feed;
-    SPK_INDEX = {};
-    AslsAgenda.speakerIndex(feed).forEach(function (s) {
-      SPK_INDEX[(s.name || s.nameEn || '').trim()] = s;
-      if (s.nameEn) SPK_INDEX[s.nameEn.trim()] = s;
-    });
     draw();
   }
 
@@ -193,8 +184,11 @@
         }
         var subtitle = LANG === 'en' ? lec.title : lec.titleEn;
         var spk = lec.speakers.map(function (x) {
+          // 연자 클릭 → 연자 페이지(초청연자)로 이동, 해당 연자 자동 열림 (팝업 대신 전체 페이지)
+          var key = x.id || (x.name || x.nameEn || '');
+          var href = 'agenda-speakers-demo.html?id=' + encodeURIComponent(CONF_ID) + '&lang=' + LANG + '&spk=' + encodeURIComponent(key);
           return '<span class="spk">' + avatar(x.photo, pick(x.name, x.nameEn)) +
-            '<span class="spk-name" onclick="openSpeaker(\'' + esc((x.name || x.nameEn || '').replace(/'/g, "\\'")) + '\')">' + esc(pick(x.name, x.nameEn)) + '</span></span>';
+            '<a class="spk-name" href="' + href + '">' + esc(pick(x.name, x.nameEn)) + '</a></span>';
         }).join('<br>') || '-';
         var aff = lec.speakers.map(function (x) { return esc(pick(x.affiliation, x.affiliationEn)); }).filter(Boolean).join(', ') || '-';
         html += '<tr><td class="col-time">' + lec.start + ' - ' + lec.end + '</td>' +
@@ -210,24 +204,7 @@
     app.innerHTML = html;
   }
 
-  /* ====== 연자 클릭 → 해당 연자의 강의목록 ====== */
-  window.openSpeaker = function (name) {
-    var s = SPK_INDEX[(name || '').trim()];
-    if (!s) return;
-    var html = '<button class="ov-close" onclick="closeSpeaker()">닫기 ✕</button>' +
-      '<div class="ov-head">' + avatar(s.photo, pick(s.name, s.nameEn)) +
-      '<div><div class="ov-name">' + esc(pick(s.name, s.nameEn)) + '</div>' +
-      '<div class="ov-aff">' + esc(pick(s.affiliation, s.affiliationEn)) + '</div></div></div>' +
-      '<div style="font-weight:700;color:var(--p2);margin-bottom:4px">' + (LANG === 'en' ? 'Lectures' : '강의 목록') + ' (' + s.lectures.length + ')</div>' +
-      s.lectures.map(function (l) {
-        return '<div class="ov-lec"><div class="ov-lec-time">' + esc(fmtDay(l.date)) + ' · ' + l.start + ' - ' + l.end + '</div>' +
-          '<div class="ov-lec-title">' + esc(pick(l.title, l.titleEn)) + '</div>' +
-          '<div class="ov-lec-room">' + esc(pick(l.room, l.roomEn)) + (l.session ? ' · ' + esc(pick(l.session, l.sessionEn)) : '') + '</div></div>';
-      }).join('');
-    document.getElementById('spkCard').innerHTML = html;
-    document.getElementById('spkOverlay').classList.add('on');
-  };
-  window.closeSpeaker = function () { document.getElementById('spkOverlay').classList.remove('on'); };
+  // 연자 클릭은 위 render()에서 연자 페이지(agenda-speakers-demo.html?spk=<id>)로 링크됩니다.
 
   if (!CONF_ID) {
     document.getElementById('app').innerHTML = '<div class="msg">주소에 <code>?id=행사ID</code>가 필요합니다.</div>';
