@@ -147,8 +147,10 @@
             toggleFav: function (id) {
                 if (!id) return;
                 var f = getFavs(), i = f.indexOf(id);
+                var saved = i < 0;
                 if (i >= 0) f.splice(i, 1); else f.push(id);
                 try { localStorage.setItem(FAVKEY, JSON.stringify(f)); } catch (e) { }
+                notifyFav(id, saved);   // 회원 담기 연동: 부모에 변경 알림
                 render();
             }
         };
@@ -267,9 +269,15 @@
         // 부모 페이지의 플로팅 버튼(국문/EN·검색)이 이 위젯을 제어할 수 있도록 명령 수신
         // 사용: iframe.contentWindow.postMessage({type:'asls-cmd', cmd:'lang', value:'en'}, '*')
         //       iframe.contentWindow.postMessage({type:'asls-cmd', cmd:'openSearch'}, '*')
+        // 담기 변경 시 부모(홈페이지)에 알림 → 홈페이지가 회원 계정에 저장
+        function notifyFav(id, saved) {
+            try { parent.postMessage({ type: 'asls-fav', conf: CONF_ID, id: id, saved: saved, favs: getFavs() }, '*'); } catch (e) { }
+        }
         window.addEventListener('message', function (e) {
             var d = e && e.data; if (!d || d.type !== 'asls-cmd') return;
-            if (d.cmd === 'lang') { LANG = (d.value === 'en') ? 'en' : 'ko'; render(); }
+            if (d.cmd === 'setFavs' && Object.prototype.toString.call(d.value) === '[object Array]') {
+                try { localStorage.setItem(FAVKEY, JSON.stringify(d.value)); } catch (x) { } render();
+            } else if (d.cmd === 'lang') { LANG = (d.value === 'en') ? 'en' : 'ko'; render(); }
             else if (d.cmd === 'openSearch') { SPK = ''; render(); var gi = $('gs'); if (gi) { try { gi.focus(); } catch (e2) { } } }
         });
 
