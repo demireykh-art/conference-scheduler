@@ -74,7 +74,8 @@
             // 국적(나라)은 룸 토글과 무관하게 항상 제공 — 연자 목록 페이지의 국가 표시용
             nationality: (m && m.nationalityKo) || s.nationalityKo || '',
             nationalityEn: (m && m.nationalityEn) || s.nationalityEn || '',
-            photo: (m && (m.photo || m.photoURL)) || ''   // 연자 사진(마스터의 photo, base64 data URL)
+            photo: (m && (m.photo || m.photoURL)) || '',  // 연자 사진(마스터의 photo, base64 data URL)
+            cv: (m && m.cv) || s.cv || ''                  // 연자 CV/약력(마스터)
         };
     }
     function normSpeakers(lec, speakerMap, showNat) {
@@ -178,6 +179,7 @@
                                 name: spk.name, nameEn: spk.nameEn, photo: spk.photo,
                                 affiliation: spk.affiliation, affiliationEn: spk.affiliationEn,
                                 nationality: spk.nationality, nationalityEn: spk.nationalityEn,
+                                cv: spk.cv || '',
                                 lectures: []
                             };
                             else if (!map[key].id && spk.id) map[key].id = spk.id;
@@ -185,6 +187,7 @@
                                 id: lec.id || '', lectureId: lec.lectureId || '',
                                 date: day.date, room: room.name, roomEn: room.nameEn,
                                 session: s.name, sessionEn: s.nameEn,
+                                role: 'speaker',   // 이 인덱스는 연자(발표) 역할 기준
                                 start: lec.start, end: lec.end,
                                 title: lec.title, titleEn: lec.titleEn
                             });

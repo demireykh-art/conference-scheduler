@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>초청 연자 · ASLS</title>
+    <link rel="icon" type="image/png" href="admin/assets/asls-logo.png">
+    <meta name="theme-color" content="#6E2B7B">
+    <style>
+        :root { --p: #6b1f7a; --p2: #3f1147; --ink: #1f2430; --dim: #7a7580; --line: #e7e2ea; --soft: #f5f6f8; }
+        * { box-sizing: border-box; }
+        html { font-size: 17.5px; }
+        html, body { margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+               color: var(--ink); background: #fff; line-height: 1.5; -webkit-text-size-adjust: 100%; overflow-x: hidden; }
+        .wrap { max-width: 100%; margin: 0 auto; padding: 16px 10px 32px; }
+
+        .top { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+        .lang { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+        .lang button { border: 0; background: #fff; padding: 8px 14px; font-size: 0.86rem; cursor: pointer; color: var(--dim);
+                       border-left: 1px solid var(--line); font-family: inherit; }
+        .lang button:first-child { border-left: 0; }
+        .lang button.on { background: var(--p); color: #fff; font-weight: 700; }
+
+        .note { background: #f6eff8; border: 1px solid #e6d6ee; color: #5a2a66; border-radius: 10px;
+                padding: 11px 14px; font-size: 0.92rem; font-weight: 700; margin: 0 0 14px; line-height: 1.5; }
+        .note .cnt { color: var(--p); }
+
+        .back { display: inline-flex; align-items: center; gap: 6px; background: #f0ecf3; border: 1px solid var(--line);
+                border-radius: 8px; padding: 7px 13px; font-weight: 700; color: var(--p2); cursor: pointer; font-size: 0.88rem; margin-bottom: 12px; }
+
+        /* 연자 헤더 카드: 좌 사진/이름/소속, 우 CV */
+        .prof { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin-bottom: 18px; }
+        .prof-top { display: flex; gap: 18px; padding: 20px; }
+        .prof-id { flex: 0 0 auto; width: 210px; text-align: center; }
+        .prof-id .pic, .prof-id .noimg { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; background: #ece7f0;
+                     display: inline-flex; align-items: center; justify-content: center; color: var(--p2); font-weight: 800; font-size: 2.2rem; }
+        .prof-id .nm { font-size: 1.35rem; font-weight: 800; color: var(--p2); margin-top: 12px; }
+        .prof-id .aff { color: var(--dim); font-size: 0.95rem; margin-top: 3px; }
+        .prof-id .nat { color: var(--p); font-size: 0.9rem; font-weight: 700; margin-top: 5px; }
+        .prof-cv { flex: 1 1 auto; min-width: 0; border-left: 1px solid var(--line); padding-left: 18px; }
+        .prof-cv h3 { margin: 0 0 8px; font-size: 1rem; color: var(--p2); font-weight: 800; }
+        .prof-cv .cv { white-space: pre-wrap; word-break: break-word; color: #333; font-size: 0.95rem; line-height: 1.6; }
+        .prof-cv .cv.empty { color: var(--dim); font-style: italic; }
+
+        .sec-h { font-weight: 800; color: var(--p2); font-size: 1.1rem; margin: 6px 0 12px; }
+
+        /* 강의 리스트: 3줄 (세션 / 일정·Room·Role / 제목 + 담기) */
+        .lec { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px;
+               display: flex; gap: 12px; align-items: flex-start; }
+        .lec-main { flex: 1 1 auto; min-width: 0; }
+        .l-sess { font-weight: 800; color: var(--p2); font-size: 0.98rem; }
+        .l-meta { color: var(--dim); font-size: 0.86rem; margin: 4px 0 6px; }
+        .l-meta .role { display: inline-block; background: var(--p); color: #fff; border-radius: 6px; padding: 1px 8px;
+                        font-size: 0.78rem; font-weight: 700; margin-left: 4px; vertical-align: middle; }
+        .l-title { font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; word-break: break-word; }
+        .fav { flex: 0 0 auto; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 12px;
+               cursor: pointer; color: var(--dim); font-weight: 700; font-size: 0.84rem; display: inline-flex; align-items: center;
+               gap: 5px; font-family: inherit; white-space: nowrap; }
+        .fav:hover { border-color: var(--p); color: var(--p); }
+        .fav.on { background: #fff6db; border-color: #f2c94c; color: #b7791f; }
+        .fav .star { font-size: 0.98rem; line-height: 1; }
+
+        /* 연자 그리드(연자 지정 없을 때) */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+        .card { border: 1px solid var(--line); border-radius: 12px; padding: 16px 12px; text-align: center; cursor: pointer; background: #fff; }
+        .card:hover { border-color: var(--p); box-shadow: 0 4px 14px rgba(60,20,70,.08); }
+        .card .pic, .card .noimg { width: 68px; height: 68px; border-radius: 50%; object-fit: cover; background: #ece7f0;
+                   display: inline-flex; align-items: center; justify-content: center; color: var(--p2); font-weight: 800; font-size: 1.3rem; }
+        .card .nm { font-weight: 700; margin-top: 8px; color: var(--p2); }
+        .card .aff { color: var(--dim); font-size: 0.82rem; margin-top: 2px; }
+        .card .cnt2 { color: var(--p); font-size: 0.8rem; font-weight: 700; margin-top: 5px; }
+
+        .msg { text-align: center; padding: 44px 16px; color: var(--dim); }
+        .msg-t { font-size: 1.05rem; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+
+        @media (max-width: 640px) {
+            .wrap { padding-left: 8px; padding-right: 8px; }
+            .prof-top { flex-direction: column; gap: 14px; }
+            .prof-cv { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 14px; }
+            .prof-id { width: auto; }
+            .lec { flex-wrap: wrap; }
+            .fav { order: 2; margin-left: auto; }
+            .lec-main { order: 3; flex-basis: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div id="app"><div class="msg"><div class="msg-t">불러오는 중…</div></div></div>
+    </div>
+
+    <script src="js/asls-agenda-public.js"></script>
+    <script>
+    (function () {
+        var params = new URLSearchParams(location.search);
+        var CONF_ID = params.get('id') || '';
+        var LANG = params.get('lang') === 'en' ? 'en' : 'ko';
+        var SPK = params.get('spk') || params.get('speaker') || '';
+        var FEED = null, INDEX = null;
+
+        var $ = function (id) { return document.getElementById(id); };
+        function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+        function pick(ko, en) { return LANG === 'en' ? (en || ko || '') : (ko || en || ''); }
+
+        var WD_KO = ['일', '월', '화', '수', '목', '금', '토'];
+        var WD_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        var MON_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        function fmtDay(d) {
+            var dt = new Date(d + 'T00:00:00'); if (isNaN(dt)) return d;
+            if (LANG === 'en') return MON_EN[dt.getMonth()] + ' ' + dt.getDate() + ' (' + WD_EN[dt.getDay()] + ')';
+            return (dt.getMonth() + 1) + '.' + dt.getDate() + '(' + WD_KO[dt.getDay()] + ')';
+        }
+        function avatar(photo, name, wrapCls) {
+            if (photo) return '<img class="' + wrapCls + '" src="' + esc(photo) + '" alt="">';
+            return '<span class="noimg ' + wrapCls + '">' + esc((name || '?').charAt(0)) + '</span>';
+        }
+
+        /* ---------- 관심강의(담기) — 시간표와 동일 저장소 공유 ---------- */
+        var FAVKEY = 'asls_fav_' + CONF_ID;
+        function getFavs() { try { return JSON.parse(localStorage.getItem(FAVKEY) || '[]'); } catch (e) { return []; } }
+        function isFav(id) { return id && getFavs().indexOf(id) >= 0; }
+
+        window.SPKPAGE = {
+            setLang: function (l) { LANG = l; render(); },
+            open: function (key) { SPK = key; render(); window.scrollTo(0, 0); },
+            back: function () { SPK = ''; render(); },
+            toggleFav: function (id) {
+                if (!id) return;
+                var f = getFavs(), i = f.indexOf(id);
+                if (i >= 0) f.splice(i, 1); else f.push(id);
+                try { localStorage.setItem(FAVKEY, JSON.stringify(f)); } catch (e) { }
+                render();
+            }
+        };
+
+        function findSpeaker(key) {
+            if (!INDEX || !key) return null;
+            var byId = null, byName = null;
+            INDEX.forEach(function (sp) {
+                if (sp.id && sp.id === key) byId = sp;
+                if (!byName && (sp.name === key || sp.nameEn === key)) byName = sp;
+            });
+            return byId || byName;
+        }
+
+        function langBar() {
+            return '<div class="top"><div class="lang">' +
+                '<button class="' + (LANG === 'ko' ? 'on' : '') + '" onclick="SPKPAGE.setLang(\'ko\')">국문</button>' +
+                '<button class="' + (LANG === 'en' ? 'on' : '') + '" onclick="SPKPAGE.setLang(\'en\')">EN</button>' +
+                '</div></div>';
+        }
+        function noteBar() {
+            var favN = getFavs().length;
+            return '<div class="note">' +
+                (LANG === 'en' ? '⭐ Tap “Save” to build your own schedule.' : '⭐ 강의 즐겨찾기로 <b>나만의 강의 스케줄</b>을 만들어 보세요.') +
+                (favN ? ' <span class="cnt">(' + (LANG === 'en' ? 'saved ' + favN : '담은 강의 ' + favN + '개') + ')</span>' : '') +
+                '</div>';
+        }
+
+        function render() {
+            var app = $('app');
+            if (!CONF_ID) { app.innerHTML = '<div class="msg"><div class="msg-t">행사 정보가 없습니다.</div><div>주소에 <code>?id=행사ID</code> 가 필요합니다.</div></div>'; postHeight(); return; }
+            if (!FEED) { app.innerHTML = '<div class="msg"><div class="msg-t">불러오는 중…</div></div>'; postHeight(); return; }
+
+            var sp = SPK ? findSpeaker(SPK) : null;
+            if (sp) { app.innerHTML = langBar() + noteBar() + renderDetail(sp); }
+            else { app.innerHTML = langBar() + noteBar() + renderGrid(); }
+            postHeight();
+        }
+
+        function renderDetail(sp) {
+            var showBack = INDEX && INDEX.length > 1;
+            var nm = esc(pick(sp.name, sp.nameEn) || '연자');
+            var aff = esc(pick(sp.affiliation, sp.affiliationEn));
+            var nat = esc(pick(sp.nationality, sp.nationalityEn));
+            var cv = (sp.cv || '').trim();
+
+            var html = (showBack ? '<div class="back" onclick="SPKPAGE.back()">← ' + (LANG === 'en' ? 'All speakers' : '연자 목록') + '</div>' : '');
+            html += '<div class="prof"><div class="prof-top">' +
+                '<div class="prof-id">' + avatar(sp.photo, pick(sp.name, sp.nameEn), 'pic') +
+                    '<div class="nm">' + nm + '</div>' +
+                    (aff ? '<div class="aff">' + aff + '</div>' : '') +
+                    (nat ? '<div class="nat">' + nat + '</div>' : '') +
+                '</div>' +
+                '<div class="prof-cv"><h3>' + (LANG === 'en' ? 'Curriculum Vitae' : 'CV · 약력') + '</h3>' +
+                    (cv ? '<div class="cv">' + esc(cv) + '</div>'
+                        : '<div class="cv empty">' + (LANG === 'en' ? 'CV will be provided soon.' : '약력 정보가 준비 중입니다.') + '</div>') +
+                '</div>' +
+            '</div></div>';
+
+            // 강의 리스트 (3줄)
+            html += '<div class="sec-h">' + (LANG === 'en' ? 'Lectures' : '강의') + ' (' + sp.lectures.length + ')</div>';
+            html += sp.lectures.map(function (lec) {
+                var on = isFav(lec.id);
+                var meta = fmtDay(lec.date) + ' · ' + lec.start + '–' + lec.end + ' · ' +
+                    esc(pick(lec.room, lec.roomEn) || '룸') +
+                    '<span class="role">' + (LANG === 'en' ? 'Speaker' : '연자') + '</span>';
+                var favBtn = lec.id ? ('<button class="fav ' + (on ? 'on' : '') + '" title="관심강의 담기" onclick="SPKPAGE.toggleFav(\'' + lec.id + '\')">' +
+                    '<span class="star">' + (on ? '★' : '☆') + '</span>' + (on ? (LANG === 'en' ? 'Saved' : '담김') : (LANG === 'en' ? 'Save' : '담기')) + '</button>') : '';
+                return '<div class="lec"><div class="lec-main">' +
+                    '<div class="l-sess">' + (esc(pick(lec.session, lec.sessionEn)) || (LANG === 'en' ? 'Session' : '세션')) + '</div>' +
+                    '<div class="l-meta">' + meta + '</div>' +
+                    '<div class="l-title">' + (esc(pick(lec.title, lec.titleEn)) || (LANG === 'en' ? '(Untitled)' : '(제목 없음)')) + '</div>' +
+                    '</div>' + favBtn + '</div>';
+            }).join('') || '<div class="msg"><div>' + (LANG === 'en' ? 'No lectures.' : '등록된 강의가 없습니다.') + '</div></div>';
+            return html;
+        }
+
+        function renderGrid() {
+            if (!INDEX || !INDEX.length) return '<div class="msg"><div class="msg-t">' + (LANG === 'en' ? 'No speakers.' : '연자 정보가 없습니다.') + '</div></div>';
+            var html = '<div class="sec-h">' + (LANG === 'en' ? 'Invited Speakers' : '초청 연자') + ' (' + INDEX.length + ')</div><div class="grid">';
+            html += INDEX.map(function (sp) {
+                var key = sp.id || sp.name || sp.nameEn;
+                return '<div class="card" onclick="SPKPAGE.open(\'' + esc(key).replace(/'/g, "\\'") + '\')">' +
+                    avatar(sp.photo, pick(sp.name, sp.nameEn), 'pic') +
+                    '<div class="nm">' + esc(pick(sp.name, sp.nameEn)) + '</div>' +
+                    (pick(sp.affiliation, sp.affiliationEn) ? '<div class="aff">' + esc(pick(sp.affiliation, sp.affiliationEn)) + '</div>' : '') +
+                    '<div class="cnt2">' + (LANG === 'en' ? sp.lectures.length + ' lecture(s)' : '강의 ' + sp.lectures.length + '개') + '</div>' +
+                    '</div>';
+            }).join('');
+            html += '</div>';
+            return html;
+        }
+
+        /* ---------- iframe 높이 자동 전달 ---------- */
+        function postHeight() {
+            try { parent.postMessage({ type: 'asls-agenda-height', id: CONF_ID, height: document.documentElement.scrollHeight }, '*'); } catch (e) { }
+        }
+        window.addEventListener('resize', postHeight);
+        window.addEventListener('load', postHeight);
+        if (window.ResizeObserver) { try { new ResizeObserver(postHeight).observe(document.body); } catch (e) { } }
+
+        function load() {
+            AslsAgenda.load(CONF_ID).then(function (feed) {
+                FEED = feed; INDEX = AslsAgenda.speakerIndex(feed); render();
+            }).catch(function (e) {
+                $('app').innerHTML = '<div class="msg"><div class="msg-t">연자 정보를 불러올 수 없습니다.</div><div>잠시 후 다시 시도해 주세요.</div></div>';
+                postHeight();
+            });
+        }
+        if (!CONF_ID) render(); else { load(); setInterval(load, 120000); }
+    })();
+    </script>
+</body>
+</html>

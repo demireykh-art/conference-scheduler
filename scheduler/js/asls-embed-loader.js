@@ -14,9 +14,15 @@
  *   data-lang     : auto | ko | en   (기본 auto)
  *   data-date     : YYYY-MM-DD        (특정 날짜만 표시, 생략 시 전체)
  *
- * 동작: 지정 위치에 iframe(agenda.html)을 자동 삽입하고, 내용 높이에 맞춰
- *       스크롤바 없이 자동으로 크기를 조절합니다. 데이터는 실시간 반영됩니다.
- *       홈페이지의 헤더/푸터/디자인은 그대로 두고, 이 영역만 프로그램으로 채워집니다.
+ * [연자 상세 위젯] 초청연자 페이지에 아래처럼 넣으면 연자 상세(사진/CV/강의목록)가 표시됩니다:
+ *   <div class="asls-speaker" data-conf-id="행사ID"></div>
+ *   <script src="https://demireykh-art.github.io/conference-scheduler/scheduler/js/asls-embed-loader.js"></script>
+ *   - 어떤 연자를 보여줄지는 부모 페이지 주소의 ?speaker=<연자id> (또는 ?spk=)를 자동으로 읽어옵니다.
+ *     (예: ...?pmode=invited&speaker=speaker-2e6fd8c8) — 시간표에서 연자 클릭 시 이 주소로 이동함.
+ *   - data-spk 속성으로 직접 지정할 수도 있습니다.
+ *
+ * 동작: 지정 위치에 iframe을 자동 삽입하고, 내용 높이에 맞춰 스크롤바 없이 자동 크기를 조절합니다.
+ *       홈페이지의 헤더/푸터/디자인은 그대로 두고, 이 영역만 채워집니다.
  */
 (function () {
     if (window.__ASLS_EMBED_LOADED__) return;   // 스크립트 중복 삽입 방지
@@ -32,32 +38,47 @@
             }
         }
         var src = ((s && s.src) || '').split('#')[0].split('?')[0];
-        // .../scheduler/js/asls-embed-loader.js  →  .../scheduler/agenda.html
-        if (/\/js\/asls-embed-loader\.js$/.test(src)) return src.replace(/\/js\/asls-embed-loader\.js$/, '/agenda.html');
-        // 폴백: 같은 폴더에 agenda.html 이 있는 경우
-        return src.replace(/asls-embed-loader\.js$/, 'agenda.html');
+        // .../scheduler/js/asls-embed-loader.js  →  .../scheduler/
+        if (/\/js\/asls-embed-loader\.js$/.test(src)) return src.replace(/\/js\/asls-embed-loader\.js$/, '/');
+        // 폴백: 같은 폴더
+        return src.replace(/asls-embed-loader\.js$/, '');
     }
-    var AGENDA_URL = baseUrl();
+    var BASE = baseUrl();
+    var AGENDA_URL = BASE + 'agenda.html';
+    var SPEAKER_URL = BASE + 'agenda-speakers.html';
 
     var frames = [];   // { el, iframe }
 
-    function buildSrc(el) {
+    // 부모 페이지 주소에서 연자 id 추출 (?speaker= 또는 ?spk=)
+    function parentSpk() {
+        try {
+            var p = new URLSearchParams(location.search);
+            return p.get('speaker') || p.get('spk') || '';
+        } catch (e) { return ''; }
+    }
+
+    function buildSrc(el, isSpeaker) {
         var conf = el.getAttribute('data-conf-id') || el.getAttribute('data-conf') || el.getAttribute('data-id') || '';
         var lang = el.getAttribute('data-lang') || 'auto';
-        var date = el.getAttribute('data-date') || '';
         var q = '?id=' + encodeURIComponent(conf);
         if (lang && lang !== 'auto') q += '&lang=' + encodeURIComponent(lang);
+        if (isSpeaker) {
+            var spk = el.getAttribute('data-spk') || parentSpk();
+            if (spk) q += '&spk=' + encodeURIComponent(spk);
+            return SPEAKER_URL + q;
+        }
+        var date = el.getAttribute('data-date') || '';
         if (date) q += '&date=' + encodeURIComponent(date);
         return AGENDA_URL + q;
     }
 
-    function mount(el) {
+    function mount(el, isSpeaker) {
         if (el.getAttribute('data-asls-mounted')) return;
         el.setAttribute('data-asls-mounted', '1');
 
         var iframe = document.createElement('iframe');
-        iframe.src = buildSrc(el);
-        iframe.title = 'ASLS 학술대회 프로그램';
+        iframe.src = buildSrc(el, isSpeaker);
+        iframe.title = isSpeaker ? 'ASLS 초청 연자' : 'ASLS 학술대회 프로그램';
         iframe.loading = 'lazy';
         iframe.setAttribute('scrolling', 'no');
         iframe.style.width = '100%';
@@ -73,8 +94,10 @@
     }
 
     function scan() {
-        var list = document.querySelectorAll('.asls-agenda, [data-asls-agenda]');
-        for (var i = 0; i < list.length; i++) mount(list[i]);
+        var prog = document.querySelectorAll('.asls-agenda, [data-asls-agenda]');
+        for (var i = 0; i < prog.length; i++) mount(prog[i], false);
+        var spk = document.querySelectorAll('.asls-speaker, [data-asls-speaker]');
+        for (var j = 0; j < spk.length; j++) mount(spk[j], true);
     }
 
     // 부모창으로 전달되는 높이 메시지 수신 → 해당 iframe 크기 조절
