@@ -21,8 +21,9 @@
             font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
             color: var(--ink); background: #fff; line-height: 1.5;
             -webkit-text-size-adjust: 100%;
+            overflow-x: hidden;
         }
-        .ag-container { max-width: 100%; margin: 0 auto; padding: 18px 16px 40px; }
+        .ag-container { max-width: 100%; margin: 0 auto; padding: 16px 10px 32px; }
 
         /* 헤더 */
         .ag-head { margin-bottom: 16px; }
@@ -82,13 +83,21 @@
         .ag-msg code { background: var(--soft); padding: 1px 6px; border-radius: 5px; }
 
         @media (max-width: 760px) {
-            .ag-title { font-size: 1.3rem; }
-            .col-time, .col-spk, .col-aff { width: auto; }
+            .ag-container { padding-left: 8px; padding-right: 8px; }
+            .ag-title { font-size: 1.35rem; }
+            .ag-controls { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .ag-lang { margin-left: 0; }
+            .ag-sess-name { display: block; }
+            .ag-sess-time { margin-left: 0; }
             thead { display: none; }
-            tbody td { display: block; border: 0; padding: 3px 16px; }
-            tbody tr { border-bottom: 1px solid var(--line); display: block; padding: 10px 0; }
+            table { display: block; width: 100%; }
+            tbody, tr { display: block; width: 100%; }
+            td { display: block; width: auto; max-width: 100%; }
+            .col-time, .col-spk, .col-aff { width: auto; max-width: 100%; }
+            tbody td { font-size: 0.98rem; border: 0; padding: 3px 14px; }
+            tbody tr { border-bottom: 1px solid var(--line); padding: 10px 0; }
             .col-time { padding-top: 11px; color: var(--p2); font-weight: 700; }
-            .break-row td { display: block; }
+            .l-title { overflow-wrap: anywhere; word-break: break-word; }
         }
     </style>
 </head>
@@ -102,7 +111,7 @@
     (function () {
         var params = new URLSearchParams(location.search);
         var CONF_ID = params.get('id') || '';
-        var LANG = params.get('lang') || 'auto';       // 'auto' | 'ko' | 'en'
+        var LANG = params.get('lang') === 'en' ? 'en' : 'ko';   // 'ko' | 'en' (기본 국문)
         var DATE = params.get('date') || '';            // 특정 날짜만
         // 연자 클릭 시 이동할 초청연자 페이지 URL 템플릿 ({id} 자리에 연자 고유 id)
         var SPK_BASE = params.get('spkbase') || 'https://www.asls.kr/html/?pmode=invited&speaker={id}';
@@ -128,8 +137,8 @@
         }
         // 헤더 언어(룸 문맥 없음): auto면 국문
         function hLang() { return LANG === 'en' ? 'en' : 'ko'; }
-        // 룸 문맥 언어: 전체 토글 우선, 없으면 룸 언어(auto)
-        function rLang(room) { return (LANG === 'ko' || LANG === 'en') ? LANG : (room && room.lang === 'en' ? 'en' : 'ko'); }
+        // 룸 문맥 언어: 선택한 언어(국문/EN) 그대로 사용
+        function rLang(room) { return LANG === 'en' ? 'en' : 'ko'; }
         function pick(lang, ko, en) { return lang === 'en' ? (en || ko || '') : (ko || en || ''); }
 
         function avatar(photo, name) {
@@ -181,7 +190,6 @@
                         return '<button class="ag-tab ' + (i === SEL.day ? 'on' : '') + '" onclick="AGENDA.selDay(' + i + ')">' + esc(fmtDayShort(d.date, hl)) + '</button>';
                     }).join('') + '</div>' +
                     '<div class="ag-lang">' +
-                        '<button class="' + (LANG === 'auto' ? 'on' : '') + '" onclick="AGENDA.setLang(\'auto\')">자동</button>' +
                         '<button class="' + (LANG === 'ko' ? 'on' : '') + '" onclick="AGENDA.setLang(\'ko\')">국문</button>' +
                         '<button class="' + (LANG === 'en' ? 'on' : '') + '" onclick="AGENDA.setLang(\'en\')">EN</button>' +
                     '</div>' +
@@ -208,7 +216,6 @@
             if (!bodyHtml) bodyHtml = '<div class="ag-msg"><div>' + (rl === 'en' ? 'No sessions yet.' : '등록된 세션이 없습니다.') + '</div></div>';
             html += bodyHtml;
 
-            html += '<div class="ag-foot">' + (rl === 'en' ? 'This program is updated automatically.' : '이 프로그램은 자동으로 업데이트됩니다.') + '</div>';
             wrap.innerHTML = html;
             postHeight();
         }
@@ -244,7 +251,6 @@
                 return '<tr class="break-row"><td class="col-time">' + time + '</td><td colspan="3">' + esc(t) + '</td></tr>';
             }
             var title = esc(pick(lang, lec.title, lec.titleEn) || (lang === 'en' ? '(Untitled)' : '(제목 없음)'));
-            var subtitle = lang === 'en' ? lec.title : lec.titleEn;   // 반대 언어를 부제로
             var spks = lec.speakers || [];
             var spkHtml = spks.map(function (x) {
                 var nm = esc(pick(lang, x.name, x.nameEn));
@@ -261,7 +267,6 @@
             return '<tr>' +
                 '<td class="col-time">' + time + '</td>' +
                 '<td><div class="l-title">' + title + '</div>' +
-                    (subtitle ? '<div class="l-sub">' + esc(subtitle) + '</div>' : '') +
                     (lec.memo ? '<div class="l-memo">📝 ' + esc(lec.memo) + '</div>' : '') + '</td>' +
                 '<td class="col-spk">' + spkHtml + '</td>' +
                 '<td class="col-aff"><span class="aff">' + aff + '</span></td>' +
