@@ -57,27 +57,39 @@
         .ag-sess-time { font-weight: 600; color: rgba(255,255,255,.9); font-size: 0.85rem; margin-left: 8px; }
         .ag-sess-mod { font-weight: 500; color: rgba(255,255,255,.92); font-size: 0.83rem; margin-top: 3px; }
 
-        table { width: 100%; border-collapse: collapse; }
-        thead th { text-align: left; font-size: 0.88rem; color: var(--p2); background: #f3ebf6; padding: 11px 18px; border-bottom: 1px solid var(--line); font-weight: 700; }
-        tbody td { padding: 13px 18px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 0.93rem; }
-        tbody tr:last-child td { border-bottom: 0; }
-        .col-time { width: 118px; white-space: nowrap; color: var(--dim); font-variant-numeric: tabular-nums; }
-        .col-spk { width: 250px; }
-        .col-aff { width: 210px; }
-        .l-title { font-weight: 700; line-height: 1.4; }
-        .l-sub { color: var(--dim); font-size: 0.85rem; margin-top: 2px; }
-        .l-memo { display: inline-block; margin-top: 5px; font-size: 0.82rem; color: #92400e; background: #fffbeb;
-                  border: 1px solid #fde68a; border-radius: 6px; padding: 2px 8px; white-space: pre-wrap; word-break: break-word; }
-        .spk { display: inline-flex; align-items: center; gap: 8px; margin: 2px 0; }
-        .spk img, .spk .noimg { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background: #ece7f0;
+        /* 상단 안내(즐겨찾기) 배너 */
+        .ag-note { background: #f6eff8; border: 1px solid #e6d6ee; color: #5a2a66; border-radius: 10px;
+                   padding: 11px 14px; font-size: 0.92rem; font-weight: 700; margin: 12px 0 2px; line-height: 1.5; }
+        .ag-note .cnt { color: var(--p); }
+
+        /* 강의 목록 (표 대신 플렉스 행 — 좌우 스크롤 없음) */
+        .lec { display: flex; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); align-items: flex-start; }
+        .lec:first-child { border-top: 0; }
+        .lec-time { flex: 0 0 92px; color: var(--p2); font-variant-numeric: tabular-nums; font-size: 0.86rem;
+                    font-weight: 700; padding-top: 2px; white-space: nowrap; }
+        .lec-body { flex: 1 1 auto; min-width: 0; }
+        .l-title { font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; word-break: break-word; }
+        .lec-people { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 5px 14px; align-items: center; }
+        .spk { display: inline-flex; align-items: center; gap: 7px; }
+        .spk img, .spk .noimg { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; background: #ece7f0;
                                 flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
-                                color: var(--p2); font-weight: 700; font-size: 0.9rem; }
+                                color: var(--p2); font-weight: 700; font-size: 0.78rem; }
         .spk-name { color: var(--p); font-weight: 600; }
         a.spk-name { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
-        .aff { color: var(--dim); }
-        .break-row td { background: var(--break); color: var(--p); font-weight: 700; }
+        .spk-aff { color: var(--dim); font-size: 0.9rem; }
+        .l-memo { display: inline-block; margin-top: 6px; font-size: 0.82rem; color: #92400e; background: #fffbeb;
+                  border: 1px solid #fde68a; border-radius: 6px; padding: 2px 8px; white-space: pre-wrap; word-break: break-word; }
+        /* 담기(즐겨찾기) 버튼 */
+        .fav { flex: 0 0 auto; border: 1px solid var(--line); background: #fff; border-radius: 999px;
+               padding: 6px 12px; cursor: pointer; color: var(--dim); font-weight: 700; font-size: 0.84rem;
+               display: inline-flex; align-items: center; gap: 5px; font-family: inherit; white-space: nowrap; }
+        .fav:hover { border-color: var(--p); color: var(--p); }
+        .fav.on { background: #fff6db; border-color: #f2c94c; color: #b7791f; }
+        .fav .star { font-size: 0.98rem; line-height: 1; }
+        .lec-break { display: flex; gap: 12px; padding: 11px 16px; border-top: 1px solid var(--line);
+                     background: var(--break); color: var(--p); font-weight: 700; }
+        .lec-break .lec-time { color: var(--p); }
 
-        .ag-foot { text-align: center; color: var(--dim); font-size: 0.8rem; margin-top: 22px; }
         .ag-msg { text-align: center; padding: 48px 16px; color: var(--dim); }
         .ag-msg-t { font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; color: var(--ink); }
         .ag-msg code { background: var(--soft); padding: 1px 6px; border-radius: 5px; }
@@ -89,15 +101,10 @@
             .ag-lang { margin-left: 0; }
             .ag-sess-name { display: block; }
             .ag-sess-time { margin-left: 0; }
-            thead { display: none; }
-            table { display: block; width: 100%; }
-            tbody, tr { display: block; width: 100%; }
-            td { display: block; width: auto; max-width: 100%; }
-            .col-time, .col-spk, .col-aff { width: auto; max-width: 100%; }
-            tbody td { font-size: 0.98rem; border: 0; padding: 3px 14px; }
-            tbody tr { border-bottom: 1px solid var(--line); padding: 10px 0; }
-            .col-time { padding-top: 11px; color: var(--p2); font-weight: 700; }
-            .l-title { overflow-wrap: anywhere; word-break: break-word; }
+            .lec { flex-wrap: wrap; padding: 12px 14px; }
+            .lec-time { flex-basis: auto; order: 1; }
+            .fav { order: 2; margin-left: auto; }
+            .lec-body { order: 3; flex-basis: 100%; }
         }
     </style>
 </head>
@@ -152,10 +159,24 @@
             return days;
         }
 
+        /* ---------- 관심강의(담기) 저장 ---------- */
+        // 임베드에서는 브라우저(localStorage)에 저장하는 데모 동작입니다.
+        // 홈페이지(메드소프트)에서는 회원 로그인에 연결해 회원별로 저장하세요.
+        var FAVKEY = 'asls_fav_' + CONF_ID;
+        function getFavs() { try { return JSON.parse(localStorage.getItem(FAVKEY) || '[]'); } catch (e) { return []; } }
+        function isFav(id) { return id && getFavs().indexOf(id) >= 0; }
+
         window.AGENDA = {
             setLang: function (l) { LANG = l; render(); },
             selDay: function (i) { SEL.day = i; SEL.room = 0; render(); },
-            selRoom: function (i) { SEL.room = i; render(); }
+            selRoom: function (i) { SEL.room = i; render(); },
+            toggleFav: function (id) {
+                if (!id) return;
+                var f = getFavs(), i = f.indexOf(id);
+                if (i >= 0) f.splice(i, 1); else f.push(id);
+                try { localStorage.setItem(FAVKEY, JSON.stringify(f)); } catch (e) { }
+                render();
+            }
         };
 
         function msg(t, sub) { return '<div class="ag-msg"><div class="ag-msg-t">' + t + '</div>' + (sub ? '<div>' + sub + '</div>' : '') + '</div>'; }
@@ -182,9 +203,16 @@
             var hl = hLang();
             var title = pick(hl, FEED.title, FEED.titleEn) || '학술대회 프로그램';
             var range = FEED.startDate ? (FEED.endDate && FEED.endDate !== FEED.startDate ? FEED.startDate + ' ~ ' + FEED.endDate : FEED.startDate) : '';
+            var favN = getFavs().length;
+            var note = (hl === 'en'
+                ? '⭐ Tap “Save” on a lecture to build your own schedule.'
+                : '⭐ 강의 옆 <b>‘담기’</b> 버튼으로 나만의 강의 스케줄을 만들어 보세요.')
+                + (favN ? ' <span class="cnt">(' + (hl === 'en' ? 'saved ' + favN : '담은 강의 ' + favN + '개') + ')</span>' : '');
+
             var html = '<div class="ag-head">' +
                 '<h1 class="ag-title">' + esc(title) + '</h1>' +
                 (range ? '<div class="ag-range">' + esc(range) + '</div>' : '') +
+                '<div class="ag-note">' + note + '</div>' +
                 '<div class="ag-controls">' +
                     '<div class="ag-tabs days">' + days.map(function (d, i) {
                         return '<button class="ag-tab ' + (i === SEL.day ? 'on' : '') + '" onclick="AGENDA.selDay(' + i + ')">' + esc(fmtDayShort(d.date, hl)) + '</button>';
@@ -234,26 +262,22 @@
                     '<span class="ag-sess-time">' + s.start + ' – ' + s.end + '</span>' + mod + '</div>';
             }
             var rows = s.lectures.map(function (lec) { return renderLecture(lec, lang); }).join('') ||
-                ('<tr><td colspan="4" class="aff" style="text-align:center">' + (lang === 'en' ? 'No lectures.' : '강의가 없습니다.') + '</td></tr>');
-            var thead = '<thead><tr>' +
-                '<th class="col-time">' + (lang === 'en' ? 'Time' : '시간') + '</th>' +
-                '<th>' + (lang === 'en' ? 'Lecture Title' : '강의 제목') + '</th>' +
-                '<th class="col-spk">' + (lang === 'en' ? 'Speaker' : '연자') + '</th>' +
-                '<th class="col-aff">' + (lang === 'en' ? 'Affiliation' : '소속') + '</th>' +
-                '</tr></thead>';
-            return '<div class="ag-sess">' + head + '<table>' + thead + '<tbody>' + rows + '</tbody></table></div>';
+                ('<div class="ag-msg"><div>' + (lang === 'en' ? 'No lectures.' : '강의가 없습니다.') + '</div></div>');
+            return '<div class="ag-sess">' + head + rows + '</div>';
         }
 
         function renderLecture(lec, lang) {
             var time = lec.start + ' – ' + lec.end;
             if (lec.type !== 'lecture') {
                 var t = pick(lang, lec.title, lec.titleEn) || (lec.type === 'panel' ? 'Panel Discussion' : (lang === 'en' ? 'Break' : '행사'));
-                return '<tr class="break-row"><td class="col-time">' + time + '</td><td colspan="3">' + esc(t) + '</td></tr>';
+                return '<div class="lec-break"><div class="lec-time">' + time + '</div><div class="lec-body"><div class="l-title">' + esc(t) + '</div></div></div>';
             }
             var title = esc(pick(lang, lec.title, lec.titleEn) || (lang === 'en' ? '(Untitled)' : '(제목 없음)'));
+            // 연자·소속: 강의 제목 아래 둘째 줄 (좌우 스크롤 없이 한 화면에)
             var spks = lec.speakers || [];
-            var spkHtml = spks.map(function (x) {
+            var peopleHtml = spks.map(function (x) {
                 var nm = esc(pick(lang, x.name, x.nameEn));
+                var aff = esc(pick(lang, x.affiliation, x.affiliationEn));
                 var inner = avatar(x.photo, pick(lang, x.name, x.nameEn));
                 if (x.id && SPK_BASE) {
                     var href = SPK_BASE.replace('{id}', encodeURIComponent(x.id));
@@ -261,16 +285,21 @@
                 } else {
                     inner += '<span class="spk-name">' + nm + '</span>';
                 }
+                if (aff) inner += '<span class="spk-aff">' + aff + '</span>';
                 return '<span class="spk">' + inner + '</span>';
-            }).join('<br>') || '-';
-            var aff = spks.map(function (x) { return esc(pick(lang, x.affiliation, x.affiliationEn)); }).filter(Boolean).join(', ') || '-';
-            return '<tr>' +
-                '<td class="col-time">' + time + '</td>' +
-                '<td><div class="l-title">' + title + '</div>' +
-                    (lec.memo ? '<div class="l-memo">📝 ' + esc(lec.memo) + '</div>' : '') + '</td>' +
-                '<td class="col-spk">' + spkHtml + '</td>' +
-                '<td class="col-aff"><span class="aff">' + aff + '</span></td>' +
-            '</tr>';
+            }).join('');
+            var on = isFav(lec.id);
+            var favBtn = lec.id ? ('<button class="fav ' + (on ? 'on' : '') + '" title="관심강의 담기 — 나만의 스케줄 만들기" onclick="AGENDA.toggleFav(\'' + lec.id + '\')">' +
+                '<span class="star">' + (on ? '★' : '☆') + '</span>' + (on ? (lang === 'en' ? 'Saved' : '담김') : (lang === 'en' ? 'Save' : '담기')) + '</button>') : '';
+            return '<div class="lec">' +
+                '<div class="lec-time">' + time + '</div>' +
+                '<div class="lec-body">' +
+                    '<div class="l-title">' + title + '</div>' +
+                    (peopleHtml ? '<div class="lec-people">' + peopleHtml + '</div>' : '') +
+                    (lec.memo ? '<div class="l-memo">📝 ' + esc(lec.memo) + '</div>' : '') +
+                '</div>' +
+                favBtn +
+            '</div>';
         }
 
         /* ---------- iframe 높이 자동 전달 ---------- */
