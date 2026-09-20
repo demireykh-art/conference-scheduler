@@ -34,7 +34,7 @@
         .prof-top { display: flex; gap: 18px; padding: 20px; }
         .prof-id { flex: 0 0 auto; width: 210px; text-align: center; }
         .prof-id .pic, .prof-id .noimg { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; background: #ece7f0;
-                     display: inline-flex; align-items: center; justify-content: center; color: var(--p2); font-weight: 800; font-size: 2.2rem; }
+                     display: inline-flex; align-items: center; justify-content: center; color: var(--p2); font-weight: 800; font-size: 1.7rem; letter-spacing: -1px; }
         .prof-id .nm { font-size: 1.35rem; font-weight: 800; color: var(--p2); margin-top: 12px; }
         .prof-id .aff { color: var(--dim); font-size: 0.95rem; margin-top: 3px; }
         .prof-id .nat { color: var(--p); font-size: 0.9rem; font-weight: 700; margin-top: 5px; }
@@ -44,6 +44,12 @@
         .prof-cv .cv.empty { color: var(--dim); font-style: italic; }
 
         .sec-h { font-weight: 800; color: var(--p2); font-size: 1.1rem; margin: 6px 0 12px; }
+        .gsearch { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 9px;
+                   padding: 0 10px; background: #fff; margin-bottom: 14px; }
+        .gsearch:focus-within { border-color: var(--p); }
+        .gsearch .ic { color: var(--dim); font-size: 0.95rem; }
+        .gsearch input { border: 0; outline: 0; padding: 9px 4px; font-size: 0.95rem; font-family: inherit; flex: 1; min-width: 0; background: transparent; color: var(--ink); }
+        .gsearch .x { border: 0; background: transparent; color: var(--dim); cursor: pointer; font-size: 0.9rem; padding: 4px; }
 
         /* 강의 리스트: 3줄 (세션 / 일정·Room·Role / 제목 + 담기) */
         .lec { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px;
@@ -66,7 +72,7 @@
         .card { border: 1px solid var(--line); border-radius: 12px; padding: 16px 12px; text-align: center; cursor: pointer; background: #fff; }
         .card:hover { border-color: var(--p); box-shadow: 0 4px 14px rgba(60,20,70,.08); }
         .card .pic, .card .noimg { width: 68px; height: 68px; border-radius: 50%; object-fit: cover; background: #ece7f0;
-                   display: inline-flex; align-items: center; justify-content: center; color: var(--p2); font-weight: 800; font-size: 1.3rem; }
+                   display: inline-flex; align-items: center; justify-content: center; color: var(--p2); font-weight: 800; font-size: 1.02rem; letter-spacing: -0.5px; }
         .card .nm { font-weight: 700; margin-top: 8px; color: var(--p2); }
         .card .aff { color: var(--dim); font-size: 0.82rem; margin-top: 2px; }
         .card .cnt2 { color: var(--p); font-size: 0.8rem; font-weight: 700; margin-top: 5px; }
@@ -97,6 +103,7 @@
         var CONF_ID = params.get('id') || '';
         var LANG = params.get('lang') === 'en' ? 'en' : 'ko';
         var SPK = params.get('spk') || params.get('speaker') || '';
+        var GSEARCH = '';   // 연자 목록 검색어
         var FEED = null, INDEX = null;
 
         var $ = function (id) { return document.getElementById(id); };
@@ -111,9 +118,20 @@
             if (LANG === 'en') return MON_EN[dt.getMonth()] + ' ' + dt.getDate() + ' (' + WD_EN[dt.getDay()] + ')';
             return (dt.getMonth() + 1) + '.' + dt.getDate() + '(' + WD_KO[dt.getDay()] + ')';
         }
+        // 사진 없을 때 원형에 표시할 글자: 한글 이름은 전체(최대 3글자), 영문은 이니셜 2자
+        function initials(name) {
+            name = (name == null ? '' : String(name)).replace(/^(Dr\.?|Prof\.?|Professor|Mr\.?|Ms\.?|Mrs\.?)\s+/i, '').trim();
+            if (!name) return '?';
+            if (/[A-Za-z]/.test(name) && /\s/.test(name)) {
+                var p = name.split(/\s+/);
+                return (p[0].charAt(0) + (p[p.length - 1].charAt(0) || '')).toUpperCase();
+            }
+            if (/^[A-Za-z]/.test(name)) return name.slice(0, 2).toUpperCase();
+            return name.slice(0, 3);   // 한글 등: 최대 3글자 전부
+        }
         function avatar(photo, name, wrapCls) {
             if (photo) return '<img class="' + wrapCls + '" src="' + esc(photo) + '" alt="">';
-            return '<span class="noimg ' + wrapCls + '">' + esc((name || '?').charAt(0)) + '</span>';
+            return '<span class="noimg ' + wrapCls + '">' + esc(initials(name)) + '</span>';
         }
 
         /* ---------- 관심강의(담기) — 시간표와 동일 저장소 공유 ---------- */
@@ -125,6 +143,7 @@
             setLang: function (l) { LANG = l; render(); },
             open: function (key) { SPK = key; render(); window.scrollTo(0, 0); },
             back: function () { SPK = ''; render(); },
+            gsearch: function (v) { GSEARCH = v || ''; render(); },
             toggleFav: function (id) {
                 if (!id) return;
                 var f = getFavs(), i = f.indexOf(id);
@@ -165,7 +184,10 @@
 
             var sp = SPK ? findSpeaker(SPK) : null;
             if (sp) { app.innerHTML = langBar() + noteBar() + renderDetail(sp); }
-            else { app.innerHTML = langBar() + noteBar() + renderGrid(); }
+            else {
+                app.innerHTML = langBar() + noteBar() + renderGrid();
+                if (GSEARCH) { var gi = $('gs'); if (gi) { try { gi.focus(); var v = gi.value; gi.value = ''; gi.value = v; } catch (e) { } } }
+            }
             postHeight();
         }
 
@@ -209,8 +231,19 @@
 
         function renderGrid() {
             if (!INDEX || !INDEX.length) return '<div class="msg"><div class="msg-t">' + (LANG === 'en' ? 'No speakers.' : '연자 정보가 없습니다.') + '</div></div>';
-            var html = '<div class="sec-h">' + (LANG === 'en' ? 'Invited Speakers' : '초청 연자') + ' (' + INDEX.length + ')</div><div class="grid">';
-            html += INDEX.map(function (sp) {
+            var ql = GSEARCH.trim().toLowerCase();
+            var list = INDEX.filter(function (sp) {
+                if (!ql) return true;
+                return [sp.name, sp.nameEn, sp.affiliation, sp.affiliationEn].join(' ').toLowerCase().indexOf(ql) >= 0;
+            });
+            var search = '<div class="gsearch"><span class="ic">🔍</span>' +
+                '<input id="gs" type="text" autocomplete="off" placeholder="' + (LANG === 'en' ? 'Search speaker / affiliation' : '연자 · 소속 검색') + '" ' +
+                'value="' + esc(GSEARCH) + '" oninput="SPKPAGE.gsearch(this.value)">' +
+                (GSEARCH ? '<button class="x" title="지우기" onclick="SPKPAGE.gsearch(\'\')">✕</button>' : '') + '</div>';
+            var html = '<div class="sec-h">' + (LANG === 'en' ? 'Invited Speakers' : '초청 연자') + ' (' + list.length + ')</div>' + search;
+            if (!list.length) return html + '<div class="msg"><div>' + (LANG === 'en' ? 'No results.' : '검색 결과가 없습니다.') + '</div></div>';
+            html += '<div class="grid">';
+            html += list.map(function (sp) {
                 var key = sp.id || sp.name || sp.nameEn;
                 return '<div class="card" onclick="SPKPAGE.open(\'' + esc(key).replace(/'/g, "\\'") + '\')">' +
                     avatar(sp.photo, pick(sp.name, sp.nameEn), 'pic') +
