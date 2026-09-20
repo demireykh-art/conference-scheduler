@@ -192,8 +192,10 @@
             toggleFav: function (id) {
                 if (!id) return;
                 var f = getFavs(), i = f.indexOf(id);
+                var saved = i < 0;
                 if (i >= 0) f.splice(i, 1); else f.push(id);
                 try { localStorage.setItem(FAVKEY, JSON.stringify(f)); } catch (e) { }
+                notifyFav(id, saved);   // 회원 담기 연동: 부모(홈페이지)에 변경 알림
                 render();
             },
             search: function (v) { SEARCH = v || ''; if (SEARCH) FAVVIEW = false; render(); },
@@ -390,6 +392,22 @@
         window.addEventListener('resize', postHeight);
         window.addEventListener('load', postHeight);
         if (window.ResizeObserver) { try { new ResizeObserver(postHeight).observe(document.body); } catch (e) { } }
+
+        /* ---------- 회원 담기(장바구니) 연동 브리지 ---------- */
+        // 담기 변경 시 부모(홈페이지)에 알림 → 홈페이지가 회원 계정에 저장
+        function notifyFav(id, saved) {
+            try { parent.postMessage({ type: 'asls-fav', conf: CONF_ID, id: id, saved: saved, favs: getFavs() }, '*'); } catch (e) { }
+        }
+        // 부모 → 위젯 명령: 회원 담기목록 주입(setFavs) / 언어(lang) / 검색(openSearch)
+        window.addEventListener('message', function (e) {
+            var d = e && e.data; if (!d || d.type !== 'asls-cmd') return;
+            if (d.cmd === 'setFavs' && Object.prototype.toString.call(d.value) === '[object Array]') {
+                try { localStorage.setItem(FAVKEY, JSON.stringify(d.value)); } catch (x) { }
+                render();
+            } else if (d.cmd === 'lang') { LANG = (d.value === 'en') ? 'en' : 'ko'; render(); }
+            else if (d.cmd === 'showSaved') { SEARCH = ''; FAVVIEW = true; render(); }
+            else if (d.cmd === 'openSearch') { FAVVIEW = false; render(); var si = $('agSearch'); if (si) { try { si.focus(); } catch (x) { } } }
+        });
 
         /* ---------- 로드 + 주기적 갱신 ---------- */
         function load() {
