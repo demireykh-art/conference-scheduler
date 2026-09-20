@@ -264,6 +264,15 @@
         window.addEventListener('load', postHeight);
         if (window.ResizeObserver) { try { new ResizeObserver(postHeight).observe(document.body); } catch (e) { } }
 
+        // 부모 페이지의 플로팅 버튼(국문/EN·검색)이 이 위젯을 제어할 수 있도록 명령 수신
+        // 사용: iframe.contentWindow.postMessage({type:'asls-cmd', cmd:'lang', value:'en'}, '*')
+        //       iframe.contentWindow.postMessage({type:'asls-cmd', cmd:'openSearch'}, '*')
+        window.addEventListener('message', function (e) {
+            var d = e && e.data; if (!d || d.type !== 'asls-cmd') return;
+            if (d.cmd === 'lang') { LANG = (d.value === 'en') ? 'en' : 'ko'; render(); }
+            else if (d.cmd === 'openSearch') { SPK = ''; render(); var gi = $('gs'); if (gi) { try { gi.focus(); } catch (e2) { } } }
+        });
+
         function load() {
             AslsAgenda.load(CONF_ID).then(function (feed) {
                 FEED = feed; INDEX = AslsAgenda.speakerIndex(feed); render();
