@@ -8,78 +8,87 @@
     <meta property="og:title" content="학술대회 프로그램 · ASLS">
     <meta property="og:description" content="ASLS 학술대회 시간표 · 프로그램">
     <meta name="theme-color" content="#6E2B7B">
-
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-
     <style>
         :root {
-            --ag-primary: #6E2B7B;
-            --ag-ink: #1f2430;
-            --ag-dim: #6b7280;
-            --ag-border: #e5e8ec;
-            --ag-soft: #f5f6f8;
-            --ag-break: #f3eef6;
+            --p: #6b1f7a; --p2: #3f1147;
+            --ink: #1f2430; --dim: #7a7580;
+            --line: #e7e2ea; --soft: #f5f6f8; --break: #faf7fb;
         }
         * { box-sizing: border-box; }
-        html { font-size: 17.5px; }   /* 전체 폰트 소폭 확대 (기본 16px → 17.5px) */
+        html { font-size: 17.5px; }
         html, body { margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
-            color: var(--ag-ink); background: #fff; line-height: 1.5;
+            color: var(--ink); background: #fff; line-height: 1.5;
             -webkit-text-size-adjust: 100%;
         }
-        .ag-container { max-width: 100%; margin: 0 auto; padding: 20px 16px 40px; }
+        .ag-container { max-width: 100%; margin: 0 auto; padding: 18px 16px 40px; }
 
-        .ag-head { margin-bottom: 18px; }
-        .ag-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 4px; color: var(--ag-primary); }
-        .ag-range { color: var(--ag-dim); font-size: 0.95rem; margin-bottom: 14px; }
+        /* 헤더 */
+        .ag-head { margin-bottom: 16px; }
+        .ag-title { font-size: 1.55rem; font-weight: 800; margin: 0 0 4px; color: var(--p); }
+        .ag-range { color: var(--dim); font-size: 0.95rem; margin-bottom: 14px; }
         .ag-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-        .ag-seg { display: inline-flex; border: 1px solid var(--ag-border); border-radius: 9px; overflow: hidden; background: #fff; }
-        .ag-seg button { border: 0; background: #fff; padding: 8px 13px; font-size: 0.85rem; cursor: pointer; color: var(--ag-dim); border-left: 1px solid var(--ag-border); font-family: inherit; }
-        .ag-seg button:first-child { border-left: 0; }
-        .ag-seg button.on { background: var(--ag-primary); color: #fff; font-weight: 700; }
-        .ag-lang { margin-left: auto; }
 
-        .ag-day { font-size: 1.05rem; font-weight: 800; margin: 26px 0 10px; padding-bottom: 7px; border-bottom: 2px solid var(--ag-primary); color: var(--ag-primary); }
-        .ag-day:first-of-type { margin-top: 8px; }
+        /* 탭 (날짜 / 룸) — pill 형태 */
+        .ag-tabs { display: flex; flex-wrap: wrap; gap: 9px; }
+        .ag-tab { border: 1px solid var(--line); border-radius: 999px; padding: 8px 17px; font-weight: 700;
+                  color: var(--p2); background: #fff; cursor: pointer; font-size: 0.92rem; font-family: inherit; }
+        .ag-tab:hover { border-color: var(--p); }
+        .ag-tab.on { background: var(--p2); color: #fff; border-color: var(--p2); }
+        .ag-tabs.rooms { margin-top: 10px; }
+        .ag-tabs.rooms .ag-tab { padding: 7px 15px; font-size: 0.9rem; }
 
-        .ag-room { border: 1px solid var(--ag-border); border-radius: 12px; overflow: hidden; margin-bottom: 16px; background: #fff; }
-        .ag-room-name { background: var(--ag-primary); color: #fff; font-weight: 700; font-size: 0.98rem; padding: 10px 14px; }
-        .ag-room-topic { background: var(--ag-primary); color: #fff; opacity: 0.9; font-size: 0.8rem; padding: 0 14px 8px; margin-top: -4px; }
+        .ag-lang { margin-left: auto; display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+        .ag-lang button { border: 0; background: #fff; padding: 8px 14px; font-size: 0.86rem; cursor: pointer;
+                          color: var(--dim); border-left: 1px solid var(--line); font-family: inherit; }
+        .ag-lang button:first-child { border-left: 0; }
+        .ag-lang button.on { background: var(--p); color: #fff; font-weight: 700; }
 
-        .ag-session { border-top: 1px solid var(--ag-border); }
-        .ag-session:first-of-type { border-top: 0; }
-        .ag-session-head { background: var(--ag-soft); padding: 8px 14px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; border-bottom: 1px solid var(--ag-border); }
-        .ag-session-name { font-weight: 700; font-size: 0.9rem; }
-        .ag-session-time { color: var(--ag-dim); font-size: 0.82rem; }
-        .ag-mod { color: var(--ag-dim); font-size: 0.82rem; }
+        .ag-divider { border: 0; border-top: 1px solid var(--line); margin: 14px 0 18px; }
 
-        .ag-lec { display: flex; gap: 12px; padding: 10px 14px; border-top: 1px dashed #eef0f3; }
-        .ag-lec:first-child { border-top: 0; }
-        .ag-time { flex: 0 0 92px; color: var(--ag-dim); font-size: 0.8rem; font-variant-numeric: tabular-nums; padding-top: 1px; white-space: nowrap; }
-        .ag-lec-main { flex: 1; min-width: 0; }
-        .ag-lec-title { font-weight: 600; font-size: 0.92rem; }
-        .ag-lec-spk { font-size: 0.85rem; margin-top: 2px; }
-        .ag-aff { color: var(--ag-dim); font-weight: 400; }
-        .ag-sep { color: var(--ag-dim); }
-        .ag-lec-meta { font-size: 0.8rem; color: var(--ag-dim); margin-top: 3px; display: flex; gap: 12px; flex-wrap: wrap; }
-        .ag-memo { font-size: 0.8rem; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 3px 8px; margin-top: 4px; display: inline-block; max-width: 100%; white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
-        .ag-break { background: var(--ag-break); }
-        .ag-break .ag-lec-title, .ag-panel .ag-lec-title { color: var(--ag-primary); font-weight: 700; }
+        /* 선택된 룸: 주제(큰 제목) + 세션들 */
+        .ag-topic { font-size: 1.5rem; font-weight: 800; color: var(--p2); letter-spacing: .2px; margin: 4px 0 16px; }
 
-        .ag-empty { padding: 12px 14px; color: var(--ag-dim); font-size: 0.84rem; }
-        .ag-foot { text-align: center; color: var(--ag-dim); font-size: 0.78rem; margin-top: 22px; }
-        .ag-msg { text-align: center; padding: 48px 16px; color: var(--ag-dim); }
-        .ag-msg-t { font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; color: var(--ag-ink); }
-        .ag-msg-s { font-size: 0.88rem; }
-        .ag-msg code { background: var(--ag-soft); padding: 1px 6px; border-radius: 5px; }
+        .ag-sess { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
+        .ag-sess-head { background: linear-gradient(90deg, var(--p), var(--p2)); color: #fff; padding: 12px 18px; }
+        .ag-sess-name { font-weight: 800; font-size: 1.02rem; }
+        .ag-sess-time { font-weight: 600; color: rgba(255,255,255,.9); font-size: 0.85rem; margin-left: 8px; }
+        .ag-sess-mod { font-weight: 500; color: rgba(255,255,255,.92); font-size: 0.83rem; margin-top: 3px; }
 
-        @media (max-width: 520px) {
-            .ag-title { font-size: 1.25rem; }
-            .ag-time { flex-basis: 78px; font-size: 0.76rem; }
-            .ag-lang { margin-left: 0; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th { text-align: left; font-size: 0.88rem; color: var(--p2); background: #f3ebf6; padding: 11px 18px; border-bottom: 1px solid var(--line); font-weight: 700; }
+        tbody td { padding: 13px 18px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 0.93rem; }
+        tbody tr:last-child td { border-bottom: 0; }
+        .col-time { width: 118px; white-space: nowrap; color: var(--dim); font-variant-numeric: tabular-nums; }
+        .col-spk { width: 250px; }
+        .col-aff { width: 210px; }
+        .l-title { font-weight: 700; line-height: 1.4; }
+        .l-sub { color: var(--dim); font-size: 0.85rem; margin-top: 2px; }
+        .l-memo { display: inline-block; margin-top: 5px; font-size: 0.82rem; color: #92400e; background: #fffbeb;
+                  border: 1px solid #fde68a; border-radius: 6px; padding: 2px 8px; white-space: pre-wrap; word-break: break-word; }
+        .spk { display: inline-flex; align-items: center; gap: 8px; margin: 2px 0; }
+        .spk img, .spk .noimg { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background: #ece7f0;
+                                flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+                                color: var(--p2); font-weight: 700; font-size: 0.9rem; }
+        .spk-name { color: var(--p); font-weight: 600; }
+        a.spk-name { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+        .aff { color: var(--dim); }
+        .break-row td { background: var(--break); color: var(--p); font-weight: 700; }
+
+        .ag-foot { text-align: center; color: var(--dim); font-size: 0.8rem; margin-top: 22px; }
+        .ag-msg { text-align: center; padding: 48px 16px; color: var(--dim); }
+        .ag-msg-t { font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; color: var(--ink); }
+        .ag-msg code { background: var(--soft); padding: 1px 6px; border-radius: 5px; }
+
+        @media (max-width: 760px) {
+            .ag-title { font-size: 1.3rem; }
+            .col-time, .col-spk, .col-aff { width: auto; }
+            thead { display: none; }
+            tbody td { display: block; border: 0; padding: 3px 16px; }
+            tbody tr { border-bottom: 1px solid var(--line); display: block; padding: 10px 0; }
+            .col-time { padding-top: 11px; color: var(--p2); font-weight: 700; }
+            .break-row td { display: block; }
         }
     </style>
 </head>
@@ -88,7 +97,200 @@
         <div id="agenda"><div class="ag-msg"><div class="ag-msg-t">불러오는 중…</div></div></div>
     </div>
 
-    <script src="js/config.js"></script>
-    <script src="js/agenda-embed.js"></script>
+    <script src="js/asls-agenda-public.js"></script>
+    <script>
+    (function () {
+        var params = new URLSearchParams(location.search);
+        var CONF_ID = params.get('id') || '';
+        var LANG = params.get('lang') || 'auto';       // 'auto' | 'ko' | 'en'
+        var DATE = params.get('date') || '';            // 특정 날짜만
+        // 연자 클릭 시 이동할 초청연자 페이지 URL 템플릿 ({id} 자리에 연자 고유 id)
+        var SPK_BASE = params.get('spkbase') || 'https://www.asls.kr/html/?pmode=invited&speaker={id}';
+        var FEED = null;
+        var SEL = { day: 0, room: 0 };
+
+        var $ = function (id) { return document.getElementById(id); };
+        function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+
+        var WD_KO = ['일', '월', '화', '수', '목', '금', '토'];
+        var WD_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        var MON_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        function fmtDayShort(d, lang) {
+            var dt = new Date(d + 'T00:00:00'); if (isNaN(dt)) return d;
+            if (lang === 'en') return MON_EN[dt.getMonth()] + ' ' + dt.getDate() + ' (' + WD_EN[dt.getDay()] + ')';
+            var p = function (n) { return String(n).padStart(2, '0'); };
+            return p(dt.getMonth() + 1) + '/' + p(dt.getDate()) + '(' + WD_KO[dt.getDay()] + ')';
+        }
+        function fmtDayLong(d, lang) {
+            var dt = new Date(d + 'T00:00:00'); if (isNaN(dt)) return d;
+            if (lang === 'en') return MON_EN[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear() + ' (' + WD_EN[dt.getDay()] + ')';
+            return dt.getFullYear() + '. ' + (dt.getMonth() + 1) + '. ' + dt.getDate() + ' (' + WD_KO[dt.getDay()] + ')';
+        }
+        // 헤더 언어(룸 문맥 없음): auto면 국문
+        function hLang() { return LANG === 'en' ? 'en' : 'ko'; }
+        // 룸 문맥 언어: 전체 토글 우선, 없으면 룸 언어(auto)
+        function rLang(room) { return (LANG === 'ko' || LANG === 'en') ? LANG : (room && room.lang === 'en' ? 'en' : 'ko'); }
+        function pick(lang, ko, en) { return lang === 'en' ? (en || ko || '') : (ko || en || ''); }
+
+        function avatar(photo, name) {
+            if (photo) return '<img src="' + esc(photo) + '" alt="">';
+            return '<span class="noimg">' + esc((name || '?').charAt(0)) + '</span>';
+        }
+
+        function activeDays() {
+            var days = (FEED && FEED.days) || [];
+            if (DATE) return days.filter(function (d) { return d.date === DATE; });
+            return days;
+        }
+
+        window.AGENDA = {
+            setLang: function (l) { LANG = l; render(); },
+            selDay: function (i) { SEL.day = i; SEL.room = 0; render(); },
+            selRoom: function (i) { SEL.room = i; render(); }
+        };
+
+        function msg(t, sub) { return '<div class="ag-msg"><div class="ag-msg-t">' + t + '</div>' + (sub ? '<div>' + sub + '</div>' : '') + '</div>'; }
+
+        function render() {
+            var wrap = $('agenda');
+            if (!CONF_ID) { wrap.innerHTML = msg('행사 정보가 없습니다.', '주소에 <code>?id=행사ID</code> 가 필요합니다.'); postHeight(); return; }
+            if (!FEED) { wrap.innerHTML = msg('프로그램을 불러오는 중…', ''); postHeight(); return; }
+
+            var days = activeDays();
+            if (!days.length) {
+                var why = (FEED._roomsTotal === 0)
+                    ? '이 행사에 룸이 없거나 데이터를 읽지 못했습니다.'
+                    : '표시할 프로그램이 없습니다. (공개된 룸 ' + FEED._roomsPublic + '개)';
+                wrap.innerHTML = msg('프로그램이 없습니다.', why); postHeight(); return;
+            }
+
+            if (SEL.day >= days.length) SEL.day = 0;
+            var day = days[SEL.day];
+            if (SEL.room >= day.rooms.length) SEL.room = 0;
+            var room = day.rooms[SEL.room];
+
+            // 헤더
+            var hl = hLang();
+            var title = pick(hl, FEED.title, FEED.titleEn) || '학술대회 프로그램';
+            var range = FEED.startDate ? (FEED.endDate && FEED.endDate !== FEED.startDate ? FEED.startDate + ' ~ ' + FEED.endDate : FEED.startDate) : '';
+            var html = '<div class="ag-head">' +
+                '<h1 class="ag-title">' + esc(title) + '</h1>' +
+                (range ? '<div class="ag-range">' + esc(range) + '</div>' : '') +
+                '<div class="ag-controls">' +
+                    '<div class="ag-tabs days">' + days.map(function (d, i) {
+                        return '<button class="ag-tab ' + (i === SEL.day ? 'on' : '') + '" onclick="AGENDA.selDay(' + i + ')">' + esc(fmtDayShort(d.date, hl)) + '</button>';
+                    }).join('') + '</div>' +
+                    '<div class="ag-lang">' +
+                        '<button class="' + (LANG === 'auto' ? 'on' : '') + '" onclick="AGENDA.setLang(\'auto\')">자동</button>' +
+                        '<button class="' + (LANG === 'ko' ? 'on' : '') + '" onclick="AGENDA.setLang(\'ko\')">국문</button>' +
+                        '<button class="' + (LANG === 'en' ? 'on' : '') + '" onclick="AGENDA.setLang(\'en\')">EN</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+
+            // 룸 탭 (룸 이름 — 본문엔 반복 안 함)
+            var rl = rLang(room);
+            html += '<div class="ag-tabs rooms">' + day.rooms.map(function (r, i) {
+                var rll = rLang(r);
+                return '<button class="ag-tab ' + (i === SEL.room ? 'on' : '') + '" onclick="AGENDA.selRoom(' + i + ')">' + esc(pick(rll, r.name, r.nameEn) || '룸') + '</button>';
+            }).join('') + '</div><hr class="ag-divider">';
+
+            // 선택된 룸: 주제(큰 제목) + 세션들
+            var topic = pick(rl, room.topic, room.topicEn);
+            if (topic) html += '<div class="ag-topic">' + esc(topic) + '</div>';
+
+            var bodyHtml = '';
+            room.sessions.forEach(function (s) {
+                // 강의가 하나도 없는 (빈) 세션은 표시하지 않음
+                if (!room.sessionless && (!s.lectures || !s.lectures.length)) return;
+                bodyHtml += renderSession(room, s, rl);
+            });
+            if (!bodyHtml) bodyHtml = '<div class="ag-msg"><div>' + (rl === 'en' ? 'No sessions yet.' : '등록된 세션이 없습니다.') + '</div></div>';
+            html += bodyHtml;
+
+            html += '<div class="ag-foot">' + (rl === 'en' ? 'This program is updated automatically.' : '이 프로그램은 자동으로 업데이트됩니다.') + '</div>';
+            wrap.innerHTML = html;
+            postHeight();
+        }
+
+        function renderSession(room, s, lang) {
+            var head = '';
+            if (!room.sessionless) {
+                var mod = s.moderators && s.moderators.length
+                    ? '<div class="ag-sess-mod">' + (lang === 'en' ? 'Moderator' : '좌장') + ': ' +
+                        s.moderators.map(function (m) {
+                            var aff = pick(lang, m.affiliation, m.affiliationEn);
+                            return esc(pick(lang, m.name, m.nameEn)) + (aff ? ' (' + esc(aff) + ')' : '');
+                        }).join(', ') + '</div>' : '';
+                head = '<div class="ag-sess-head">' +
+                    '<span class="ag-sess-name">' + esc(pick(lang, s.name, s.nameEn) || (lang === 'en' ? 'Session' : '세션')) + '</span>' +
+                    '<span class="ag-sess-time">' + s.start + ' – ' + s.end + '</span>' + mod + '</div>';
+            }
+            var rows = s.lectures.map(function (lec) { return renderLecture(lec, lang); }).join('') ||
+                ('<tr><td colspan="4" class="aff" style="text-align:center">' + (lang === 'en' ? 'No lectures.' : '강의가 없습니다.') + '</td></tr>');
+            var thead = '<thead><tr>' +
+                '<th class="col-time">' + (lang === 'en' ? 'Time' : '시간') + '</th>' +
+                '<th>' + (lang === 'en' ? 'Lecture Title' : '강의 제목') + '</th>' +
+                '<th class="col-spk">' + (lang === 'en' ? 'Speaker' : '연자') + '</th>' +
+                '<th class="col-aff">' + (lang === 'en' ? 'Affiliation' : '소속') + '</th>' +
+                '</tr></thead>';
+            return '<div class="ag-sess">' + head + '<table>' + thead + '<tbody>' + rows + '</tbody></table></div>';
+        }
+
+        function renderLecture(lec, lang) {
+            var time = lec.start + ' – ' + lec.end;
+            if (lec.type !== 'lecture') {
+                var t = pick(lang, lec.title, lec.titleEn) || (lec.type === 'panel' ? 'Panel Discussion' : (lang === 'en' ? 'Break' : '행사'));
+                return '<tr class="break-row"><td class="col-time">' + time + '</td><td colspan="3">' + esc(t) + '</td></tr>';
+            }
+            var title = esc(pick(lang, lec.title, lec.titleEn) || (lang === 'en' ? '(Untitled)' : '(제목 없음)'));
+            var subtitle = lang === 'en' ? lec.title : lec.titleEn;   // 반대 언어를 부제로
+            var spks = lec.speakers || [];
+            var spkHtml = spks.map(function (x) {
+                var nm = esc(pick(lang, x.name, x.nameEn));
+                var inner = avatar(x.photo, pick(lang, x.name, x.nameEn));
+                if (x.id && SPK_BASE) {
+                    var href = SPK_BASE.replace('{id}', encodeURIComponent(x.id));
+                    inner += '<a class="spk-name" href="' + esc(href) + '" target="_top">' + nm + '</a>';
+                } else {
+                    inner += '<span class="spk-name">' + nm + '</span>';
+                }
+                return '<span class="spk">' + inner + '</span>';
+            }).join('<br>') || '-';
+            var aff = spks.map(function (x) { return esc(pick(lang, x.affiliation, x.affiliationEn)); }).filter(Boolean).join(', ') || '-';
+            return '<tr>' +
+                '<td class="col-time">' + time + '</td>' +
+                '<td><div class="l-title">' + title + '</div>' +
+                    (subtitle ? '<div class="l-sub">' + esc(subtitle) + '</div>' : '') +
+                    (lec.memo ? '<div class="l-memo">📝 ' + esc(lec.memo) + '</div>' : '') + '</td>' +
+                '<td class="col-spk">' + spkHtml + '</td>' +
+                '<td class="col-aff"><span class="aff">' + aff + '</span></td>' +
+            '</tr>';
+        }
+
+        /* ---------- iframe 높이 자동 전달 ---------- */
+        function postHeight() {
+            try { parent.postMessage({ type: 'asls-agenda-height', id: CONF_ID, height: document.documentElement.scrollHeight }, '*'); } catch (e) { }
+        }
+        window.addEventListener('resize', postHeight);
+        window.addEventListener('load', postHeight);
+        if (window.ResizeObserver) { try { new ResizeObserver(postHeight).observe(document.body); } catch (e) { } }
+
+        /* ---------- 로드 + 주기적 갱신 ---------- */
+        function load() {
+            AslsAgenda.load(CONF_ID).then(function (feed) {
+                FEED = feed; render();
+            }).catch(function (e) {
+                $('agenda').innerHTML = msg('프로그램을 불러올 수 없습니다.', '잠시 후 다시 시도해 주세요.');
+                postHeight();
+            });
+        }
+        if (!CONF_ID) { render(); }
+        else {
+            load();
+            setInterval(load, 60000);   // 60초마다 자동 갱신(스케줄러 수정사항 반영)
+        }
+    })();
+    </script>
 </body>
 </html>
