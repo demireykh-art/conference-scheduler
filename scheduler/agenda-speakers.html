@@ -104,6 +104,7 @@
         var LANG = params.get('lang') === 'en' ? 'en' : 'ko';
         var SPK = params.get('spk') || params.get('speaker') || '';
         var GSEARCH = '';   // 연자 목록 검색어
+        var AUTH = { require: false, loggedIn: false };   // 담기 로그인 정책(부모가 setAuth로 설정)
         var FEED = null, INDEX = null;
 
         var $ = function (id) { return document.getElementById(id); };
@@ -146,6 +147,7 @@
             gsearch: function (v) { GSEARCH = v || ''; render(); },
             toggleFav: function (id) {
                 if (!id) return;
+                if (AUTH.require && !AUTH.loggedIn) { requireLogin(); return; }   // 로그인 회원만 담기
                 var f = getFavs(), i = f.indexOf(id);
                 var saved = i < 0;
                 if (i >= 0) f.splice(i, 1); else f.push(id);
@@ -273,8 +275,21 @@
         function notifyFav(id, saved) {
             try { parent.postMessage({ type: 'asls-fav', conf: CONF_ID, id: id, saved: saved, favs: getFavs() }, '*'); } catch (e) { }
         }
+        // 로그인 필요 안내: 부모에 로그인 요청 → 부모가 로그인창을 띄우면 안내문 생략
+        var loginAckTimer = null;
+        function requireLogin() {
+            try { parent.postMessage({ type: 'asls-login-required', conf: CONF_ID }, '*'); } catch (e) { }
+            if (loginAckTimer) clearTimeout(loginAckTimer);
+            loginAckTimer = setTimeout(function () {
+                alert(LANG === 'en' ? 'Please log in to save lectures.' : '관심강의 담기는 로그인 후 이용할 수 있습니다.');
+                loginAckTimer = null;
+            }, 700);
+        }
         window.addEventListener('message', function (e) {
-            var d = e && e.data; if (!d || d.type !== 'asls-cmd') return;
+            var d = e && e.data; if (!d) return;
+            if (d.type === 'asls-login-ack') { if (loginAckTimer) { clearTimeout(loginAckTimer); loginAckTimer = null; } return; }
+            if (d.type !== 'asls-cmd') return;
+            if (d.cmd === 'setAuth') { AUTH.require = !!d.require; AUTH.loggedIn = !!d.loggedIn; render(); return; }
             if (d.cmd === 'setFavs' && Object.prototype.toString.call(d.value) === '[object Array]') {
                 try { localStorage.setItem(FAVKEY, JSON.stringify(d.value)); } catch (x) { } render();
             } else if (d.cmd === 'lang') { LANG = (d.value === 'en') ? 'en' : 'ko'; render(); }
