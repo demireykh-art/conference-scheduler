@@ -395,7 +395,7 @@
             cal: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>',
             img: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="9" r="1.7"/><path d="M21 15.5l-5-5-9 9.5"/></svg>',
             mail: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="M3 6.5l9 6.5 9-6.5"/></svg>',
-            chat: '<svg class="i" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4C6.9 4 3 7.3 3 11.2c0 2.5 1.7 4.7 4.2 6l-.9 3.3c-.1.3.2.6.5.4l3.9-2.2c.4.05.9.08 1.3.08 5.1 0 9-3.3 9-7.3S17.1 4 12 4z"/></svg>'
+            kakao: '<svg class="i" viewBox="0 0 24 24" fill="currentColor" aria-label="KakaoTalk"><path d="M12 3C6.477 3 2 6.463 2 10.691c0 2.735 1.827 5.135 4.576 6.495-.15.53-.966 3.34-.99 3.556 0 0-.019.164.087.226.106.063.23.014.23.014.297-.041 3.442-2.256 3.988-2.643.68.096 1.38.148 2.109.148 5.523 0 10-3.463 10-7.691C22 6.463 17.523 3 12 3z"/></svg>'
         };
 
         function exportBar(hl) {
@@ -404,7 +404,7 @@
                 '<button class="exp primary" onclick="AGENDA.expICS()">' + ICON.cal + (hl === 'en' ? 'Calendar' : '캘린더') + '</button>' +
                 '<button class="exp" onclick="AGENDA.expImage()">' + ICON.img + (hl === 'en' ? 'Image' : '이미지') + '</button>' +
                 '<button class="exp" onclick="AGENDA.expMail()">' + ICON.mail + (hl === 'en' ? 'Mail' : '메일') + '</button>' +
-                '<button class="exp kakao" onclick="AGENDA.expKakao()">' + ICON.chat + (hl === 'en' ? 'KakaoTalk' : '카카오톡') + '</button>' +
+                '<button class="exp kakao" onclick="AGENDA.expKakao()">' + ICON.kakao + (hl === 'en' ? 'KakaoTalk' : '카카오톡') + '</button>' +
             '</div>';
         }
 
