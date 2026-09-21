@@ -56,6 +56,20 @@
         .ag-result { border: 1px solid var(--line); border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
         .ag-result-ctx { background: #f3ebf6; color: var(--p2); font-weight: 700; font-size: 0.83rem; padding: 8px 16px; }
 
+        /* 내 스케줄 보내기 바 */
+        .exp-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+                   background: #faf7fb; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 2px 0 14px; }
+        .exp-t { font-weight: 800; color: var(--p2); font-size: 0.95rem; width: 100%; margin-bottom: 2px; }
+        .exp { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: #fff;
+               border-radius: 10px; padding: 9px 14px; font-weight: 700; color: var(--p2); font-size: 0.9rem; cursor: pointer; font-family: inherit; }
+        .exp:hover { border-color: var(--p); color: var(--p); }
+        .i { width: 17px; height: 17px; flex: 0 0 auto; vertical-align: -3px; }
+        .ag-result-head .i { color: #f2c94c; }
+        .exp.primary { background: var(--p); color: #fff; border-color: var(--p); }
+        .exp.primary:hover { color: #fff; }
+        .exp.kakao { background: #FEE500; color: #3A1D1D; border-color: #FEE500; }
+        .exp.kakao:hover { color: #3A1D1D; }
+
         .ag-lang { margin-left: auto; display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
         .ag-lang button { border: 0; background: #fff; padding: 8px 14px; font-size: 0.86rem; cursor: pointer;
                           color: var(--dim); border-left: 1px solid var(--line); font-family: inherit; }
@@ -131,6 +145,7 @@
     </div>
 
     <script src="js/asls-agenda-public.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script>
     (function () {
         var params = new URLSearchParams(location.search);
@@ -200,6 +215,55 @@
             },
             search: function (v) { SEARCH = v || ''; if (SEARCH) FAVVIEW = false; render(); },
             toggleFavView: function () { FAVVIEW = !FAVVIEW; if (FAVVIEW) SEARCH = ''; render(); }
+        };
+
+        /* ---------- 내 스케줄 보내기(내보내기) ---------- */
+        function scheduleText() {
+            return AslsAgenda.findLectures(FEED, getFavs()).map(function (e) {
+                var l = e.lecture;
+                var t = LANG === 'en' ? (l.titleEn || l.title) : (l.title || l.titleEn);
+                var room = LANG === 'en' ? (e.roomEn || e.room) : (e.room || e.roomEn);
+                return '· ' + e.date + ' ' + l.start + '-' + l.end + ' [' + room + '] ' + t;
+            }).join('\n');
+        }
+        function calName() { return (FEED && (LANG === 'en' ? FEED.titleEn : FEED.title)) || 'ASLS'; }
+        function noSaved() { alert(LANG === 'en' ? 'No saved lectures.' : '담은 강의가 없습니다.'); }
+
+        window.AGENDA.expICS = function () {
+            var ids = getFavs(); if (!ids.length) { noSaved(); return; }
+            try {
+                var ics = AslsAgenda.toICS(FEED, ids, { lang: LANG, calendarName: calName() });
+                var blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a'); a.href = url; a.download = 'asls-my-schedule.ics';
+                document.body.appendChild(a); a.click();
+                setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1500);
+            } catch (e) { alert(LANG === 'en' ? 'Download failed.' : '캘린더 파일 저장에 실패했습니다.'); }
+        };
+        window.AGENDA.expImage = function () {
+            var el = $('agResults'); if (!el) return;
+            if (typeof html2canvas !== 'function') { alert(LANG === 'en' ? 'Image tool is loading, please try again.' : '이미지 기능을 불러오는 중입니다. 잠시 후 다시 눌러 주세요.'); return; }
+            html2canvas(el, { backgroundColor: '#ffffff', scale: 2, useCORS: true }).then(function (canvas) {
+                var a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = 'asls-my-schedule.png';
+                document.body.appendChild(a); a.click(); a.remove();
+            }).catch(function () { alert(LANG === 'en' ? 'Image save failed.' : '이미지 저장에 실패했습니다.'); });
+        };
+        window.AGENDA.expMail = function () {
+            var ids = getFavs(); if (!ids.length) { noSaved(); return; }
+            var subject = '[ASLS] ' + (LANG === 'en' ? 'My Schedule' : '내 스케줄');
+            var body = (LANG === 'en' ? 'My ASLS schedule:' : '내 ASLS 강의 스케줄:') + '\n\n' + scheduleText() + '\n\n' + location.href;
+            var href = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+            try { window.top.location.href = href; } catch (e) { location.href = href; }
+        };
+        var kakaoAckTimer = null;
+        window.AGENDA.expKakao = function () {
+            var ids = getFavs(); if (!ids.length) { noSaved(); return; }
+            try { parent.postMessage({ type: 'asls-share', kind: 'kakao', title: calName(), count: ids.length, favs: ids, text: scheduleText(), url: location.href }, '*'); } catch (e) { }
+            if (kakaoAckTimer) clearTimeout(kakaoAckTimer);
+            kakaoAckTimer = setTimeout(function () {
+                alert(LANG === 'en' ? 'KakaoTalk sharing will be available after the homepage connects a Kakao app key.' : '카카오톡 공유는 홈페이지에 카카오 연결(앱키) 후 사용할 수 있습니다.');
+                kakaoAckTimer = null;
+            }, 700);
         };
 
         function msg(t, sub) { return '<div class="ag-msg"><div class="ag-msg-t">' + t + '</div>' + (sub ? '<div>' + sub + '</div>' : '') + '</div>'; }
@@ -319,8 +383,29 @@
                     : (hl === 'en' ? 'No results.' : '검색 결과가 없습니다.');
                 return '<div class="ag-msg"><div>' + m + '</div></div>';
             }
-            var head = (FAVVIEW ? (hl === 'en' ? '⭐ Saved lectures' : '⭐ 담은 강의') : (hl === 'en' ? 'Results' : '검색 결과')) + ' (' + out.length + ')';
-            return '<div class="ag-result-head">' + head + '</div>' + out.map(function (it) { return renderResult(it, hl); }).join('');
+            var head = (FAVVIEW ? (ICON.star + ' ' + (hl === 'en' ? 'Saved lectures' : '담은 강의')) : (hl === 'en' ? 'Results' : '검색 결과')) + ' (' + out.length + ')';
+            var body = '<div class="ag-result-head">' + head + '</div>' + out.map(function (it) { return renderResult(it, hl); }).join('');
+            if (FAVVIEW) return exportBar(hl) + '<div id="agResults">' + body + '</div>';
+            return body;
+        }
+
+        // 세련된 인라인 SVG 아이콘 (currentColor)
+        var ICON = {
+            star: '<svg class="i" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 18l-5.8 3 1.1-6.5L2.6 9.4l6.5-.9L12 2.6z"/></svg>',
+            cal: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>',
+            img: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="9" r="1.7"/><path d="M21 15.5l-5-5-9 9.5"/></svg>',
+            mail: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="M3 6.5l9 6.5 9-6.5"/></svg>',
+            chat: '<svg class="i" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4C6.9 4 3 7.3 3 11.2c0 2.5 1.7 4.7 4.2 6l-.9 3.3c-.1.3.2.6.5.4l3.9-2.2c.4.05.9.08 1.3.08 5.1 0 9-3.3 9-7.3S17.1 4 12 4z"/></svg>'
+        };
+
+        function exportBar(hl) {
+            return '<div class="exp-bar">' +
+                '<div class="exp-t">' + (hl === 'en' ? 'Send my schedule' : '내 스케줄 보내기') + '</div>' +
+                '<button class="exp primary" onclick="AGENDA.expICS()">' + ICON.cal + (hl === 'en' ? 'Calendar' : '캘린더') + '</button>' +
+                '<button class="exp" onclick="AGENDA.expImage()">' + ICON.img + (hl === 'en' ? 'Image' : '이미지') + '</button>' +
+                '<button class="exp" onclick="AGENDA.expMail()">' + ICON.mail + (hl === 'en' ? 'Mail' : '메일') + '</button>' +
+                '<button class="exp kakao" onclick="AGENDA.expKakao()">' + ICON.chat + (hl === 'en' ? 'KakaoTalk' : '카카오톡') + '</button>' +
+            '</div>';
         }
 
         function renderResult(it, hl) {
@@ -400,7 +485,10 @@
         }
         // 부모 → 위젯 명령: 회원 담기목록 주입(setFavs) / 언어(lang) / 검색(openSearch)
         window.addEventListener('message', function (e) {
-            var d = e && e.data; if (!d || d.type !== 'asls-cmd') return;
+            var d = e && e.data; if (!d) return;
+            // 카카오 공유를 부모(홈페이지)가 처리했다는 응답 → 안내문 대신 실제 공유가 뜬 것
+            if (d.type === 'asls-share-ack') { if (kakaoAckTimer) { clearTimeout(kakaoAckTimer); kakaoAckTimer = null; } return; }
+            if (d.type !== 'asls-cmd') return;
             if (d.cmd === 'setFavs' && Object.prototype.toString.call(d.value) === '[object Array]') {
                 try { localStorage.setItem(FAVKEY, JSON.stringify(d.value)); } catch (x) { }
                 render();
