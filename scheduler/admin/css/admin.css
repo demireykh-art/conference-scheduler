@@ -661,6 +661,10 @@ a { color: inherit; }
     padding: 9px 10px; font-size: 0.86rem; color: var(--text); border-radius: 7px; cursor: pointer; white-space: nowrap;
 }
 .export-item:hover { background: #f0f5ff; color: var(--primary); }
+.export-lang { display: flex; gap: 5px; padding: 2px 8px 8px; }
+.export-lang .elang { flex: 1; padding: 6px 4px; font-size: 0.78rem; font-weight: 700; border: 1px solid var(--border); background: #fff; color: var(--text-dim); border-radius: 7px; cursor: pointer; }
+.export-lang .elang:hover { border-color: var(--primary); color: var(--primary); }
+.export-lang .elang.on { background: var(--primary); border-color: var(--primary); color: #fff; }
 .export-since { display: flex; gap: 6px; align-items: center; padding: 2px 8px 8px; }
 .export-since input[type="datetime-local"] { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; font-size: 0.8rem; }
 /* 룸이 많으면 아래줄로 가지 말고 가로 스크롤 */

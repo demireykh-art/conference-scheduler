@@ -2084,14 +2084,12 @@ function safeName() { return ((CONF && CONF.title) || '시간표').replace(/[\\/
 function kmaRooms() { return orderedRooms().filter(r => r.kmaSubmit); }
 
 /* ---------- 엑셀 ---------- */
-function exportExcelRooms(rooms, suffix) {
+// mode: 'both'(국·영문) | 'ko'(국문만) | 'en'(영문만). 룸 이름과 별도로 '주제(topic)'도 출력.
+function exportExcelRooms(rooms, suffix, mode) {
+    mode = (mode === 'ko' || mode === 'en') ? mode : 'both';
     if (typeof XLSX === 'undefined') { Toast.error('엑셀 모듈을 불러오지 못했습니다.'); return; }
     if (!CONF) return;
     if (!rooms.length) { Toast.warning('내보낼 룸이 없습니다.'); return; }
-    // 국문·영문을 각각 별도 열로 출력 (22열). 영문 열은 마스터(최신) 영문값으로 채움.
-    const rows = [['룸', '날짜', '세션', '세션(영문)', '좌장', '좌장(영문)', '좌장소속', '좌장소속(영문)',
-        '표시언어', '시작', '종료', '시간(분)', '제목', '제목(영문)', '연자', '연자(영문)', '소속', '소속(영문)',
-        '파트너사', '제품', '제품분류', '제품설명']];
     const redRows = [];   // 데이터 행별 '기준 시각 이후 변경' 여부(빨간색)
     const refTs = getChangeSinceTs();
     const join = arr => arr.filter(Boolean).join('; ');
@@ -2110,51 +2108,73 @@ function exportExcelRooms(rooms, suffix) {
             affEn: arr.map(affEnOf).filter(Boolean).join(' / ')
         };
     };
+    // 모드별 컬럼 정의: [헤더, 값(c) 함수]  — c = 한 행의 값 묶음
+    const COLS = {
+        both: [['룸', c => c.roomKo], ['룸(영문)', c => c.roomEn], ['주제', c => c.topicKo], ['주제(영문)', c => c.topicEn],
+            ['날짜', c => c.date], ['세션', c => c.sessKo], ['세션(영문)', c => c.sessEn],
+            ['좌장', c => c.modNameKo], ['좌장(영문)', c => c.modNameEn], ['좌장소속', c => c.modAffKo], ['좌장소속(영문)', c => c.modAffEn],
+            ['표시언어', c => c.lang], ['시작', c => c.start], ['종료', c => c.end], ['시간(분)', c => c.dur],
+            ['제목', c => c.titleKo], ['제목(영문)', c => c.titleEn], ['연자', c => c.spKo], ['연자(영문)', c => c.spEn], ['소속', c => c.affKo], ['소속(영문)', c => c.affEn],
+            ['파트너사', c => c.partner], ['제품', c => c.product], ['제품분류', c => c.cat], ['제품설명', c => c.desc]],
+        ko: [['룸', c => c.roomKo], ['주제', c => c.topicKo], ['날짜', c => c.date], ['세션', c => c.sessKo],
+            ['좌장', c => c.modNameKo], ['좌장소속', c => c.modAffKo], ['시작', c => c.start], ['종료', c => c.end], ['시간(분)', c => c.dur],
+            ['제목', c => c.titleKo], ['연자', c => c.spKo], ['소속', c => c.affKo],
+            ['파트너사', c => c.partner], ['제품', c => c.product], ['제품분류', c => c.cat], ['제품설명', c => c.desc]],
+        en: [['Room', c => c.roomEn || c.roomKo], ['Topic', c => c.topicEn || c.topicKo], ['Date', c => c.date], ['Session', c => c.sessEn || c.sessKo],
+            ['Moderator', c => c.modNameEn || c.modNameKo], ['Affiliation', c => c.modAffEn || c.modAffKo], ['Start', c => c.start], ['End', c => c.end], ['Min', c => c.dur],
+            ['Title', c => c.titleEn || c.titleKo], ['Speaker', c => c.spEn || c.spKo], ['Affiliation', c => c.affEn || c.affKo],
+            ['Partner', c => c.partner], ['Product', c => c.product], ['Category', c => c.cat], ['Description', c => c.desc]]
+    }[mode];
+    const header = COLS.map(f => f[0]);
+    const rows = [header];
     rooms.forEach(r => {
         computeRoom(r).forEach(s => {
             const lang = effectiveLang(r, s);
             const mod = modInfo(s);
+            const base = {
+                roomKo: r.name || '', roomEn: r.nameEn || '', topicKo: r.topic || '', topicEn: r.topicEn || '', date: r.date || '',
+                sessKo: s.name || '', sessEn: s.nameEn || '',
+                modNameKo: mod.nameKo, modNameEn: mod.nameEn, modAffKo: mod.affKo, modAffEn: mod.affEn,
+                lang: lang === 'en' ? '영어' : '한글'
+            };
             s.lectures.forEach(lec => {
                 const n = normalizeLecture(lec);
-                rows.push([
-                    r.name, r.date || '', s.name, s.nameEn || '',
-                    mod.nameKo, mod.nameEn, mod.affKo, mod.affEn,
-                    lang === 'en' ? '영어' : '한글',
-                    formatTime(lec._start), formatTime(lec._end), lec.duration || 0,
-                    n.titleKo || '', n.titleEn || '',
-                    join(n.speakers.map(nameKoOf)), join(n.speakers.map(nameEnOf)),
-                    join(n.speakers.map(affKoOf)), join(n.speakers.map(affEnOf)),
-                    n.partnerKo || n.partnerEn || '', n.productKo || n.productEn || '', n.productCategory, n.productDesc
-                ]);
-                const red = changedSince(lec, refTs);
-                if (red) changedCnt++;
+                const c = Object.assign({}, base, {
+                    start: formatTime(lec._start), end: formatTime(lec._end), dur: lec.duration || 0,
+                    titleKo: n.titleKo || '', titleEn: n.titleEn || '',
+                    spKo: join(n.speakers.map(nameKoOf)), spEn: join(n.speakers.map(nameEnOf)),
+                    affKo: join(n.speakers.map(affKoOf)), affEn: join(n.speakers.map(affEnOf)),
+                    partner: n.partnerKo || n.partnerEn || '', product: n.productKo || n.productEn || '', cat: n.productCategory || '', desc: n.productDesc || ''
+                });
+                rows.push(COLS.map(f => f[1](c)));
+                const red = changedSince(lec, refTs); if (red) changedCnt++;
                 redRows.push(red);
             });
             // 강의 없이 좌장만 지정된 세션도 좌장 정보 포함
             if (!s.lectures.length && mod.nameKo) {
-                rows.push([r.name, r.date || '', s.name, s.nameEn || '',
-                    mod.nameKo, mod.nameEn, mod.affKo, mod.affEn,
-                    lang === 'en' ? '영어' : '한글',
-                    formatTime(s._start), formatTime(s._end), '', '(좌장만 지정된 세션)', '', '', '', '', '', '', '', '', '']);
+                const c = Object.assign({}, base, {
+                    start: formatTime(s._start), end: formatTime(s._end), dur: '',
+                    titleKo: '(좌장만 지정된 세션)', titleEn: '', spKo: '', spEn: '', affKo: '', affEn: '',
+                    partner: '', product: '', cat: '', desc: ''
+                });
+                rows.push(COLS.map(f => f[1](c)));
                 redRows.push(false);
             }
         });
     });
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 24 }, { wch: 24 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 18 },
-        { wch: 8 }, { wch: 7 }, { wch: 7 }, { wch: 8 }, { wch: 40 }, { wch: 40 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 18 },
-        { wch: 16 }, { wch: 16 }, { wch: 24 }, { wch: 36 }];
-    // 헤더: 굵게 + 영문 채움 열은 노란색 표시(세션영문·좌장영문·좌장소속영문·제목영문·연자영문·소속영문)
+    ws['!cols'] = header.map(h => ({ wch: /제목|Title|설명|Description|세션|Session/.test(h) ? 40 : (/룸|Room|주제|Topic|좌장|Moderator|연자|Speaker|소속|Affiliation/.test(h) ? 18 : 9) }));
+    // 헤더 굵게 + (국·영문 모드에서) 영문 열은 노란색
     if (typeof XLSX.utils.encode_cell === 'function' && ws['!ref']) {
-        const YELLOW = new Set([3, 5, 7, 13, 15, 17]);
-        const hr = XLSX.utils.decode_range(ws['!ref']);
-        for (let c = hr.s.c; c <= hr.e.c; c++) {
+        const yellow = new Set();
+        if (mode === 'both') header.forEach((h, i) => { if (/\(영문\)/.test(h)) yellow.add(i); });
+        for (let c = 0; c < header.length; c++) {
             const ref = XLSX.utils.encode_cell({ r: 0, c });
             if (!ws[ref]) ws[ref] = { t: 's', v: '' };
-            ws[ref].s = YELLOW.has(c) ? { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } } } : { font: { bold: true } };
+            ws[ref].s = yellow.has(c) ? { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } } } : { font: { bold: true } };
         }
     }
-    // 오늘 변경된 강의 행은 빨간 글씨(+ 연한 빨강 바탕)
+    // 기준 시각 이후 변경된 강의 행은 빨간 글씨(+ 연한 빨강 바탕)
     if (typeof XLSX.utils.encode_cell === 'function' && ws['!ref']) {
         const range = XLSX.utils.decode_range(ws['!ref']);
         const redStyle = { font: { color: { rgb: 'DD0000' }, bold: true }, fill: { fgColor: { rgb: 'FDECEC' } } };
@@ -2169,8 +2189,9 @@ function exportExcelRooms(rooms, suffix) {
         });
     }
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '시간표');
-    XLSX.writeFile(wb, `${safeName()}${suffix}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, mode === 'en' ? 'Program' : '시간표');
+    const langTag = mode === 'ko' ? '_국문' : (mode === 'en' ? '_영문' : '');
+    XLSX.writeFile(wb, `${safeName()}${suffix}${langTag}.xlsx`);
     Toast.success(changedCnt ? `엑셀 다운로드 — 기준 시각 이후 변경 ${changedCnt}건 빨간색 표시` : '엑셀 파일을 내려받았습니다. (기준 시각 이후 변경 없음)');
 }
 // 기준 시각(refTs, ms) 이후 변경/생성된 강의인지 — 배치 사본 또는 풀 강의의 updatedAt/createdAt 기준
@@ -2214,9 +2235,14 @@ function initChangeSince() {
     el.value = v;
 }
 initChangeSince();
-window.exportRoomExcel = function () { closeExportMenu(); const r = getRoom(CURRENT_ROOM); exportExcelRooms(r ? [r] : [], `_${(r && r.name) || '룸'}`); };
-window.exportAllExcel = function () { closeExportMenu(); exportExcelRooms(orderedRooms(), '_전체강의'); };
-window.exportKmaExcel = function () { closeExportMenu(); const rs = kmaRooms(); if (!rs.length) { Toast.warning('의협제출로 지정된 룸이 없습니다. (룸 설정에서 "의협제출" 체크)'); return; } exportExcelRooms(rs, '_의협아젠다'); };
+let EXPORT_LANG = 'both';   // 엑셀 출력 언어: 'both'(국·영문) | 'ko'(국문만) | 'en'(영문만)
+window.setExportLang = function (l) {
+    EXPORT_LANG = (l === 'ko' || l === 'en') ? l : 'both';
+    document.querySelectorAll('#exportLangSel .elang').forEach(b => b.classList.toggle('on', b.getAttribute('data-lang') === EXPORT_LANG));
+};
+window.exportRoomExcel = function () { closeExportMenu(); const r = getRoom(CURRENT_ROOM); exportExcelRooms(r ? [r] : [], `_${(r && r.name) || '룸'}`, EXPORT_LANG); };
+window.exportAllExcel = function () { closeExportMenu(); exportExcelRooms(orderedRooms(), '_전체강의', EXPORT_LANG); };
+window.exportKmaExcel = function () { closeExportMenu(); const rs = kmaRooms(); if (!rs.length) { Toast.warning('의협제출로 지정된 룸이 없습니다. (룸 설정에서 "의협제출" 체크)'); return; } exportExcelRooms(rs, '_의협아젠다', EXPORT_LANG); };
 
 /* ---------- PDF 아젠다 (인쇄 → PDF로 저장) ---------- */
 window.exportRoomPdf = function () { closeExportMenu(); const r = getRoom(CURRENT_ROOM); openAgendaPrint(r ? [r] : [], (r && r.name) || '룸'); };
