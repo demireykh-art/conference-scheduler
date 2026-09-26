@@ -31,7 +31,9 @@ document.getElementById('lecSearch').addEventListener('input', renderPool);
 (function initLecSort() {
     const sel = document.getElementById('lecSort');
     if (!sel) return;
-    sel.innerHTML = sortOptionsHtml(LEC_SORT, '제목');
+    sel.innerHTML = sortOptionsHtml(LEC_SORT, '제목')
+        + `<option value="speakerAsc" ${LEC_SORT === 'speakerAsc' ? 'selected' : ''}>연자순 (가나다)</option>`
+        + `<option value="speakerDesc" ${LEC_SORT === 'speakerDesc' ? 'selected' : ''}>연자순 (역순)</option>`;
     sel.addEventListener('change', () => { LEC_SORT = sel.value; renderPool(); });
 })();
 
@@ -207,13 +209,34 @@ function renderDateFilter(baseList, placedMap) {
 window.setLecDate = function (d) { LEC_DATE = d; renderPool(); };
 
 /* ---------- 목록 렌더 ---------- */
+// 강의의 대표 연자 이름(정렬 키) — 첫 연자, 마스터(최신) 이름 우선. 연자 없으면 맨 뒤로.
+function lecSpeakerKey(l) {
+    const s = (l.speakers || [])[0];
+    if (!s) return '￿';
+    const m = s.id && window.Masters && Masters.speaker && Masters.speaker(s.id);
+    return (m && m.nameKo) || s.nameKo || (m && m.nameEn) || s.nameEn || '￿';
+}
+// 정렬: 연자순(speakerAsc/Desc)은 자체 처리, 그 외(제목/등록순)는 공용 sortList
+function sortPool(list, mode) {
+    if (mode === 'speakerAsc' || mode === 'speakerDesc') {
+        const a = list.slice();
+        a.sort((x, y) => {
+            let c = lecSpeakerKey(x).localeCompare(lecSpeakerKey(y), 'ko');
+            if (c === 0) c = (x.titleKo || '').localeCompare(y.titleKo || '', 'ko');   // 동점은 제목순
+            return mode === 'speakerDesc' ? -c : c;
+        });
+        return a;
+    }
+    return sortList(list, mode, 'titleKo');
+}
+
 function renderPool() {
     const placedMap = placedRoomsMap();
     const q = document.getElementById('lecSearch').value.trim().toLowerCase();
     const cat = document.getElementById('catFilter').value;
 
     // 기준집합(baseList): 검색·분류만 반영 (일정/미배치/중복 토글과 무관) → 모든 개수의 기준
-    let baseList = sortList(POOL, LEC_SORT, 'titleKo');
+    let baseList = sortPool(POOL, LEC_SORT);
     if (cat) baseList = baseList.filter(l => (l.categories || []).includes(cat));
     if (q) baseList = baseList.filter(l => {
         const hay = [l.titleKo, l.titleEn, ...(l.tags || []), ...(l.categories || []), ...(l.types || []),
