@@ -2062,7 +2062,7 @@ function enableLectureDrag(roomId) {
             const from = sameParent ? rows.indexOf(dragEl) : -1;
             const to = rows.indexOf(row);
             if (sameParent && from < to) row.after(dragEl); else row.before(dragEl);
-            rebuildRoomLecturesFromDOM(roomId);
+            rebuildRoomLecturesFromDOM(roomId, dragEl.getAttribute('data-lec'));
         });
     });
 
@@ -2076,13 +2076,14 @@ function enableLectureDrag(roomId) {
             if (!activeDrag || activeDrag.type !== 'lecture') return;
             if (e.target.closest('.lecture-row')) return;   // 행 위 드롭은 행 핸들러가 처리
             e.preventDefault();
-            if (activeDrag.el) { list.appendChild(activeDrag.el); rebuildRoomLecturesFromDOM(roomId); }
+            if (activeDrag.el) { const mid = activeDrag.el.getAttribute('data-lec'); list.appendChild(activeDrag.el); rebuildRoomLecturesFromDOM(roomId, mid); }
         });
     });
 }
 
 // DOM(각 세션 리스트의 강의 순서)을 기준으로 룸 전체 강의 배치를 재구성해 저장
-function rebuildRoomLecturesFromDOM(roomId) {
+// movedLecId: 드래그로 옮긴 강의(있으면 변경이력에 이동 위치를 기록)
+function rebuildRoomLecturesFromDOM(roomId, movedLecId) {
     if (!AdminAuth.canEdit()) return;   // 뷰어면 무시(재렌더로 원복)
     const room = CONF.rooms[roomId];
     if (!room) return;
@@ -2092,14 +2093,47 @@ function rebuildRoomLecturesFromDOM(roomId) {
         Object.entries(sess.lectures || {}).forEach(([lid, l]) => { lecById[lid] = l; });
     });
     const updates = {};
+    const domBySession = {};   // sid -> [lid,...] (변경이력 위치 계산용)
     document.querySelectorAll('#sessions .lecture-list[data-session]').forEach(listEl => {
         const sid = listEl.getAttribute('data-session');
         const ids = [...listEl.querySelectorAll('.lecture-row')].map(el => el.getAttribute('data-lec'));
+        domBySession[sid] = ids;
         const newLectures = {};
         ids.forEach((lid, i) => { if (lecById[lid]) newLectures[lid] = { ...lecById[lid], order: i }; });
         updates[`rooms/${roomId}/sessions/${sid}/lectures`] = Object.keys(newLectures).length ? newLectures : null;
     });
-    confRef().update(updates).catch(e => Toast.error('이동 저장 실패: ' + e.message));
+    // 이동 위치는 쓰기 전에 DOM 기준으로 계산(로컬 캐시 반영 타이밍과 무관)
+    let moveLoc = '', moveTitle = '', moveEntity = '';
+    if (movedLecId && lecById[movedLecId]) {
+        moveLoc = movedLecLocFromDOM(roomId, domBySession, lecById, movedLecId);
+        moveTitle = normalizeLecture(lecById[movedLecId]).titleKo || '(제목 없음)';
+        moveEntity = lecById[movedLecId].lectureId || movedLecId;
+    }
+    confRef().update(updates)
+        .then(() => { if (moveLoc) logActivity('move', 'lecture', `강의 "${moveTitle}" 이동(드래그) → ${moveLoc}`, { confId: CONF_ID, confTitle: ctitle(), entityId: moveEntity }); })
+        .catch(e => Toast.error('이동 저장 실패: ' + e.message));
+}
+// 드래그 후 DOM 순서를 기준으로 옮긴 강의의 위치(룸·날짜·시간·세션) 계산.
+// computeRoom과 동일하게 room.startTime부터 세션·강의를 누적한다.
+function movedLecLocFromDOM(roomId, domBySession, lecById, lecId) {
+    const room = getRoom(roomId);
+    if (!room) return '';
+    let cursor = parseTime(room.startTime || '09:00');
+    let found = null, foundSess = '';
+    toOrderedArray(room.sessions).forEach(s => {
+        const ids = domBySession[s.id] || toOrderedArray(s.lectures).map(l => l.id);
+        ids.forEach(lid => {
+            const dur = Number((lecById[lid] || {}).duration) || 0;
+            const start = cursor; cursor += dur;
+            if (lid === lecId) { found = { start, end: cursor }; foundSess = s.name || ''; }
+        });
+    });
+    if (!found) return '';
+    const parts = [room.name || '룸'];
+    if (room.date) parts.push(room.date);
+    parts.push(`${formatTime(found.start)}~${formatTime(found.end)}`);
+    if (foundSess) parts.push(foundSess);
+    return parts.join(' · ');
 }
 
 /* ============================================================
