@@ -144,7 +144,7 @@ window.openSpeakerModal = function () {
     if (!AdminAuth.requireEdit()) return;
     SPK_EDIT_ID = null;
     document.getElementById('spkModalTitle').textContent = '연자 등록';
-    ['spkNameKo', 'spkNameEn', 'spkAffKo', 'spkAffEn', 'spkNatKo', 'spkNatEn', 'spkCv', 'spkEmail'].forEach(id => document.getElementById(id).value = '');
+    ['spkNameKo', 'spkNameEn', 'spkAffKo', 'spkAffEn', 'spkNatKo', 'spkNatEn', 'spkCv', 'spkEmail', 'spkPhone'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('spkRoleExec').checked = false;
     document.getElementById('spkRoleAdvisor').checked = false;
     document.getElementById('spkRoleAmb').checked = false;
@@ -170,6 +170,7 @@ window.editSpeaker = function (id) {
     document.getElementById('spkNatEn').value = s.nationalityEn || '';
     document.getElementById('spkCv').value = s.cv || '';
     document.getElementById('spkEmail').value = s.email || '';
+    document.getElementById('spkPhone').value = s.phone || '';
     document.getElementById('spkRoleExec').checked = !!s.roleExec;
     document.getElementById('spkRoleAdvisor').checked = !!s.roleAdvisor;
     document.getElementById('spkRoleAmb').checked = !!s.roleAmb;
@@ -203,6 +204,7 @@ function doSaveSpeaker(closeAfter) {
         nationalityEn: document.getElementById('spkNatEn').value.trim(),
         cv: document.getElementById('spkCv').value.trim(),
         email: document.getElementById('spkEmail').value.trim(),
+        phone: document.getElementById('spkPhone').value.trim(),
         roleExec: document.getElementById('spkRoleExec').checked,
         roleAdvisor: document.getElementById('spkRoleAdvisor').checked,
         roleAmb: document.getElementById('spkRoleAmb').checked,
