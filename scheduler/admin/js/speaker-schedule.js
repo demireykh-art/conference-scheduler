@@ -22,6 +22,8 @@ let RID = 0;   // 행 DOM id 카운터(중복 이동용)
 let FILTER_DATE = '';     // '' = 전체
 let FIELD = 'all';        // all | name | title | company
 let Q = '';
+let ONLY_CONF = false;    // 중복만 보기
+let CONF_RIDS = [], confPtr = -1;   // 현재 화면의 중복 행 rid 목록(다음 중복 이동용)
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('spksched');
 Masters.init();
@@ -175,22 +177,33 @@ function compHit(p) { return ((p.aff || '') + ' ' + (p.affEn || '')).toLowerCase
 // 사람 카드에 표시할 rows + 표시 여부
 function visibleRows(p) {
     let rows = p.items.filter(dayOk);
-    let show;
-    if (!Q) show = rows.length > 0;
-    else if (FIELD === 'name') show = nameHit(p) && rows.length > 0;
-    else if (FIELD === 'company') show = compHit(p) && rows.length > 0;
-    else if (FIELD === 'title') { rows = rows.filter(titleOk); show = rows.length > 0; }
-    else { // all
-        if (nameHit(p) || compHit(p)) show = rows.length > 0;
-        else { rows = rows.filter(titleOk); show = rows.length > 0; }
+    let textOK = true;
+    if (Q) {
+        if (FIELD === 'name') textOK = nameHit(p);
+        else if (FIELD === 'company') textOK = compHit(p);
+        else if (FIELD === 'title') { rows = rows.filter(titleOk); }
+        else { // all
+            if (nameHit(p) || compHit(p)) textOK = true;
+            else { rows = rows.filter(titleOk); textOK = rows.length > 0; }
+        }
     }
-    return show ? rows : null;
+    if (!textOK) return null;
+    if (ONLY_CONF) rows = rows.filter(a => a.conflict);   // 중복만 보기
+    return rows.length ? rows : null;
 }
 
 /* ---------- 렌더 ---------- */
 window.setDay = function (d) { FILTER_DATE = d; render(); };
 window.onFieldChange = function (v) { FIELD = v; render(); };
 window.onSearch = function (v) { Q = (v || '').trim().toLowerCase(); render(); };
+window.toggleOnlyConf = function () { ONLY_CONF = !ONLY_CONF; render(); if (ONLY_CONF) window.scrollTo({ top: 0, behavior: 'smooth' }); };
+window.nextConflict = function () {
+    if (!CONF_RIDS.length) { if (window.Toast && Toast.warning) Toast.warning('현재 화면에 중복 건이 없습니다. (날짜를 "전체"로 두세요)'); return; }
+    confPtr = (confPtr + 1) % CONF_RIDS.length;
+    const el = document.getElementById(CONF_RIDS[confPtr]);
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('ss-flash'); setTimeout(() => el.classList.remove('ss-flash'), 1800); }
+    if (window.Toast && Toast.info) Toast.info(`중복 ${confPtr + 1}/${CONF_RIDS.length}`);
+};
 
 let LAST = null;   // 마지막 collect 결과(GPT 복사용)
 
@@ -204,6 +217,10 @@ function render() {
     dates.forEach((d, i) => { tabs += `<button class="ss-tab ${FILTER_DATE === d ? 'on' : ''}" onclick="setDay('${d}')">${i === 0 ? '첫날 ' : (i === 1 ? '둘째날 ' : (i + 1) + '일차 ')}${escapeHtml(fmtDay(d))} <b>${dayCount(d)}</b></button>`; });
     document.getElementById('ssDays').innerHTML = tabs;
 
+    // 전체 중복 건수(필터 무관) — '중복만 보기' 버튼 표시용
+    let conflictTotal = 0; persons.forEach(p => p.items.forEach(a => { if (a.conflict) conflictTotal++; }));
+    CONF_RIDS = []; confPtr = -1;
+
     // 사람 카드
     const people = [...persons.values()].sort((a, b) => (a.name || a.nameEn || '').localeCompare(b.name || b.nameEn || '', 'ko'));
     let shownLec = 0, shownPersons = 0, conflictN = 0;
@@ -214,7 +231,7 @@ function render() {
         shownPersons++;
         const lecRows = rows.filter(a => a.kind === 'lec'), modRows = rows.filter(a => a.kind === 'mod');
         shownLec += lecRows.length;
-        rows.forEach(a => { if (a.conflict) conflictN++; });
+        rows.forEach(a => { if (a.conflict) { conflictN++; CONF_RIDS.push(a.rid); } });
         const nm = escapeHtml(p.name || p.nameEn || '(이름 없음)') + (p.nameEn && p.name ? ` <span class="ss-en">${escapeHtml(p.nameEn)}</span>` : '');
         const aff = (p.aff || p.affEn) ? `<span class="ss-aff">${escapeHtml(p.aff || p.affEn)}</span>` : '';
         html += `<div class="ss-card">
@@ -224,8 +241,8 @@ function render() {
         </div>`;
     });
 
-    // 연자 미지정 강의
-    const noSpk = noSpeakerLecs.filter(dayOk).filter(a => FIELD !== 'name' && FIELD !== 'company' ? titleOk(a) : true);
+    // 연자 미지정 강의 (중복만 보기에서는 숨김 — 연자 없는 강의는 중복 대상 아님)
+    const noSpk = ONLY_CONF ? [] : noSpeakerLecs.filter(dayOk).filter(a => FIELD !== 'name' && FIELD !== 'company' ? titleOk(a) : true);
     if (noSpk.length && (FIELD === 'all' || FIELD === 'title' || !Q)) {
         shownLec += noSpk.length;
         html += `<div class="ss-card ss-card-warn">
@@ -234,8 +251,16 @@ function render() {
             <div class="ss-rows">${noSpk.map(rowHtml).join('')}</div></div>`;
     }
 
-    if (!html) html = '<div class="card empty-state">표시할 일정이 없습니다.</div>';
+    if (!html) html = `<div class="card empty-state">${ONLY_CONF ? '중복된 일정이 없습니다.' : '표시할 일정이 없습니다.'}</div>`;
     document.getElementById('ssList').innerHTML = html;
+
+    // 중복 바로찾기 컨트롤
+    const cb = document.getElementById('ssConfBar');
+    if (cb) cb.innerHTML = conflictTotal
+        ? `<button class="btn btn-sm ${ONLY_CONF ? 'btn-primary' : ''}" onclick="toggleOnlyConf()">⚠ 중복만 보기 (${conflictTotal})</button>`
+        + `<button class="btn btn-sm" onclick="nextConflict()" title="중복 건을 하나씩 순서대로 이동">다음 중복 ▾</button>`
+        + (ONLY_CONF ? '<span class="ss-confhint">중복된 건만 표시 중 — 버튼을 다시 누르면 전체</span>' : '')
+        : '';
 
     // 요약
     document.getElementById('ssSummary').innerHTML =

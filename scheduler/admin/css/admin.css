@@ -1618,3 +1618,6 @@ html.modal-open, body.modal-open { overflow: hidden; }
     .ss-bar input { flex-basis: 100%; }
     .ss-left { flex-basis: 92px; }
 }
+.ss-confbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: -2px 0 12px; }
+.ss-confbar:empty { display: none; }
+.ss-confhint { font-size: 0.8rem; color: #b45309; font-weight: 700; }
