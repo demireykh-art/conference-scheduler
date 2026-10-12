@@ -1590,17 +1590,31 @@ html.modal-open, body.modal-open { overflow: hidden; }
 .ss-cnt.lec { background: #e8f0fe; color: #1a53c4; }
 .ss-cnt.mod { background: #f0ecf7; color: #6b1f7a; }
 .ss-rows { padding: 4px 0; }
-.ss-row { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; justify-content: space-between; padding: 8px 15px; border-top: 1px dashed #eef0f3; }
+.ss-row { display: flex; gap: 12px; align-items: flex-start; padding: 8px 15px; border-top: 1px dashed #eef0f3; }
 .ss-row:first-child { border-top: 0; }
 .ss-row.sch-link { cursor: pointer; }
 .ss-row.sch-link:hover { background: #f0f5ff; }
-.ss-row-t { font-weight: 600; font-size: 0.9rem; }
-.ss-row-m { color: var(--text-dim); font-size: 0.82rem; }
+.ss-row-unp { opacity: .82; }
+/* 좌측: 날짜/시간 먼저 */
+.ss-left { flex: 0 0 118px; }
+.ss-dt { display: flex; flex-direction: column; line-height: 1.25; }
+.ss-dt .ss-d { font-size: 0.78rem; color: var(--text-dim); }
+.ss-dt .ss-t { font-weight: 800; font-size: 0.88rem; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ss-unp-dt { font-weight: 700; font-size: 0.8rem; color: #b45309; }
+/* 우측: 제목/연자 */
+.ss-main { flex: 1 1 auto; min-width: 0; }
+.ss-ttl { font-weight: 600; font-size: 0.9rem; }
+.ss-loc { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 2px; }
 .ss-k { display: inline-block; font-size: 0.72rem; font-weight: 800; border-radius: 5px; padding: 1px 7px; margin-right: 7px; vertical-align: middle; }
 .ss-k.lec { background: #e8f0fe; color: #1a53c4; }
 .ss-k.mod { background: #f0ecf7; color: #6b1f7a; }
 .ss-k.panel { background: #fff3e0; color: #b45309; }
+.ss-jump { cursor: pointer; }
+.ss-jump:hover { filter: brightness(0.94); }
+.ss-unp-badge { display: inline-block; margin-left: 6px; font-size: 0.7rem; font-weight: 800; border-radius: 5px; padding: 1px 7px; background: #fff3e0; color: #b45309; border: 1px solid #f6d08a; }
+.ss-flash { animation: ssFlash 1.8s ease; }
+@keyframes ssFlash { 0% { background: #fff6c2; } 60% { background: #fff6c2; } 100% { background: transparent; } }
 @media (max-width: 640px) {
     .ss-bar input { flex-basis: 100%; }
-    .ss-row { flex-direction: column; gap: 2px; }
+    .ss-left { flex-basis: 92px; }
 }

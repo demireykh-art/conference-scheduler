@@ -15,7 +15,9 @@ let CONF_LIST = [];
 let CONF_ID = new URLSearchParams(location.search).get('id') || '';
 let CONF_NAME = '', CONF_START = '', CONF_END = '';
 let ROOMS = {};
-let roomsRef = null;
+let POOL = {};
+let roomsRef = null, poolRef = null;
+let RID = 0;   // 행 DOM id 카운터(중복 이동용)
 
 let FILTER_DATE = '';     // '' = 전체
 let FIELD = 'all';        // all | name | title | company
@@ -47,12 +49,15 @@ window.changeConf = function (id) {
 
 function subscribeConf() {
     if (roomsRef) { roomsRef.off(); roomsRef = null; }
+    if (poolRef) { poolRef.off(); poolRef = null; }
     const c = CONF_LIST.find(x => x.id === CONF_ID);
     CONF_NAME = c ? c.title : ''; CONF_START = c ? c.startDate : ''; CONF_END = c ? c.endDate : '';
     document.getElementById('confName').textContent = CONF_NAME + (CONF_START ? ` · ${fmtDateRange(CONF_START, CONF_END)}` : '');
-    if (!CONF_ID) { ROOMS = {}; render(); return; }
+    if (!CONF_ID) { ROOMS = {}; POOL = {}; render(); return; }
     roomsRef = database.ref('/adminConferences/' + CONF_ID + '/rooms');
     roomsRef.on('value', snap => { ROOMS = snap.val() || {}; render(); });
+    poolRef = database.ref('/adminConferences/' + CONF_ID + '/lecturePool');
+    poolRef.on('value', snap => { POOL = snap.val() || {}; render(); });
 }
 
 /* ---------- 좌장(사회) 정규화 — 신형 moderators[](최대 2) + 구형 moderator{} ---------- */
@@ -76,15 +81,16 @@ function fmtDay(d) { if (!d) return ''; const dt = new Date(d + 'T00:00:00'); re
 /* ---------- 전체 일정 수집 (강의 + 좌장) ---------- */
 // 반환: { persons: Map(key→person), noSpeakerLecs: [], dates: Set, totalLec, sessionCnt }
 function collect() {
+    RID = 0;
     const persons = new Map();
     const noSpeakerLecs = [];
     const dates = new Set();
-    let totalLec = 0, sessionCnt = 0;
+    const placedPool = new Set();   // 시간표에 배치된 강의(lectureId) 집합
+    let totalLec = 0, sessionCnt = 0, unplacedCnt = 0;
 
     function getPerson(info) {
         if (!persons.has(info.key)) persons.set(info.key, { key: info.key, id: info.id, name: info.name, nameEn: info.nameEn, aff: info.aff, affEn: info.affEn, items: [] });
         const p = persons.get(info.key);
-        // 이름/소속이 비어있던 경우 보강
         if (!p.name && info.name) p.name = info.name;
         if (!p.aff && info.aff) p.aff = info.aff;
         return p;
@@ -102,28 +108,42 @@ function collect() {
             (session.lectures || []).forEach(lec => {
                 if (lec.isBreak) return;
                 totalLec++;
+                if (lec.lectureId) placedPool.add(lec.lectureId);
                 const speakers = lec.isPanel ? panelSpeakers : (lec.speakers || []);
                 const item = {
                     kind: 'lec', date: room.date || '', roomId: room.id, roomName: room.name || '룸',
                     sessionId: session.id, sessionName: session.name || '', start: lec._start, end: lec._end,
                     title: lec.titleKo || lec.titleEn || '(제목 없음)', lecId: lec.id, lectureId: lec.lectureId || '',
-                    isPanel: !!lec.isPanel, conflict: false
+                    isPanel: !!lec.isPanel, conflict: false, confWith: []
                 };
                 const infos = speakers.map(personInfo).filter(i => i.key);
-                if (!infos.length) { noSpeakerLecs.push(item); return; }
-                infos.forEach(info => { getPerson(info).items.push(Object.assign({}, item)); });
+                if (!infos.length) { noSpeakerLecs.push(Object.assign({ rid: 'ssr' + (++RID) }, item)); return; }
+                infos.forEach(info => { getPerson(info).items.push(Object.assign({ rid: 'ssr' + (++RID) }, item)); });
             });
             // 좌장(사회)
             modArr(session).forEach(mod => {
                 const info = personInfo(mod);
                 if (!info.key) return;
                 getPerson(info).items.push({
-                    kind: 'mod', date: room.date || '', roomId: room.id, roomName: room.name || '룸',
+                    rid: 'ssr' + (++RID), kind: 'mod', date: room.date || '', roomId: room.id, roomName: room.name || '룸',
                     sessionId: session.id, sessionName: session.name || '(세션)', start: session._start, end: session._end,
-                    title: session.name || '(세션)', lecId: '', lectureId: '', conflict: false
+                    title: session.name || '(세션)', lecId: '', lectureId: '', conflict: false, confWith: []
                 });
             });
         });
+    });
+
+    // 미배치 강의(강의 풀에 있으나 시간표에 없음) — 연자별로 추가, 미배치 표시
+    toOrderedArray(POOL).forEach(lec => {
+        if (lec.id && placedPool.has(lec.id)) return;
+        const infos = (lec.speakers || []).map(personInfo).filter(i => i.key);
+        if (!infos.length) return;   // 연자 없는 미배치 강의는 생략
+        unplacedCnt++;
+        infos.forEach(info => getPerson(info).items.push({
+            rid: 'ssr' + (++RID), kind: 'lec', unplaced: true, date: '', roomId: '', roomName: '',
+            sessionId: '', sessionName: '', start: null, end: null,
+            title: lec.titleKo || lec.titleEn || '(제목 없음)', lecId: '', lectureId: lec.id || '', conflict: false, confWith: []
+        }));
     });
 
     // 중복(겹침) 계산 — 사람별로, 같은 날 · 다른 (룸,세션) · 시간겹침(+버퍼)
@@ -135,11 +155,16 @@ function collect() {
             if ((a.date || '') !== (b.date || '')) continue;
             if (a.roomId === b.roomId && a.sessionId === b.sessionId) continue;   // 같은 룸·세션(좌장+강의)은 중복 아님
             const buffer = (a.roomId === b.roomId) ? 0 : SPEAKER_TRAVEL_MIN;
-            if (a.start < b.end + buffer && b.start < a.end + buffer) { a.conflict = true; b.conflict = true; }
+            if (a.start < b.end + buffer && b.start < a.end + buffer) {
+                a.conflict = b.conflict = true;
+                a.confWith.push(b.rid); b.confWith.push(a.rid);   // 서로 이동용
+            }
         }
-        it.sort((a, b) => (a.date || '').localeCompare(b.date || '') || ((a.start ?? 0) - (b.start ?? 0)));
+        // 미배치는 항상 뒤로, 그 외 날짜·시간순
+        it.sort((a, b) => (!!a.unplaced !== !!b.unplaced ? (a.unplaced ? 1 : -1)
+            : ((a.date || '').localeCompare(b.date || '') || ((a.start ?? 0) - (b.start ?? 0)))));
     });
-    return { persons, noSpeakerLecs, dates: [...dates].sort(), totalLec, sessionCnt };
+    return { persons, noSpeakerLecs, dates: [...dates].sort(), totalLec, sessionCnt, unplacedCnt };
 }
 
 /* ---------- 필터 ---------- */
@@ -171,10 +196,10 @@ let LAST = null;   // 마지막 collect 결과(GPT 복사용)
 
 function render() {
     LAST = collect();
-    const { persons, noSpeakerLecs, dates, totalLec } = LAST;
+    const { persons, noSpeakerLecs, dates, totalLec, unplacedCnt } = LAST;
 
     // 날짜 탭
-    const dayCount = d => { let n = 0; persons.forEach(p => p.items.forEach(a => { if (a.kind === 'lec' && (!d || a.date === d)) n++; })); n += noSpeakerLecs.filter(a => !d || a.date === d).length; return n; };
+    const dayCount = d => { let n = 0; persons.forEach(p => p.items.forEach(a => { if (a.kind === 'lec' && !a.unplaced && (!d || a.date === d)) n++; })); n += noSpeakerLecs.filter(a => !d || a.date === d).length; return n; };
     let tabs = `<button class="ss-tab ${FILTER_DATE === '' ? 'on' : ''}" onclick="setDay('')">전체 <b>${dayCount('')}</b></button>`;
     dates.forEach((d, i) => { tabs += `<button class="ss-tab ${FILTER_DATE === d ? 'on' : ''}" onclick="setDay('${d}')">${i === 0 ? '첫날 ' : (i === 1 ? '둘째날 ' : (i + 1) + '일차 ')}${escapeHtml(fmtDay(d))} <b>${dayCount(d)}</b></button>`; });
     document.getElementById('ssDays').innerHTML = tabs;
@@ -216,17 +241,38 @@ function render() {
     document.getElementById('ssSummary').innerHTML =
         `시간표 강의 <b>${totalLec}</b>개 · 연자 <b>${shownPersons}</b>명 · 표시 강의 <b>${shownLec}</b>건`
         + (conflictN ? ` · <span class="ss-warn">중복 ${conflictN}건</span>` : ` · 중복 없음`)
+        + (unplacedCnt ? ` · <span class="ss-warn">미배치 ${unplacedCnt}건</span>` : '')
         + (noSpeakerLecs.length ? ` · <span class="ss-warn">연자 미지정 ${noSpeakerLecs.length}건</span>` : '');
 }
 
 function rowHtml(a) {
-    const time = (a.start != null) ? `${formatTime(a.start)}-${formatTime(a.end)}` : '';
+    const unplaced = !!a.unplaced;
+    const left = unplaced
+        ? '<span class="ss-unp-dt">미배치</span>'
+        : `<span class="ss-dt"><span class="ss-d">${escapeHtml(fmtDay(a.date))}</span><span class="ss-t">${formatTime(a.start)}–${formatTime(a.end)}</span></span>`;
     const kindBadge = a.kind === 'mod' ? '<span class="ss-k mod">좌장/사회</span>' : (a.isPanel ? '<span class="ss-k panel">패널</span>' : '<span class="ss-k lec">강의</span>');
-    const conf = a.conflict ? '<span class="sch-badge dup" title="같은 날 동일 연자 시간 겹침(다른 룸)">중복</span>' : '';
-    const meta = `📍 ${escapeHtml(a.roomName)}${a.sessionName ? ' · ' + escapeHtml(a.sessionName) : ''}${a.date ? ' · ' + escapeHtml(fmtDay(a.date)) : ''}${time ? ' · ⏰ ' + time : ''}`;
-    const click = a.roomId ? ` class="ss-row sch-link" title="시간표에서 보기" onclick="gotoTimetable('${a.roomId}','${a.lecId || ''}')"` : ' class="ss-row"';
-    return `<div${click}><span class="ss-row-t">${kindBadge}${escapeHtml(a.title)}${conf}</span><span class="ss-row-m">${meta}</span></div>`;
+    const confBadge = a.conflict ? `<span class="sch-badge dup ss-jump" title="겹치는 일정으로 이동" onclick="jumpConflict(event,'${(a.confWith && a.confWith[0]) || ''}')">중복 ⤵</span>` : '';
+    const unpBadge = unplaced ? '<span class="ss-unp-badge" title="시간표에 아직 배치되지 않았습니다">미배치</span>' : '';
+    const loc = unplaced ? '' : `<span class="ss-loc">📍 ${escapeHtml(a.roomName)}${a.sessionName ? ' · ' + escapeHtml(a.sessionName) : ''}</span>`;
+    const canClick = !unplaced && a.roomId;
+    const cls = 'ss-row' + (canClick ? ' sch-link' : '') + (unplaced ? ' ss-row-unp' : '');
+    const click = canClick ? ` title="시간표에서 보기" onclick="gotoTimetable('${a.roomId}','${a.lecId || ''}')"` : '';
+    return `<div id="${a.rid}" class="${cls}"${click}>
+        <span class="ss-left">${left}</span>
+        <span class="ss-main">${kindBadge}<span class="ss-ttl">${escapeHtml(a.title)}</span>${confBadge}${unpBadge}${loc}</span>
+    </div>`;
 }
+
+// 중복 배지 클릭 → 겹치는 상대 일정으로 스크롤 + 강조
+window.jumpConflict = function (ev, rid) {
+    if (ev) ev.stopPropagation();
+    if (!rid) return;
+    const el = document.getElementById(rid);
+    if (!el) { if (window.Toast && Toast.warning) Toast.warning('겹치는 일정이 현재 필터/검색에서 숨겨져 있습니다. 날짜를 "전체"로 두고 다시 눌러보세요.'); return; }
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('ss-flash');
+    setTimeout(() => el.classList.remove('ss-flash'), 1800);
+};
 
 window.gotoTimetable = function (roomId, lecId) {
     if (!roomId) return;
