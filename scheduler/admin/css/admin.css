@@ -1562,3 +1562,45 @@ html.modal-open, body.modal-open { overflow: hidden; }
 .import-room.imp-dup { opacity: 0.7; }
 .imp-exists { font-size: 0.68rem; font-weight: 700; color: #b7791f; background: #fbf1df; padding: 2px 7px; border-radius: 999px; }
 .imp-new { font-size: 0.68rem; font-weight: 700; color: #1F8A5B; background: #e6f4ec; padding: 2px 7px; border-radius: 999px; }
+
+/* ------------------------------------------------------------
+   연자별 강의 일정 — speaker-schedule.html
+   ------------------------------------------------------------ */
+.ss-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 10px; }
+.ss-bar-label { font-size: 0.78rem; font-weight: 700; color: var(--text-dim); }
+.ss-bar select, .ss-bar input { padding: 8px 11px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.86rem; background: #fff; }
+.ss-bar input { min-width: 180px; flex: 0 1 240px; }
+.ss-bar #ssConfSelect { max-width: 300px; }
+.ss-days { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
+.ss-tab { border: 1px solid var(--border); background: #fff; color: var(--text); border-radius: 999px; padding: 7px 14px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+.ss-tab:hover { border-color: var(--primary); }
+.ss-tab.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.ss-tab b { font-weight: 800; margin-left: 3px; opacity: .85; }
+.ss-summary { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 12px; }
+.ss-summary b { color: var(--text); }
+.ss-summary .ss-warn, .ss-warn { color: #c0392b; font-weight: 700; }
+.ss-card { border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; overflow: hidden; background: #fff; }
+.ss-card-warn { border-color: #f1c40f; }
+.ss-card-h { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: space-between; padding: 11px 15px; background: var(--bg, #f7f8fa); border-bottom: 1px solid var(--border); }
+.ss-name { font-weight: 800; color: var(--text); font-size: 0.98rem; }
+.ss-name .ss-en { font-weight: 600; color: var(--text-dim); font-size: 0.86rem; margin-left: 4px; }
+.ss-aff { font-weight: 600; color: var(--text-dim); font-size: 0.84rem; margin-left: 6px; }
+.ss-counts { display: inline-flex; gap: 6px; }
+.ss-cnt { font-size: 0.76rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; }
+.ss-cnt.lec { background: #e8f0fe; color: #1a53c4; }
+.ss-cnt.mod { background: #f0ecf7; color: #6b1f7a; }
+.ss-rows { padding: 4px 0; }
+.ss-row { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; justify-content: space-between; padding: 8px 15px; border-top: 1px dashed #eef0f3; }
+.ss-row:first-child { border-top: 0; }
+.ss-row.sch-link { cursor: pointer; }
+.ss-row.sch-link:hover { background: #f0f5ff; }
+.ss-row-t { font-weight: 600; font-size: 0.9rem; }
+.ss-row-m { color: var(--text-dim); font-size: 0.82rem; }
+.ss-k { display: inline-block; font-size: 0.72rem; font-weight: 800; border-radius: 5px; padding: 1px 7px; margin-right: 7px; vertical-align: middle; }
+.ss-k.lec { background: #e8f0fe; color: #1a53c4; }
+.ss-k.mod { background: #f0ecf7; color: #6b1f7a; }
+.ss-k.panel { background: #fff3e0; color: #b45309; }
+@media (max-width: 640px) {
+    .ss-bar input { flex-basis: 100%; }
+    .ss-row { flex-direction: column; gap: 2px; }
+}
