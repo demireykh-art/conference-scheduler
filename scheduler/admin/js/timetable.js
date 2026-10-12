@@ -420,6 +420,27 @@ function curLecLocLabel(roomId, sessionId, lecId) {
     else if (sess.name) parts.push(sess.name);
     return parts.join(' · ');
 }
+// 세션 위치(룸·날짜·시간) 요약 — 세션 변경이력용. 세션이 현재 CONF에 있을 때 사용.
+function sessLocLabel(roomId, sessionId) {
+    const room = getRoom(roomId);
+    if (!room) return '';
+    const parts = [room.name || '룸'];
+    if (room.date) parts.push(room.date);
+    const sess = computeRoom(room).find(s => s.id === sessionId);
+    if (sess) parts.push(`${formatTime(sess._start)}~${formatTime(sess._end)}`);
+    return parts.join(' · ');
+}
+// 룸 끝(새 세션이 시작될 지점) 요약 — 세션 '추가' 직전 위치 계산용
+function roomTailLabel(roomId) {
+    const room = getRoom(roomId);
+    if (!room) return '';
+    const parts = [room.name || '룸'];
+    if (room.date) parts.push(room.date);
+    const ss = computeRoom(room);
+    const end = ss.length ? ss[ss.length - 1]._end : parseTime(room.startTime || '09:00');
+    parts.push(`${formatTime(end)}~`);
+    return parts.join(' · ');
+}
 function roomLogArr() {
     const arr = [];
     Object.entries((CONF && CONF.roomLog) || {}).forEach(([id, e]) => { if (e) arr.push({ id, ...e }); });
@@ -679,9 +700,10 @@ window.saveBreak = function () {
     const data = isPanel
         ? { isPanel: true, titleKo, titleEn, duration: dur, order }
         : { isBreak: true, titleKo, titleEn, duration: dur, order };
+    const bloc = lecLocLabel(t.roomId, t.sessionId, dur);   // 쓰기 전에 위치 계산
     confRef().child(`rooms/${t.roomId}/sessions/${t.sessionId}/lectures/${uuid()}`).set(data)
         .then(() => {
-            logActivity('create', 'lecture', `${isPanel ? '패널' : '행사 항목'} "${titleKo || titleEn}" 추가`, { confId: CONF_ID, confTitle: ctitle(), entityId: t.sessionId });
+            logActivity('create', 'lecture', `${isPanel ? '패널' : '행사 항목'} "${titleKo || titleEn}" 추가${bloc ? ' → ' + bloc : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: t.sessionId });
             Toast.success('추가되었습니다.'); closeBreakModal();
         })
         .catch(e => Toast.error('추가 실패: ' + e.message));
@@ -1570,7 +1592,8 @@ window.saveSession = function () {
         confRef().update(updates)
             .then(() => {
                 mods.forEach(m => { if (m.id) ensureConfSpeaker(m.id, '사회자'); });
-                logActivity('update', 'session', `세션 "${name}" 수정${modSummary}`, { confId: CONF_ID, confTitle: ctitle(), entityId: sessionId });
+                const uloc = sessLocLabel(roomId, sessionId);
+                logActivity('update', 'session', `세션 "${name}" 수정${modSummary}${uloc ? ' · ' + uloc : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: sessionId });
                 Toast.success('저장되었습니다.'); closeSessionModal();
             });
     } else {
@@ -1579,10 +1602,11 @@ window.saveSession = function () {
         const data = { name, order: sessions.length };
         if (nameEn) data.nameEn = nameEn;
         if (mods.length) data.moderators = mods;
+        const cloc = roomTailLabel(roomId);   // 쓰기 전에 새 세션 시작 위치 계산
         confRef().child(`rooms/${roomId}/sessions/${id}`).set(data)
             .then(() => {
                 mods.forEach(m => { if (m.id) ensureConfSpeaker(m.id, '사회자'); });
-                logActivity('create', 'session', `세션 "${name}" 추가${modSummary}`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
+                logActivity('create', 'session', `세션 "${name}" 추가${modSummary}${cloc ? ' · ' + cloc : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
                 Toast.success('세션이 추가되었습니다.'); closeSessionModal();
             });
     }
@@ -1592,8 +1616,9 @@ window.deleteSession = async function (roomId, sessionId) {
     const s = CONF.rooms[roomId].sessions[sessionId];
     const ok = await confirmDialog(`"${s ? s.name : ''}" 세션을 삭제할까요?\n포함된 강의가 모두 삭제됩니다.`, { danger: true, okText: '삭제' });
     if (!ok) return;
+    const dloc = sessLocLabel(roomId, sessionId);   // 삭제 전에 위치 계산
     confRef().child(`rooms/${roomId}/sessions/${sessionId}`).remove().then(() => {
-        logActivity('delete', 'session', `세션 "${s ? s.name : ''}" 삭제`, { confId: CONF_ID, confTitle: ctitle(), entityId: sessionId });
+        logActivity('delete', 'session', `세션 "${s ? s.name : ''}" 삭제${dloc ? ' · ' + dloc : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: sessionId });
         Toast.success('삭제되었습니다.');
     });
 };
@@ -1902,9 +1927,10 @@ window.deleteLecture = async function (roomId, sessionId, lecId) {
     const lec = CONF.rooms[roomId].sessions[sessionId].lectures[lecId];
     const ok = await confirmDialog(`"${lec ? normalizeLecture(lec).titleKo : ''}" 강의를 삭제할까요?`, { danger: true, okText: '삭제' });
     if (!ok) return;
+    const delLoc = curLecLocLabel(roomId, sessionId, lecId);   // 삭제 전에 위치 계산
     confRef().child(`rooms/${roomId}/sessions/${sessionId}/lectures/${lecId}`).remove()
         .then(() => {
-            logActivity('delete', 'lecture', `시간표 강의 "${lec ? normalizeLecture(lec).titleKo : ''}" 삭제`, { confId: CONF_ID, confTitle: ctitle(), entityId: lec && lec.lectureId ? lec.lectureId : lecId });
+            logActivity('delete', 'lecture', `시간표 강의 "${lec ? normalizeLecture(lec).titleKo : ''}" 삭제${delLoc ? ' · ' + delLoc : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: lec && lec.lectureId ? lec.lectureId : lecId });
             if (!(lec && lec.isBreak)) logRoomChange({
                 action: 'delete', title: lec ? normalizeLecture(lec).titleKo : '',
                 fromRoomId: roomId, fromRoomName: (getRoom(roomId) || {}).name || ''
