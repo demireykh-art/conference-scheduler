@@ -1621,3 +1621,13 @@ html.modal-open, body.modal-open { overflow: hidden; }
 .ss-confbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: -2px 0 12px; }
 .ss-confbar:empty { display: none; }
 .ss-confhint { font-size: 0.8rem; color: #b45309; font-weight: 700; }
+/* 우측 고정 플로팅 — 다음 중복 */
+.ss-fab { position: fixed; right: 18px; bottom: 24px; z-index: 60; }
+.ss-fab:empty { display: none; }
+.ss-fab-btn { display: inline-flex; align-items: center; gap: 8px; background: #c0392b; color: #fff; border: 0;
+    border-radius: 999px; padding: 12px 18px; font-size: 0.9rem; font-weight: 800; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(192,57,43,.38); font-family: inherit; }
+.ss-fab-btn:hover { background: #a93226; }
+.ss-fab-btn:active { transform: translateY(1px); }
+.ss-fab-n { background: rgba(255,255,255,.28); border-radius: 999px; padding: 1px 9px; font-size: 0.82rem; }
+@media (max-width: 640px) { .ss-fab { right: 12px; bottom: 16px; } .ss-fab-btn { padding: 11px 15px; } }
