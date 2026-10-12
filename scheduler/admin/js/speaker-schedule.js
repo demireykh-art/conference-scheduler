@@ -24,6 +24,7 @@ let FIELD = 'all';        // all | name | title | company
 let Q = '';
 let ONLY_CONF = false;    // 중복만 보기
 let ONLY_NOSPK = false;   // 연자 미지정만 보기
+let ONLY_UNPLACED = false; // 미배치건만 보기
 let CONF_RIDS = [], confPtr = -1;   // 현재 화면의 중복 행 rid 목록(다음 중복 이동용)
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('spksched');
@@ -190,6 +191,7 @@ function visibleRows(p) {
     }
     if (!textOK) return null;
     if (ONLY_CONF) rows = rows.filter(a => a.conflict);   // 중복만 보기
+    if (ONLY_UNPLACED) rows = rows.filter(a => a.unplaced);  // 미배치건만 보기
     return rows.length ? rows : null;
 }
 
@@ -197,8 +199,9 @@ function visibleRows(p) {
 window.setDay = function (d) { FILTER_DATE = d; render(); };
 window.onFieldChange = function (v) { FIELD = v; render(); };
 window.onSearch = function (v) { Q = (v || '').trim().toLowerCase(); render(); };
-window.toggleOnlyConf = function () { ONLY_CONF = !ONLY_CONF; if (ONLY_CONF) ONLY_NOSPK = false; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-window.toggleOnlyNoSpk = function () { ONLY_NOSPK = !ONLY_NOSPK; if (ONLY_NOSPK) ONLY_CONF = false; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+window.toggleOnlyConf = function () { ONLY_CONF = !ONLY_CONF; if (ONLY_CONF) { ONLY_NOSPK = false; ONLY_UNPLACED = false; } render(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+window.toggleOnlyNoSpk = function () { ONLY_NOSPK = !ONLY_NOSPK; if (ONLY_NOSPK) { ONLY_CONF = false; ONLY_UNPLACED = false; } render(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+window.toggleOnlyUnplaced = function () { ONLY_UNPLACED = !ONLY_UNPLACED; if (ONLY_UNPLACED) { ONLY_CONF = false; ONLY_NOSPK = false; FILTER_DATE = ''; } render(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 window.nextConflict = function () {
     if (!CONF_RIDS.length) { if (window.Toast && Toast.warning) Toast.warning('현재 화면에 중복 건이 없습니다. (날짜를 "전체"로 두세요)'); return; }
     confPtr = (confPtr + 1) % CONF_RIDS.length;
@@ -254,7 +257,7 @@ function render() {
     });
 
     // 연자 미지정 강의 (중복만 보기에서는 숨김). '미지정만 보기'에서는 검색필드와 무관하게 표시.
-    const noSpk = ONLY_CONF ? [] : noSpeakerLecs.filter(dayOk).filter(a => (ONLY_NOSPK || !(FIELD === 'name' || FIELD === 'company')) ? titleOk(a) : true);
+    const noSpk = (ONLY_CONF || ONLY_UNPLACED) ? [] : noSpeakerLecs.filter(dayOk).filter(a => (ONLY_NOSPK || !(FIELD === 'name' || FIELD === 'company')) ? titleOk(a) : true);
     if (noSpk.length && (ONLY_NOSPK || FIELD === 'all' || FIELD === 'title' || !Q)) {
         shownLec += noSpk.length;
         html += `<div class="ss-card ss-card-warn">
@@ -263,7 +266,7 @@ function render() {
             <div class="ss-rows">${noSpk.map(rowHtml).join('')}</div></div>`;
     }
 
-    if (!html) html = `<div class="card empty-state">${ONLY_CONF ? '중복된 일정이 없습니다.' : (ONLY_NOSPK ? '연자 미지정 강의가 없습니다.' : '표시할 일정이 없습니다.')}</div>`;
+    if (!html) html = `<div class="card empty-state">${ONLY_CONF ? '중복된 일정이 없습니다.' : (ONLY_NOSPK ? '연자 미지정 강의가 없습니다.' : (ONLY_UNPLACED ? '미배치 강의가 없습니다.' : '표시할 일정이 없습니다.'))}</div>`;
     document.getElementById('ssList').innerHTML = html;
 
     // 상단 필터 버튼: 중복만 / 연자 미지정만
@@ -272,8 +275,10 @@ function render() {
         let b = '';
         if (conflictTotal) b += `<button class="btn btn-sm ${ONLY_CONF ? 'btn-primary' : ''}" onclick="toggleOnlyConf()">⚠ 중복만 보기 (${conflictTotal})</button>`;
         if (noSpeakerLecs.length) b += `<button class="btn btn-sm ${ONLY_NOSPK ? 'btn-primary' : ''}" onclick="toggleOnlyNoSpk()">👤 연자 미지정만 (${noSpeakerLecs.length})</button>`;
+        if (unplacedCnt) b += `<button class="btn btn-sm ${ONLY_UNPLACED ? 'btn-primary' : ''}" onclick="toggleOnlyUnplaced()">📍 미배치건만 (${unplacedCnt})</button>`;
         if (ONLY_CONF) b += '<span class="ss-confhint">중복된 건만 표시 중 — 버튼을 다시 누르면 전체</span>';
         else if (ONLY_NOSPK) b += '<span class="ss-confhint">연자 미지정만 표시 중 — 버튼을 다시 누르면 전체</span>';
+        else if (ONLY_UNPLACED) b += '<span class="ss-confhint">미배치 강의만 표시 중 — 버튼을 다시 누르면 전체</span>';
         cb.innerHTML = b;
     }
 
