@@ -392,6 +392,34 @@ function logRoomChange(entry) {
         });
     } catch (e) { }
 }
+// 강의 위치(룸·날짜·시간·세션) 한 줄 요약 — 변경이력에 "어디·언제" 를 남기기 위함.
+// 세션 맨 뒤에 추가/이동되므로 세션의 현재 끝시각(_end)을 새 강의 시작으로 본다.
+function lecLocLabel(roomId, sessionId, durMin) {
+    const room = getRoom(roomId);
+    if (!room) return '';
+    const parts = [room.name || '룸'];
+    if (room.date) parts.push(room.date);
+    const sess = computeRoom(room).find(s => s.id === sessionId);
+    if (sess) {
+        const start = sess._end, end = start + (Number(durMin) || 0);
+        parts.push(`${formatTime(start)}~${formatTime(end)}`);
+        if (sess.name) parts.push(sess.name);
+    }
+    return parts.join(' · ');
+}
+// 이미 배치된 강의의 현재 위치(룸·날짜·시간·세션) 요약
+function curLecLocLabel(roomId, sessionId, lecId) {
+    const room = getRoom(roomId);
+    if (!room) return '';
+    const sess = computeRoom(room).find(s => s.id === sessionId);
+    if (!sess) return room.name || '룸';
+    const lec = (sess.lectures || []).find(l => l.id === lecId);
+    const parts = [room.name || '룸'];
+    if (room.date) parts.push(room.date);
+    if (lec) { parts.push(`${formatTime(lec._start)}~${formatTime(lec._end)}`); if (sess.name) parts.push(sess.name); }
+    else if (sess.name) parts.push(sess.name);
+    return parts.join(' · ');
+}
 function roomLogArr() {
     const arr = [];
     Object.entries((CONF && CONF.roomLog) || {}).forEach(([id, e]) => { if (e) arr.push({ id, ...e }); });
@@ -1665,11 +1693,13 @@ window.placeLecture = async function (poolId) {
         order: toOrderedArray(CONF.rooms[roomId].sessions[sessionId].lectures).length,
         updatedAt: firebase.database.ServerValue.TIMESTAMP   // 변경 표시(엑셀 빨간색)용
     };
+    // 위치(룸·날짜·시간) 요약은 쓰기 전에 계산 — 쓰기 후엔 로컬 캐시가 이미 새 강의를 포함해 시작시각이 틀어짐
+    const placeLoc = lecLocLabel(roomId, sessionId, data.duration);
     confRef().child(`rooms/${roomId}/sessions/${sessionId}/lectures/${uuid()}`).set(data)
         .then(() => {
             // 배치된 강의의 연자를 이 행사 연자/사회자 목록에 자동 추가
             (pool.speakers || []).forEach(s => { if (s && s.id) ensureConfSpeaker(s.id, '연자'); });
-            logActivity('place', 'lecture', `강의 "${data.titleKo}" 시간표 배치`, { confId: CONF_ID, confTitle: ctitle(), entityId: pool.id });
+            logActivity('place', 'lecture', `강의 "${data.titleKo}" 배치${placeLoc ? ' → ' + placeLoc : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: pool.id });
             Toast.success(`"${data.titleKo}" 배치됨`); renderPlaceList();
         })
         .catch(e => Toast.error('배치 실패: ' + e.message));
@@ -1919,15 +1949,21 @@ window.confirmMove = async function () {
     if (!(await confirmSpecChange(lec, getRoom(toRoom)))) return;   // 지정 요일·시간과 다르면 경고
     const targetLectures = toOrderedArray(CONF.rooms[toRoom].sessions[toSession].lectures);
     const moved = { ...lec, order: targetLectures.length, updatedAt: firebase.database.ServerValue.TIMESTAMP };
+    // 이동 전/후 위치 요약(변경이력용) — 업데이트 전에 현재 위치를 계산해 둔다
+    const lecTitle = normalizeLecture(lec).titleKo || '(제목 없음)';
+    const fromLoc = curLecLocLabel(roomId, sessionId, lecId);
+    const toLoc = lecLocLabel(toRoom, toSession, lec.duration);
     const updates = {};
     updates[`rooms/${roomId}/sessions/${sessionId}/lectures/${lecId}`] = null;
     updates[`rooms/${toRoom}/sessions/${toSession}/lectures/${lecId}`] = moved;
     confRef().update(updates).then(() => {
         if (roomId !== toRoom) logRoomChange({
-            action: 'move', title: normalizeLecture(lec).titleKo,
+            action: 'move', title: lecTitle,
             fromRoomId: roomId, fromRoomName: (getRoom(roomId) || {}).name || '',
             toRoomId: toRoom, toRoomName: (getRoom(toRoom) || {}).name || ''
         });
+        logActivity('move', 'lecture', `강의 "${lecTitle}" 이동${fromLoc ? ' · ' + fromLoc : ''} → ${toLoc || '(위치확인 필요)'}`,
+            { confId: CONF_ID, confTitle: ctitle(), entityId: lec.lectureId || lecId });
         Toast.success('이동되었습니다.'); closeMoveModal();
     });
 };
