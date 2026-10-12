@@ -23,6 +23,7 @@ let FILTER_DATE = '';     // '' = 전체
 let FIELD = 'all';        // all | name | title | company
 let Q = '';
 let ONLY_CONF = false;    // 중복만 보기
+let ONLY_NOSPK = false;   // 연자 미지정만 보기
 let CONF_RIDS = [], confPtr = -1;   // 현재 화면의 중복 행 rid 목록(다음 중복 이동용)
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('spksched');
@@ -196,7 +197,8 @@ function visibleRows(p) {
 window.setDay = function (d) { FILTER_DATE = d; render(); };
 window.onFieldChange = function (v) { FIELD = v; render(); };
 window.onSearch = function (v) { Q = (v || '').trim().toLowerCase(); render(); };
-window.toggleOnlyConf = function () { ONLY_CONF = !ONLY_CONF; render(); if (ONLY_CONF) window.scrollTo({ top: 0, behavior: 'smooth' }); };
+window.toggleOnlyConf = function () { ONLY_CONF = !ONLY_CONF; if (ONLY_CONF) ONLY_NOSPK = false; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+window.toggleOnlyNoSpk = function () { ONLY_NOSPK = !ONLY_NOSPK; if (ONLY_NOSPK) ONLY_CONF = false; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 window.nextConflict = function () {
     if (!CONF_RIDS.length) { if (window.Toast && Toast.warning) Toast.warning('현재 화면에 중복 건이 없습니다. (날짜를 "전체"로 두세요)'); return; }
     confPtr = (confPtr + 1) % CONF_RIDS.length;
@@ -225,7 +227,7 @@ function render() {
     const people = [...persons.values()].sort((a, b) => (a.name || a.nameEn || '').localeCompare(b.name || b.nameEn || '', 'ko'));
     let shownLec = 0, shownPersons = 0, conflictN = 0;
     let html = '';
-    people.forEach(p => {
+    if (!ONLY_NOSPK) people.forEach(p => {
         const rows = visibleRows(p);
         if (!rows) return;
         shownPersons++;
@@ -241,9 +243,9 @@ function render() {
         </div>`;
     });
 
-    // 연자 미지정 강의 (중복만 보기에서는 숨김 — 연자 없는 강의는 중복 대상 아님)
-    const noSpk = ONLY_CONF ? [] : noSpeakerLecs.filter(dayOk).filter(a => FIELD !== 'name' && FIELD !== 'company' ? titleOk(a) : true);
-    if (noSpk.length && (FIELD === 'all' || FIELD === 'title' || !Q)) {
+    // 연자 미지정 강의 (중복만 보기에서는 숨김). '미지정만 보기'에서는 검색필드와 무관하게 표시.
+    const noSpk = ONLY_CONF ? [] : noSpeakerLecs.filter(dayOk).filter(a => (ONLY_NOSPK || !(FIELD === 'name' || FIELD === 'company')) ? titleOk(a) : true);
+    if (noSpk.length && (ONLY_NOSPK || FIELD === 'all' || FIELD === 'title' || !Q)) {
         shownLec += noSpk.length;
         html += `<div class="ss-card ss-card-warn">
             <div class="ss-card-h"><div class="ss-name">⚠ 연자 미지정 강의 <span class="ss-en">연자 정보가 비어 있는 강의</span></div>
@@ -251,15 +253,24 @@ function render() {
             <div class="ss-rows">${noSpk.map(rowHtml).join('')}</div></div>`;
     }
 
-    if (!html) html = `<div class="card empty-state">${ONLY_CONF ? '중복된 일정이 없습니다.' : '표시할 일정이 없습니다.'}</div>`;
+    if (!html) html = `<div class="card empty-state">${ONLY_CONF ? '중복된 일정이 없습니다.' : (ONLY_NOSPK ? '연자 미지정 강의가 없습니다.' : '표시할 일정이 없습니다.')}</div>`;
     document.getElementById('ssList').innerHTML = html;
 
-    // 중복 바로찾기 컨트롤
+    // 상단 필터 버튼: 중복만 / 연자 미지정만
     const cb = document.getElementById('ssConfBar');
-    if (cb) cb.innerHTML = conflictTotal
-        ? `<button class="btn btn-sm ${ONLY_CONF ? 'btn-primary' : ''}" onclick="toggleOnlyConf()">⚠ 중복만 보기 (${conflictTotal})</button>`
-        + `<button class="btn btn-sm" onclick="nextConflict()" title="중복 건을 하나씩 순서대로 이동">다음 중복 ▾</button>`
-        + (ONLY_CONF ? '<span class="ss-confhint">중복된 건만 표시 중 — 버튼을 다시 누르면 전체</span>' : '')
+    if (cb) {
+        let b = '';
+        if (conflictTotal) b += `<button class="btn btn-sm ${ONLY_CONF ? 'btn-primary' : ''}" onclick="toggleOnlyConf()">⚠ 중복만 보기 (${conflictTotal})</button>`;
+        if (noSpeakerLecs.length) b += `<button class="btn btn-sm ${ONLY_NOSPK ? 'btn-primary' : ''}" onclick="toggleOnlyNoSpk()">👤 연자 미지정만 (${noSpeakerLecs.length})</button>`;
+        if (ONLY_CONF) b += '<span class="ss-confhint">중복된 건만 표시 중 — 버튼을 다시 누르면 전체</span>';
+        else if (ONLY_NOSPK) b += '<span class="ss-confhint">연자 미지정만 표시 중 — 버튼을 다시 누르면 전체</span>';
+        cb.innerHTML = b;
+    }
+
+    // 우측 고정 플로팅: 다음 중복 (항상 떠 있음, 반복 클릭으로 순회)
+    const fab = document.getElementById('ssFab');
+    if (fab) fab.innerHTML = CONF_RIDS.length
+        ? `<button class="ss-fab-btn" onclick="nextConflict()" title="클릭할 때마다 다음 중복으로 이동">⚠ 다음 중복<span class="ss-fab-n">${CONF_RIDS.length}</span></button>`
         : '';
 
     // 요약
