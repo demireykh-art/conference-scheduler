@@ -236,9 +236,19 @@ function render() {
         rows.forEach(a => { if (a.conflict) { conflictN++; CONF_RIDS.push(a.rid); } });
         const nm = escapeHtml(p.name || p.nameEn || '(이름 없음)') + (p.nameEn && p.name ? ` <span class="ss-en">${escapeHtml(p.nameEn)}</span>` : '');
         const aff = (p.aff || p.affEn) ? `<span class="ss-aff">${escapeHtml(p.aff || p.affEn)}</span>` : '';
+        const k = String(p.key).replace(/['\\]/g, '\\$&');
         html += `<div class="ss-card">
-            <div class="ss-card-h"><div class="ss-name">${nm} ${aff}</div>
-                <div class="ss-counts"><span class="ss-cnt lec">강의 ${lecRows.length}</span><span class="ss-cnt mod">좌장/사회 ${modRows.length}</span></div></div>
+            <div class="ss-card-h">
+                <div class="ss-name">${nm} ${aff}</div>
+                <div class="ss-head-right">
+                    <div class="ss-counts"><span class="ss-cnt lec">강의 ${lecRows.length}</span><span class="ss-cnt mod">좌장/사회 ${modRows.length}</span></div>
+                    <div class="ss-send">
+                        <button class="ss-btn" title="이 연자 일정을 카톡/문자용으로 복사" onclick="ssCopy('${k}',this)">📋 복사</button>
+                        <button class="ss-btn" title="이 연자에게 일정 메일(Gmail 작성창)" onclick="ssMail('${k}')">📧 메일</button>
+                        <button class="ss-btn" title="카카오톡으로 일정 카드 보내기" onclick="ssKakao('${k}')">💬 카톡</button>
+                    </div>
+                </div>
+            </div>
             <div class="ss-rows">${rows.map(rowHtml).join('')}</div>
         </div>`;
     });
@@ -313,6 +323,88 @@ window.jumpConflict = function (ev, rid) {
 window.gotoTimetable = function (roomId, lecId) {
     if (!roomId) return;
     location.href = `timetable.html?id=${encodeURIComponent(CONF_ID)}&room=${encodeURIComponent(roomId)}${lecId ? '&lec=' + encodeURIComponent(lecId) : ''}`;
+};
+
+/* ---------- 연자별 일정 전송(복사/메일/카톡) ---------- */
+// 카카오 공유 초기화(앱키 있으면)
+try { if (window.Kakao && window.KAKAO_JS_KEY && !Kakao.isInitialized()) Kakao.init(window.KAKAO_JS_KEY); } catch (e) { }
+
+function personScheduleText(p) {
+    const name = (p.name || p.nameEn || '') + (p.name && p.nameEn ? ` (${p.nameEn})` : '');
+    const lec = p.items.filter(a => a.kind === 'lec');
+    const mod = p.items.filter(a => a.kind === 'mod');
+    let t = `[${CONF_NAME}] 일정 안내 — ${name}\n`;
+    t += `\n■ 강의 (${lec.length})\n` + sectionText(lec);
+    t += `\n\n■ 사회/좌장 (${mod.length})\n` + sectionText(mod);
+    return t;
+}
+function sectionText(items) {
+    if (!items.length) return '- 없음';
+    const placed = items.filter(a => !a.unplaced && a.date);
+    const unplaced = items.filter(a => a.unplaced);
+    const byDate = {}, order = [];
+    placed.forEach(a => { if (!(a.date in byDate)) { byDate[a.date] = []; order.push(a.date); } byDate[a.date].push(a); });
+    order.sort((x, y) => x.localeCompare(y));
+    const blocks = [];
+    order.forEach(d => {
+        const rows = byDate[d].slice().sort((a, b) => (a.start ?? 0) - (b.start ?? 0)).map(a => {
+            const time = a.start != null ? `${formatTime(a.start)}-${formatTime(a.end)} ` : '';
+            return `▶${time}${a.roomName || ''}${a.sessionName ? ' / ' + a.sessionName : ''}\n- ${a.title}`;
+        }).join('\n\n');
+        blocks.push(`[${fmtDay(d)}]\n${rows}`);
+    });
+    unplaced.forEach(a => blocks.push(`📍(미배치)\n- ${a.title}`));
+    return blocks.join('\n\n');
+}
+function getPersonByKey(key) { return LAST && LAST.persons && LAST.persons.get(key); }
+
+// 복사 — 완료 시 버튼에 ✓ 복사 완료 표시(잠깐)
+window.ssCopy = function (key, btn) {
+    const p = getPersonByKey(key); if (!p) return;
+    if (btn.classList.contains('ss-copied')) return;   // 연타 방지
+    const text = personScheduleText(p);
+    const orig = btn.innerHTML;
+    const done = () => { btn.classList.add('ss-copied'); btn.innerHTML = '✓ 복사 완료'; setTimeout(() => { btn.classList.remove('ss-copied'); btn.innerHTML = orig; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(() => ssFallbackCopy(text, done));
+    else ssFallbackCopy(text, done);
+};
+function ssFallbackCopy(text, done) {
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { if (window.Toast) Toast.error('복사 실패 — 직접 선택해 복사하세요.'); }
+    ta.remove();
+}
+window.ssMail = function (key) {
+    const p = getPersonByKey(key); if (!p) return;
+    const m = (p.id && Masters.speaker) ? (Masters.speaker(p.id) || {}) : {};
+    const email = m.email || '';
+    const subject = `${CONF_NAME} 강의/사회 일정 안내`;
+    const body = `안녕하세요, ${(p.name || p.nameEn) ? (p.name || p.nameEn) + ' 선생님' : '선생님'}.\n\nASLS 사무국입니다.\n${CONF_NAME} 관련 선생님의 강의/사회 일정을 안내드립니다.\n\n${personScheduleText(p)}\n\n변경이 필요하시면 회신 부탁드립니다.\n감사합니다.\n\nASLS 사무국 드림`;
+    const url = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(email) + '&su=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    window.open(url, '_blank');
+    if (!email && window.Toast) Toast.info('이 연자의 이메일이 없습니다. Gmail 작성창에서 수신인을 입력하세요.');
+};
+window.ssKakao = function (key) {
+    if (!(window.Kakao && Kakao.isInitialized && Kakao.isInitialized())) {
+        if (window.Toast) Toast.warning('카카오 공유 설정 전입니다. config.js의 KAKAO_JS_KEY 입력 + 도메인 등록이 필요합니다. (지금은 📋 복사를 이용해 주세요)');
+        return;
+    }
+    const p = getPersonByKey(key); if (!p) return;
+    if (!p.id) { if (window.Toast) Toast.warning('연자 고유 id가 없어 카톡 카드 링크를 만들 수 없습니다. 복사/메일을 이용해 주세요.'); return; }
+    const link = `https://www.asls.kr/html/?pmode=invited&speaker=${encodeURIComponent(p.id)}`;
+    const lec = p.items.filter(a => a.kind === 'lec').length, mod = p.items.filter(a => a.kind === 'mod').length;
+    try {
+        Kakao.Share.sendDefault({
+            objectType: 'feed',
+            content: {
+                title: `[${CONF_NAME}] ${p.name || p.nameEn}님 강의 일정`,
+                description: `강의 ${lec}건 · 사회/좌장 ${mod}건\n탭하여 상세 일정을 확인하세요.`,
+                imageUrl: 'https://demireykh-art.github.io/conference-scheduler/scheduler/admin/assets/asls-logo.png',
+                link: { mobileWebUrl: link, webUrl: link }
+            },
+            buttons: [{ title: '내 일정 보기', link: { mobileWebUrl: link, webUrl: link } }]
+        });
+    } catch (e) { if (window.Toast) Toast.error('카톡 공유 실패: ' + (e && e.message || e)); }
 };
 
 /* ---------- GPT 더블체크용 텍스트 ---------- */
