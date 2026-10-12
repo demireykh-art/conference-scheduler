@@ -1589,6 +1589,11 @@ html.modal-open, body.modal-open { overflow: hidden; }
 .ss-cnt { font-size: 0.76rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; }
 .ss-cnt.lec { background: #e8f0fe; color: #1a53c4; }
 .ss-cnt.mod { background: #f0ecf7; color: #6b1f7a; }
+.ss-head-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ss-send { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.ss-btn { font-size: 0.78rem; font-weight: 700; border: 1px solid var(--border); background: #fff; color: var(--text); border-radius: 7px; padding: 5px 10px; cursor: pointer; line-height: 1.1; transition: background .12s, border-color .12s, color .12s; }
+.ss-btn:hover { background: var(--bg, #f3f4f7); border-color: #c7ccd6; }
+.ss-btn.ss-copied { background: #e7f6ec; border-color: #38a169; color: #1f7a3f; }
 .ss-rows { padding: 4px 0; }
 .ss-row { display: flex; gap: 12px; align-items: flex-start; padding: 8px 15px; border-top: 1px dashed #eef0f3; }
 .ss-row:first-child { border-top: 0; }
