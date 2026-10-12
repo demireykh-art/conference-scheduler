@@ -17,6 +17,12 @@ window.AppConfig = {
     // 최초 관리자 이메일
     SUPER_ADMIN_EMAIL: 'demire.ykh@gmail.com',
 
+    // 카카오 JS 앱키 (연자 일정 '카톡 보내기' 공유용)
+    //  - https://developers.kakao.com → 내 애플리케이션 → JavaScript 키
+    //  - 플랫폼 > Web 사이트 도메인에 관리자 주소(예: https://demireykh-art.github.io) 등록 필요
+    //  - 비워두면 카톡 공유 버튼은 안내만 표시됩니다.
+    KAKAO_JS_KEY: '',
+
     // 세션 타임아웃 (2시간)
     SESSION_TIMEOUT: 2 * 60 * 60 * 1000,
 
@@ -101,6 +107,9 @@ window.AppConfig = {
     // 업체 목록 — Firebase /companies 에서 로드
     INITIAL_COMPANIES: [],
 };
+
+// 카카오 공유 앱키(전역)
+window.KAKAO_JS_KEY = window.AppConfig.KAKAO_JS_KEY || '';
 
 // Firebase 초기화
 firebase.initializeApp(window.AppConfig.firebase);

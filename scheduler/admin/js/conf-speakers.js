@@ -20,6 +20,12 @@ const SPEAKER_TRAVEL_MIN = 10;     // 다른 룸 이동 버퍼(분) — 시간�
 document.getElementById('sidebarMount').innerHTML = renderSidebar('events');
 Masters.init();
 
+// 카카오 공유(반자동) 초기화 — 앱키 있으면 활성화
+try { if (window.Kakao && window.KAKAO_JS_KEY && !Kakao.isInitialized()) Kakao.init(window.KAKAO_JS_KEY); } catch (e) { }
+const ASLS_HOST = 'https://www.asls.kr';
+const ASLS_LOGO = 'https://demireykh-art.github.io/conference-scheduler/scheduler/admin/assets/asls-logo.png';
+function speakerPublicLink(id) { return `${ASLS_HOST}/html/?pmode=invited&speaker=${encodeURIComponent(id)}`; }
+
 if (!CONF_ID) {
     document.getElementById('peopleList').innerHTML =
         '<div class="card empty-state">행사 id가 없습니다. <a href="index.html">행사 목록</a>에서 선택하세요.</div>';
@@ -161,6 +167,7 @@ function scheduleHtml(id) {
             <span class="sch-tb-label">이 일정 전송</span>
             <button class="btn btn-sm btn-primary" title="${m.email ? '이 일정을 메일로 보내기(Gmail 작성창)' : '이메일이 없습니다 — Gmail 작성창에서 수신인 직접 입력'}" onclick="mailSchedule('${id}')">📧 일정 메일 보내기</button>
             <button class="btn btn-sm" title="이 일정 내용을 복사(카톡·문자에 붙여넣기)" onclick="copySchedule('${id}')">📋 일정 복사(카톡)</button>
+            <button class="btn btn-sm" title="카카오톡으로 이 연자에게 일정 카드 보내기 — 카톡 대화상대 선택 후 전송" onclick="kakaoSchedule('${id}')">💬 카톡 보내기</button>
             ${shareBtn}
         </div>
         <div class="sch-grid">
@@ -240,6 +247,30 @@ window.shareSchedule = async function (id) {
         if (navigator.share) await navigator.share({ title: confTitleText() + ' 일정', text: scheduleText(id) });
         else copySchedule(id);
     } catch (e) { if (e && e.name !== 'AbortError') Toast.error('공유 실패: ' + e.message); }
+};
+// 카카오톡 공유(반자동): 버튼 클릭 → 카톡 대화상대(해당 연자) 선택 → '내 일정 보기' 카드 전송
+window.kakaoSchedule = function (id) {
+    if (!(window.Kakao && Kakao.isInitialized && Kakao.isInitialized())) {
+        Toast.warning('카카오 공유 설정 전입니다. config.js의 KAKAO_JS_KEY 입력 + 카카오 developers에 도메인 등록이 필요합니다. (지금은 "일정 복사(카톡)"를 이용해 주세요)');
+        return;
+    }
+    const m = Masters.speaker(id) || {};
+    const name = m.nameKo || m.nameEn || '연자';
+    const lec = applyFilterSort(personSchedule(id).lectures, ['title', 'session']);
+    const mod = applyFilterSort(personSchedule(id).sessionsMod, ['session']);
+    const link = speakerPublicLink(id);
+    try {
+        Kakao.Share.sendDefault({
+            objectType: 'feed',
+            content: {
+                title: `[${confTitleText()}] ${name}님 강의 일정`,
+                description: `강의 ${lec.length}건 · 사회/좌장 ${mod.length}건\n탭하여 상세 일정을 확인하세요.`,
+                imageUrl: ASLS_LOGO,
+                link: { mobileWebUrl: link, webUrl: link }
+            },
+            buttons: [{ title: '내 일정 보기', link: { mobileWebUrl: link, webUrl: link } }]
+        });
+    } catch (e) { Toast.error('카톡 공유 실패: ' + (e && e.message || e)); }
 };
 
 /* ---------- 일괄 전송 (현재 필터 기준) ---------- */
