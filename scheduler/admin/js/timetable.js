@@ -703,7 +703,7 @@ window.saveBreak = function () {
     const bloc = lecLocLabel(t.roomId, t.sessionId, dur);   // 쓰기 전에 위치 계산
     confRef().child(`rooms/${t.roomId}/sessions/${t.sessionId}/lectures/${uuid()}`).set(data)
         .then(() => {
-            logActivity('create', 'lecture', `${isPanel ? '패널' : '행사 항목'} "${titleKo || titleEn}" 추가${bloc ? ' → ' + bloc : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: t.sessionId });
+            logActivity('create', 'lecture', `${bloc ? bloc + ' — ' : ''}${isPanel ? '패널' : '행사 항목'} "${titleKo || titleEn}" 추가`, { confId: CONF_ID, confTitle: ctitle(), entityId: t.sessionId });
             Toast.success('추가되었습니다.'); closeBreakModal();
         })
         .catch(e => Toast.error('추가 실패: ' + e.message));
@@ -1593,7 +1593,7 @@ window.saveSession = function () {
             .then(() => {
                 mods.forEach(m => { if (m.id) ensureConfSpeaker(m.id, '사회자'); });
                 const uloc = sessLocLabel(roomId, sessionId);
-                logActivity('update', 'session', `세션 "${name}" 수정${modSummary}${uloc ? ' · ' + uloc : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: sessionId });
+                logActivity('update', 'session', `${uloc ? uloc + ' — ' : ''}세션 "${name}" 수정${modSummary}`, { confId: CONF_ID, confTitle: ctitle(), entityId: sessionId });
                 Toast.success('저장되었습니다.'); closeSessionModal();
             });
     } else {
@@ -1606,7 +1606,7 @@ window.saveSession = function () {
         confRef().child(`rooms/${roomId}/sessions/${id}`).set(data)
             .then(() => {
                 mods.forEach(m => { if (m.id) ensureConfSpeaker(m.id, '사회자'); });
-                logActivity('create', 'session', `세션 "${name}" 추가${modSummary}${cloc ? ' · ' + cloc : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
+                logActivity('create', 'session', `${cloc ? cloc + ' — ' : ''}세션 "${name}" 추가${modSummary}`, { confId: CONF_ID, confTitle: ctitle(), entityId: id });
                 Toast.success('세션이 추가되었습니다.'); closeSessionModal();
             });
     }
@@ -1618,7 +1618,7 @@ window.deleteSession = async function (roomId, sessionId) {
     if (!ok) return;
     const dloc = sessLocLabel(roomId, sessionId);   // 삭제 전에 위치 계산
     confRef().child(`rooms/${roomId}/sessions/${sessionId}`).remove().then(() => {
-        logActivity('delete', 'session', `세션 "${s ? s.name : ''}" 삭제${dloc ? ' · ' + dloc : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: sessionId });
+        logActivity('delete', 'session', `${dloc ? dloc + ' — ' : ''}세션 "${s ? s.name : ''}" 삭제`, { confId: CONF_ID, confTitle: ctitle(), entityId: sessionId });
         Toast.success('삭제되었습니다.');
     });
 };
@@ -1724,7 +1724,7 @@ window.placeLecture = async function (poolId) {
         .then(() => {
             // 배치된 강의의 연자를 이 행사 연자/사회자 목록에 자동 추가
             (pool.speakers || []).forEach(s => { if (s && s.id) ensureConfSpeaker(s.id, '연자'); });
-            logActivity('place', 'lecture', `강의 "${data.titleKo}" 배치${placeLoc ? ' → ' + placeLoc : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: pool.id });
+            logActivity('place', 'lecture', `${placeLoc ? placeLoc + ' — ' : ''}강의 "${data.titleKo}" 배치`, { confId: CONF_ID, confTitle: ctitle(), entityId: pool.id });
             Toast.success(`"${data.titleKo}" 배치됨`); renderPlaceList();
         })
         .catch(e => Toast.error('배치 실패: ' + e.message));
@@ -1930,7 +1930,7 @@ window.deleteLecture = async function (roomId, sessionId, lecId) {
     const delLoc = curLecLocLabel(roomId, sessionId, lecId);   // 삭제 전에 위치 계산
     confRef().child(`rooms/${roomId}/sessions/${sessionId}/lectures/${lecId}`).remove()
         .then(() => {
-            logActivity('delete', 'lecture', `시간표 강의 "${lec ? normalizeLecture(lec).titleKo : ''}" 삭제${delLoc ? ' · ' + delLoc : ''}`, { confId: CONF_ID, confTitle: ctitle(), entityId: lec && lec.lectureId ? lec.lectureId : lecId });
+            logActivity('delete', 'lecture', `${delLoc ? delLoc + ' — ' : ''}시간표 강의 "${lec ? normalizeLecture(lec).titleKo : ''}" 삭제`, { confId: CONF_ID, confTitle: ctitle(), entityId: lec && lec.lectureId ? lec.lectureId : lecId });
             if (!(lec && lec.isBreak)) logRoomChange({
                 action: 'delete', title: lec ? normalizeLecture(lec).titleKo : '',
                 fromRoomId: roomId, fromRoomName: (getRoom(roomId) || {}).name || ''
@@ -1988,7 +1988,7 @@ window.confirmMove = async function () {
             fromRoomId: roomId, fromRoomName: (getRoom(roomId) || {}).name || '',
             toRoomId: toRoom, toRoomName: (getRoom(toRoom) || {}).name || ''
         });
-        logActivity('move', 'lecture', `강의 "${lecTitle}" 이동${fromLoc ? ' · ' + fromLoc : ''} → ${toLoc || '(위치확인 필요)'}`,
+        logActivity('move', 'lecture', `${toLoc || '(위치확인 필요)'} — 강의 "${lecTitle}" 이동${fromLoc ? ' (이전: ' + fromLoc + ')' : ''}`,
             { confId: CONF_ID, confTitle: ctitle(), entityId: lec.lectureId || lecId });
         Toast.success('이동되었습니다.'); closeMoveModal();
     });
@@ -2136,7 +2136,7 @@ function rebuildRoomLecturesFromDOM(roomId, movedLecId) {
         moveEntity = lecById[movedLecId].lectureId || movedLecId;
     }
     confRef().update(updates)
-        .then(() => { if (moveLoc) logActivity('move', 'lecture', `강의 "${moveTitle}" 이동(드래그) → ${moveLoc}`, { confId: CONF_ID, confTitle: ctitle(), entityId: moveEntity }); })
+        .then(() => { if (moveLoc) logActivity('move', 'lecture', `${moveLoc} — 강의 "${moveTitle}" 이동(드래그)`, { confId: CONF_ID, confTitle: ctitle(), entityId: moveEntity }); })
         .catch(e => Toast.error('이동 저장 실패: ' + e.message));
 }
 // 드래그 후 DOM 순서를 기준으로 옮긴 강의의 위치(룸·날짜·시간·세션) 계산.
