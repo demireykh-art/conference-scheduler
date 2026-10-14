@@ -246,6 +246,7 @@ function renderPool() {
     });
 
     renderDateFilter(baseList, placedMap);
+    renderOrphanBanner();   // 풀에 없는 배치 강의(고아) 안내 — 목록이 비어도 항상 표시
 
     // 실제 표시 목록: 기준집합 + 일정/미배치/중복 토글
     let list = baseList.slice();
@@ -307,6 +308,104 @@ function renderPool() {
         </tr>`;
     }).join('');
 }
+
+/* ---------- 고아(orphan) 배치 강의 ----------
+   강의 풀에서 삭제됐지만 시간표 배치(사본)가 남아 있는 강의.
+   → 시간표엔 보이는데 강의관리 목록엔 없어 수정이 안 되는 상황을 복구한다.
+   lectureId 를 그대로 유지해 '풀로 복원'하면 배치본과 다시 연결된다.           */
+function orphanPlacements() {
+    const poolIds = new Set(POOL.map(l => l.id));
+    const byId = new Map();   // lectureId -> { lectureId, snap, spots:[{room,session}] }
+    Object.values(CONF_ROOMS || {}).forEach(room => {
+        Object.values(room.sessions || {}).forEach(session => {
+            Object.values(session.lectures || {}).forEach(lec => {
+                const lid = lec && lec.lectureId;
+                if (!lid || lec.isBreak || lec.isPanel) return;   // 휴식/패널은 풀 강의가 아님
+                if (poolIds.has(lid)) return;                      // 풀에 있으면 정상
+                if (!byId.has(lid)) byId.set(lid, { lectureId: lid, snap: lec, spots: [] });
+                byId.get(lid).spots.push({ room: room.name || '룸', session: session.name || '' });
+            });
+        });
+    });
+    return [...byId.values()];
+}
+
+function renderOrphanBanner() {
+    const el = document.getElementById('orphanBanner');
+    if (!el) return;
+    const orphans = orphanPlacements();
+    if (!orphans.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = '';
+    const rows = orphans.map(o => {
+        const s = o.snap;
+        const title = escapeHtml(s.titleKo || s.titleEn || '(제목 없음)');
+        const spk = (s.speakers || []).map(x => escapeHtml(x.nameKo || x.nameEn)).join(', ') || '<span class="dim">연자 미지정</span>';
+        const where = o.spots.map(w => escapeHtml(w.room + (w.session ? ' · ' + w.session : ''))).join(' / ');
+        return `<div class="orphan-row">
+            <div class="orphan-info"><b>${title}</b><div class="dim" style="font-size:0.8rem">연자: ${spk} · 📍 ${where}</div></div>
+            <button class="btn btn-sm btn-primary" onclick="restoreOrphan('${o.lectureId}')">풀로 복원</button>
+        </div>`;
+    }).join('');
+    el.innerHTML = `
+        <div class="orphan-head">
+            <div>⚠ 시간표엔 있으나 강의관리 목록엔 없는 강의 <b>${orphans.length}</b>건</div>
+            <button class="btn btn-sm" onclick="restoreAllOrphans()">전체 복원</button>
+        </div>
+        <div class="orphan-desc">강의 풀에서 삭제됐지만 시간표 배치가 남은 강의입니다. <b>풀로 복원</b>하면 여기 목록에 나타나 연자·내용을 수정할 수 있고, 시간표 배치본과도 다시 연결됩니다.</div>
+        <div class="orphan-list">${rows}</div>`;
+}
+
+// 배치 사본(snapshot)으로 풀 강의 데이터를 복원 구성 (같은 lectureId 유지)
+function orphanToPoolData(snap, order) {
+    return {
+        titleKo: snap.titleKo || '', titleEn: snap.titleEn || '',
+        duration: Number(snap.duration) || 0,
+        categories: snap.categories || [], tags: snap.tags || [], types: snap.types || [],
+        speakers: (snap.speakers || []).map(x => ({
+            id: x.id || '', nameKo: x.nameKo || '', nameEn: x.nameEn || '',
+            affiliationKo: x.affiliationKo || '', affiliationEn: x.affiliationEn || ''
+        })),
+        partnerId: snap.partnerId || '', partnerKo: snap.partnerKo || '', partnerEn: snap.partnerEn || '',
+        productKo: snap.productKo || '', productEn: snap.productEn || '',
+        productCategory: snap.productCategory || '', productDesc: snap.productDesc || '',
+        memo: snap.memo || '',
+        order: order,
+        restoredFromPlacement: true,
+        createdAt: firebase.database.ServerValue.TIMESTAMP,
+        updatedAt: firebase.database.ServerValue.TIMESTAMP
+    };
+}
+
+window.restoreOrphan = function (lectureId) {
+    if (!AdminAuth.requireEdit()) return;
+    const o = orphanPlacements().find(x => x.lectureId === lectureId);
+    if (!o) { renderPool(); return; }
+    const data = orphanToPoolData(o.snap, POOL.length);
+    const confTitle = (CONFS.find(c => c.id === CONF_ID) || {}).title || '';
+    adminConfRef().child('lecturePool/' + lectureId).set(data)
+        .then(() => {
+            logActivity('create', 'lecture', `강의 "${data.titleKo}" 풀로 복원(시간표 배치본)`, { confId: CONF_ID, confTitle, entityId: lectureId });
+            Toast.success('강의 풀로 복원되었습니다. 이제 목록에서 수정할 수 있어요.');
+        })
+        .catch(e => Toast.error('복원 실패: ' + e.message));
+};
+
+window.restoreAllOrphans = async function () {
+    if (!AdminAuth.requireEdit()) return;
+    const orphans = orphanPlacements();
+    if (!orphans.length) return;
+    const ok = await confirmDialog(`시간표에만 있는 강의 ${orphans.length}건을 모두 강의 풀로 복원할까요?`, { okText: '복원' });
+    if (!ok) return;
+    const updates = {};
+    orphans.forEach((o, i) => { updates['lecturePool/' + o.lectureId] = orphanToPoolData(o.snap, POOL.length + i); });
+    const confTitle = (CONFS.find(c => c.id === CONF_ID) || {}).title || '';
+    adminConfRef().update(updates)
+        .then(() => {
+            logActivity('create', 'lecture', `시간표에만 있던 강의 ${orphans.length}건 풀로 복원`, { confId: CONF_ID, confTitle });
+            Toast.success(`${orphans.length}건을 강의 풀로 복원했습니다.`);
+        })
+        .catch(e => Toast.error('복원 실패: ' + e.message));
+};
 
 /* ---------- 분류 셀렉트 + 힌트 ---------- */
 let partnerDraft = null;  // 선택된 파트너사 {id,nameKo,nameEn}
