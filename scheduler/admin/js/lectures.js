@@ -745,8 +745,10 @@ window.deleteLecture = async function (id) {
     if (!AdminAuth.requireEdit()) return;
     const l = POOL.find(x => x.id === id);
     const placed = placedLectureIds().has(id);
+    const spots = placedRoomsMap()[id] || [];
+    const where = spots.map(s => s.room + (s.session ? ' · ' + s.session : '')).join(' / ');
     const msg = placed
-        ? `"${l ? l.titleKo : ''}" 강의를 풀에서 삭제할까요?\n(시간표에 이미 배치된 사본은 그대로 남습니다.)`
+        ? `⚠️ 이 강의는 시간표에 배치되어 있습니다.\n( 📍 ${where} )\n\n"${l ? l.titleKo : ''}" 강의를 풀에서 삭제할까요?\n\n※ 풀에서만 지워지고 시간표 배치본은 그대로 남습니다.\n   → 시간표엔 보이지만 강의관리 목록에선 사라져 연자 수정이 안 됩니다(고아 강의).\n   꼭 삭제하려면, 먼저 시간표에서도 해당 강의를 삭제하는 것을 권장합니다.`
         : `"${l ? l.titleKo : ''}" 강의를 삭제할까요?`;
     const ok = await confirmDialog(msg, { danger: true, okText: '삭제' });
     if (!ok) return;
@@ -778,12 +780,23 @@ window.openMoveLecModal = function (id) {
 };
 window.closeMoveLecModal = function () { document.getElementById('moveLecModal').classList.remove('open'); };
 
-window.doMoveLecture = function (mode) {
+window.doMoveLecture = async function (mode) {
     if (!AdminAuth.requireEdit()) return;
     const target = document.getElementById('moveLecTarget').value;
     if (!target) { Toast.warning('대상 행사를 선택하세요.'); return; }
     const l = POOL.find(x => x.id === MOVE_LEC_ID);
     if (!l) { Toast.error('강의를 찾을 수 없습니다.'); return; }
+    // '이동'은 이 행사 풀에서 강의를 제거한다 → 시간표에 배치돼 있으면 고아(orphan)가 된다
+    if (mode === 'move') {
+        const spots = placedRoomsMap()[MOVE_LEC_ID] || [];
+        if (spots.length) {
+            const where = spots.map(s => s.room + (s.session ? ' · ' + s.session : '')).join(' / ');
+            const ok = await confirmDialog(
+                `⚠️ 이 강의는 현재 행사 시간표에 배치되어 있습니다.\n( 📍 ${where} )\n\n"${l.titleKo || l.titleEn || ''}" 를 다른 행사로 "이동"하면 이 행사 풀에서는 삭제되지만, 시간표 배치본은 그대로 남습니다.\n→ 시간표엔 보이지만 강의관리 목록에선 사라져 수정이 안 됩니다(고아 강의).\n\n현재 행사에도 남겨두려면 "이동" 대신 "복제"를 사용하세요. 계속 이동할까요?`,
+                { danger: true, okText: '이동' });
+            if (!ok) return;
+        }
+    }
     const { id, ...rest } = l;   // 원본 id 제거
     const tconf = CONFS.find(c => c.id === target) || {};
     const targetRef = database.ref('/adminConferences/' + target + '/lecturePool');
