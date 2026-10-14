@@ -1121,6 +1121,12 @@ tr.row-pre { background: #fffaf0; }
 /* 클릭 가능한 중복 배지 (호버=정보, 클릭=이동) */
 .conflict-badge { cursor: pointer; }
 .conflict-badge:hover { background: #c1121f; box-shadow: 0 0 0 2px rgba(229,72,77,0.25); }
+/* 고아 배지 — 강의관리 목록에서 삭제되어 시간표에만 남은 강의 */
+.dup-badge.orphan-badge { background: #8a5a00; color: #fff; }
+.dup-badge + .dup-badge.orphan-badge { margin-left: 4px; }
+/* 목록복원 버튼 강조 */
+.lec-actions .txt-btn.restore { color: #8a5a00; font-weight: 700; }
+.lec-actions .txt-btn.restore:hover { background: #fff3d6; color: #6b4500; }
 
 /* 여러 겹침 강의 선택 메뉴 */
 .conflict-menu {
