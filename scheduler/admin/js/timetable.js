@@ -1298,6 +1298,8 @@ function renderLectureRow(roomId, sessionId, lec, lang) {
     }
     // 제목도 강의 풀(최신)에서 우선 조회 후 사본으로 폴백
     const pool = lec.lectureId ? POOL.find(p => p.id === lec.lectureId) : null;
+    // 고아(orphan): 배치본인데 강의 풀(강의관리)에서 삭제되어 목록에 없는 강의
+    const isOrphan = !!lec.lectureId && !pool;
     const memoVal = (pool && pool.memo) || lec.memo || '';
     const memoHtml = memoVal ? `<div class="lec-memo" title="메모">📝 ${escapeHtml(memoVal)}</div>` : '';
     const titleKo = (pool && pool.titleKo) || n.titleKo;
@@ -1315,6 +1317,7 @@ function renderLectureRow(roomId, sessionId, lec, lang) {
                 ${(n.types || []).map(t => `<span class="chip type">${escapeHtml(t)}</span>`).join('')}
                 ${CONFLICT_IDS.has(lec.id) ? conflictBadge(lec.id) : ''}
                 ${lec.lectureId && DUP_PLACE_IDS.has(lec.lectureId) ? '<span class="dup-badge dup-place" title="같은 강의가 다른 룸/세션에도 배치됨 (중복배치)">중복배치</span>' : ''}
+                ${isOrphan ? '<span class="dup-badge orphan-badge" title="강의 관리 목록에서 삭제된 강의입니다. ‘목록복원’을 누르면 강의관리에 다시 등록되어 수정할 수 있어요. (시간표 배치는 그대로 유지)">강의목록에 없음</span>' : ''}
             </div>
             <div class="lec-title">${title}</div>
             ${subtitle ? `<div class="lec-subtitle">${escapeHtml(subtitle)}</div>` : ''}
@@ -1323,6 +1326,7 @@ function renderLectureRow(roomId, sessionId, lec, lang) {
             ${memoHtml}
         </div>
         <div class="lec-actions">
+            ${isOrphan ? `<button class="txt-btn restore" title="강의관리 목록에 다시 등록(복원)합니다. 시간표 배치는 바뀌지 않습니다." onclick="restorePoolFromPlacement('${roomId}','${sessionId}','${lec.id}')">목록복원</button>` : ''}
             <button class="txt-btn" onclick="openMoveModal('${roomId}','${sessionId}','${lec.id}')">이동</button>
             <button class="txt-btn" onclick="openDurModal('${roomId}','${sessionId}','${lec.id}')">시간</button>
             <button class="txt-btn danger" onclick="deleteLecture('${roomId}','${sessionId}','${lec.id}')">삭제</button>
@@ -1728,6 +1732,43 @@ window.placeLecture = async function (poolId) {
             Toast.success(`"${data.titleKo}" 배치됨`); renderPlaceList();
         })
         .catch(e => Toast.error('배치 실패: ' + e.message));
+};
+
+// 고아(목록에서 삭제된) 배치 강의를 강의관리(풀)에 다시 등록 — 같은 lectureId 유지로 재연결.
+// 시간표 배치는 전혀 바꾸지 않는다(lecturePool 에만 기록).
+window.restorePoolFromPlacement = function (roomId, sessionId, lecId) {
+    if (!AdminAuth.requireEdit()) return;
+    const room = CONF && CONF.rooms && CONF.rooms[roomId];
+    const sess = room && room.sessions && room.sessions[sessionId];
+    const lec = sess && sess.lectures && sess.lectures[lecId];
+    if (!lec || !lec.lectureId) { Toast.error('강의 정보를 찾을 수 없습니다.'); return; }
+    const lectureId = lec.lectureId;
+    if (POOL.find(p => p.id === lectureId)) { Toast.info('이미 강의관리 목록에 있는 강의입니다.'); return; }
+    const n = normalizeLecture(lec);
+    const data = {
+        titleKo: n.titleKo || lec.titleKo || '', titleEn: n.titleEn || lec.titleEn || '',
+        duration: Number(lec.duration) || 0,
+        categories: lec.categories || n.categories || [], tags: lec.tags || n.tags || [], types: lec.types || n.types || [],
+        speakers: (n.speakers || []).map(s => ({
+            id: s.id || '', nameKo: s.nameKo || '', nameEn: s.nameEn || '',
+            affiliationKo: s.affiliationKo || '', affiliationEn: s.affiliationEn || ''
+        })),
+        partnerId: n.partnerId || '', partnerKo: n.partnerKo || '', partnerEn: n.partnerEn || '',
+        productKo: n.productKo || '', productEn: n.productEn || '',
+        productCategory: n.productCategory || '', productDesc: n.productDesc || '',
+        memo: lec.memo || '',
+        order: POOL.length,
+        restoredFromPlacement: true,
+        createdAt: firebase.database.ServerValue.TIMESTAMP,
+        updatedAt: firebase.database.ServerValue.TIMESTAMP
+    };
+    confRef().child('lecturePool/' + lectureId).set(data)
+        .then(() => {
+            (data.speakers || []).forEach(s => { if (s && s.id) ensureConfSpeaker(s.id, '연자'); });
+            logActivity('create', 'lecture', `강의 "${data.titleKo}" 강의관리 목록 복원(시간표 배치본)`, { confId: CONF_ID, confTitle: ctitle(), entityId: lectureId });
+            Toast.success('강의관리 목록에 복원되었습니다. 이제 강의관리에서 연자·내용을 수정할 수 있어요.');
+        })
+        .catch(e => Toast.error('복원 실패: ' + e.message));
 };
 
 /* ---------- 연자 중복(동선) 체크 ---------- */
