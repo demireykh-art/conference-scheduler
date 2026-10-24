@@ -10,6 +10,7 @@ let CONF_RAW = null;             // 선택 행사 원본
 let POSTER = null;               // { template, w, h, slots }
 let TEMPLATE_IMG = null;         // 캔버스 합성용 Image
 let scale = 1, SELECTED = 'event';
+let EDIT_MODE = false;           // 배치 편집 모드(모바일 실수 방지: 기본 잠금)
 let GEN = [];                    // [{name, canvas}]
 let posterDirty = false;         // 저장 안 된 템플릿/배치 변경 여부
 let autoGenDone = false;         // 이 행사 자동 생성 완료 여부
@@ -53,7 +54,7 @@ window.onPosConfChange = function () {
 };
 
 function loadConf() {
-    TEMPLATE_IMG = null; GEN = []; POSTER = null; posterDirty = false; autoGenDone = false;
+    TEMPLATE_IMG = null; GEN = []; POSTER = null; posterDirty = false; autoGenDone = false; EDIT_MODE = false;
     document.getElementById('posGrid').innerHTML = '';
     document.getElementById('posCount').textContent = '';
     renderStage();
@@ -96,8 +97,9 @@ document.getElementById('posTplFile').addEventListener('change', async e => {
         POSTER = { template: dataUrl, w, h, slots: (POSTER && POSTER.slots) ? POSTER.slots : defaultSlots(w, h) };
         TEMPLATE_IMG = img;
         markDirty();
+        EDIT_MODE = true;   // 새 배경을 올리면 바로 배치 수정 모드로
         renderStage();
-        Toast.success('배경을 올렸습니다. 사진·이름·문구 위치를 맞춘 뒤 저장하세요.');
+        Toast.success('배경을 올렸습니다. 요소를 드래그해 위치를 맞춘 뒤 저장하세요.');
     } catch (err) { Toast.error('이미지 처리 실패: ' + (err.message || err)); }
 });
 
@@ -136,6 +138,7 @@ function renderStage() {
         stage.style.width = ''; stage.style.height = '';
         stage.innerHTML = ''; stage.appendChild(empty); empty.style.display = '';
         document.getElementById('posCtrls').style.display = 'none';
+        EDIT_MODE = false; applyEditMode();
         return;
     }
     scale = PVW / POSTER.w;
@@ -153,9 +156,31 @@ function renderStage() {
         styleHandle(k);
         makeDraggable(el, k);
     });
-    document.getElementById('posCtrls').style.display = '';
+    applyEditMode();
     selectElement(SELECTED);
 }
+
+/* ---------- 편집 모드(잠금/수정) ---------- */
+function applyEditMode() {
+    const stage = document.getElementById('posStage');
+    const has = !!(POSTER && POSTER.template);
+    if (stage) stage.classList.toggle('editing', EDIT_MODE && has);
+    const ctrls = document.getElementById('posCtrls');
+    if (ctrls) ctrls.style.display = (EDIT_MODE && has) ? '' : 'none';
+    const btn = document.getElementById('posEditToggle');
+    if (btn) {
+        btn.textContent = EDIT_MODE ? '🔒 편집 잠금' : '✏️ 배치 수정';
+        btn.classList.toggle('btn-primary', EDIT_MODE);
+        btn.style.display = has ? '' : 'none';
+    }
+}
+window.toggleEditMode = function () {
+    if (!POSTER || !POSTER.template) { Toast.warning('먼저 배경이 필요합니다.'); return; }
+    if (!EDIT_MODE && !AdminAuth.requireEdit()) return;
+    EDIT_MODE = !EDIT_MODE;
+    applyEditMode();
+    if (EDIT_MODE) Toast.info('배치 수정 모드입니다. 요소를 드래그해 위치를 맞춘 뒤 저장하세요.');
+};
 
 function styleHandle(key) {
     const el = document.getElementById('pe-h-' + key);
@@ -178,6 +203,7 @@ function styleHandle(key) {
 function makeDraggable(el, key) {
     let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0, moved = false;
     el.addEventListener('pointerdown', e => {
+        if (!EDIT_MODE) return;   // 잠금 상태에서는 드래그 안 함(스크롤 보호)
         if (!AdminAuth.canEdit || !AdminAuth.canEdit()) { selectElement(key); return; }
         dragging = true; moved = false;
         sx = e.clientX; sy = e.clientY; ox = POSTER.slots[key].x; oy = POSTER.slots[key].y;
