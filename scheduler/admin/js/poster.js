@@ -53,19 +53,32 @@ window.onPosConfChange = function () {
 };
 
 function loadConf() {
-    TEMPLATE_IMG = null; GEN = []; posterDirty = false; autoGenDone = false;
+    TEMPLATE_IMG = null; GEN = []; POSTER = null; posterDirty = false; autoGenDone = false;
     document.getElementById('posGrid').innerHTML = '';
     document.getElementById('posCount').textContent = '';
+    renderStage();
     database.ref('/adminConferences/' + CONF_ID).once('value').then(snap => {
         CONF_RAW = snap.val() || {};
         const p = CONF_RAW.poster;
         if (p && p.template && p.w && p.h) {
+            // ① 연자 포스터용으로 저장해 둔 배경·배치가 있으면 그것 사용
             POSTER = { template: p.template, w: p.w, h: p.h, slots: Object.assign(defaultSlots(p.w, p.h), p.slots || {}) };
+            renderStage();
+            maybeAutoGenerate();
+        } else if (CONF_RAW.posterUrl) {
+            // ② 없으면 '행사설정'의 포스터 이미지를 배경으로 자동 사용 (업로드 불필요)
+            loadImg(CONF_RAW.posterUrl).then(img => {
+                const w = img.naturalWidth || 1080, h = img.naturalHeight || 1350;
+                POSTER = { template: CONF_RAW.posterUrl, w, h, slots: defaultSlots(w, h), fromSettings: true };
+                TEMPLATE_IMG = img;
+                renderStage();
+                maybeAutoGenerate();
+                if (window.Toast) Toast.info('행사설정의 포스터 이미지를 배경으로 불러왔습니다. 위치만 맞춰 저장하면 됩니다.');
+            }).catch(() => { POSTER = null; renderStage(); });
         } else {
             POSTER = null;
+            renderStage();
         }
-        renderStage();
-        maybeAutoGenerate();   // 저장된 템플릿이 있으면 자동으로 다시 생성
     });
 }
 
