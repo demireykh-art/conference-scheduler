@@ -430,19 +430,43 @@ function posterCard(name, canvas, noPhoto, search) {
 
 function canvasToBlob(canvas) { return new Promise(res => canvas.toBlob(res, 'image/png')); }
 function fileName(name) { return `${(confTitle() || '행사').replace(/[\\/:*?"<>|]/g, '_')}_${(name || '연자').replace(/[\\/:*?"<>|]/g, '_')}.png`; }
+function isMobile() { return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || ''); }
+// dataURL → File (동기) : iOS는 공유를 사용자 제스처 안에서 호출해야 하므로 await 없이 파일 생성
+function dataURLtoFile(dataUrl, fn) {
+    const i = dataUrl.indexOf(','); const head = dataUrl.slice(0, i), b64 = dataUrl.slice(i + 1);
+    const mime = (head.match(/data:([^;]+)/) || [])[1] || 'image/png';
+    const bin = atob(b64), u8 = new Uint8Array(bin.length);
+    for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
+    return new File([u8], fn, { type: mime });
+}
 
-function downloadCanvas(canvas, name) {
-    canvas.toBlob(blob => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = fileName(name);
+// 이미지 저장 — 모바일(iOS 등)은 a[download] 미지원 → 공유 시트(‘이미지 저장’)로 처리
+async function downloadCanvas(canvas, name) {
+    const fn = fileName(name);
+    // ① 모바일: Web Share(파일) → ‘사진에 저장/공유’ (제스처 유지 위해 동기 생성)
+    if (isMobile() && navigator.canShare) {
+        try {
+            const file = dataURLtoFile(canvas.toDataURL('image/png'), fn);
+            if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: fn }); return; }
+        } catch (e) { if (e && e.name === 'AbortError') return; /* 사용자 취소 */ }
+    }
+    // ② 데스크톱: 직접 다운로드 / ③ 최후: 새 탭
+    let blob; try { blob = await canvasToBlob(canvas); } catch (e) { Toast.error('이미지 생성 실패'); return; }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    if ('download' in a) {
+        a.href = url; a.download = fn;
         document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }, 'image/png');
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } else {
+        window.open(url, '_blank');
+        if (window.Toast) Toast.info('이미지를 길게 눌러 ‘사진에 저장’을 선택하세요.');
+        setTimeout(() => URL.revokeObjectURL(url), 15000);
+    }
 }
 async function shareCanvas(canvas, name) {
     try {
-        const blob = await canvasToBlob(canvas);
-        const file = new File([blob], fileName(name), { type: 'image/png' });
+        const file = dataURLtoFile(canvas.toDataURL('image/png'), fileName(name));   // 동기(제스처 유지)
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
             await navigator.share({ files: [file], title: confTitle(), text: `I'M SPEAKING AT ${confTitle()} — ${name}` });
         } else { downloadCanvas(canvas, name); }
@@ -461,10 +485,19 @@ window.downloadAllZip = async function () {
     const zip = new JSZip();
     for (const g of list) { const blob = await canvasToBlob(g.canvas); zip.file(fileName(g.name), blob); }
     const out = await zip.generateAsync({ type: 'blob' });
-    const url = URL.createObjectURL(out);
     const base = (confTitle() || '행사').replace(/[\\/:*?"<>|]/g, '_');
-    const a = document.createElement('a'); a.href = url; a.download = `${base}_연자포스터${q ? '_검색' : ''}.zip`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    const zipName = `${base}_연자포스터${q ? '_검색' : ''}.zip`;
+    // 모바일: 공유 시트(파일로 저장) 우선
+    if (isMobile() && navigator.canShare) {
+        try {
+            const file = new File([out], zipName, { type: 'application/zip' });
+            if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: zipName }); Toast.success(`${list.length}장 공유/저장`); return; }
+        } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    const url = URL.createObjectURL(out);
+    const a = document.createElement('a');
+    if ('download' in a) { a.href = url; a.download = zipName; document.body.appendChild(a); a.click(); a.remove(); }
+    else { window.open(url, '_blank'); }
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
     Toast.success(`${list.length}장 ZIP 다운로드${q ? ' (검색 결과)' : ''}`);
 };
