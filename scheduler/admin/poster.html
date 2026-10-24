@@ -39,10 +39,13 @@
                     <!-- 편집기 -->
                     <div class="card poster-editor">
                         <div class="pe-head">
-                            <b>1. 포스터 배경 · 배치 편집</b>
-                            <label class="btn btn-sm">🖼️ 배경 이미지 선택
-                                <input type="file" id="posTplFile" accept="image/*" style="display:none">
-                            </label>
+                            <b>1. 포스터 배경 · 배치</b>
+                            <div style="display:flex;gap:6px;align-items:center">
+                                <button class="btn btn-sm" id="posEditToggle" onclick="toggleEditMode()">✏️ 배치 수정</button>
+                                <label class="btn btn-sm">🖼️ 배경 변경
+                                    <input type="file" id="posTplFile" accept="image/*" style="display:none">
+                                </label>
+                            </div>
                         </div>
                         <div id="posStageWrap" class="pe-stage-wrap">
                             <div id="posStage" class="pe-stage">
