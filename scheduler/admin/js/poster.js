@@ -77,7 +77,7 @@ document.getElementById('posTplFile').addEventListener('change', async e => {
     if (!file) return;
     if (!file.type.startsWith('image/')) { Toast.warning('이미지 파일만 가능합니다.'); return; }
     try {
-        const dataUrl = await compressImage(file, 1200, 0.86);
+        const dataUrl = await compressImage(file, 1080, 0.82);   // 인스타 표준 1080px, 저장 용량 최소화
         const img = await loadImg(dataUrl);
         const w = img.naturalWidth, h = img.naturalHeight;
         POSTER = { template: dataUrl, w, h, slots: (POSTER && POSTER.slots) ? POSTER.slots : defaultSlots(w, h) };
@@ -224,16 +224,42 @@ function toHex(c) {
 /* ---------- 저장 ---------- */
 window.savePoster = function () {
     if (!AdminAuth.requireEdit()) return;
-    if (!POSTER || !POSTER.template) { Toast.warning('먼저 배경 이미지를 올려주세요.'); return; }
-    database.ref('/adminConferences/' + CONF_ID + '/poster').set({
-        template: POSTER.template, w: POSTER.w, h: POSTER.h, slots: POSTER.slots,
-        updatedAt: firebase.database.ServerValue.TIMESTAMP
-    }).then(() => {
-        posterDirty = false;
-        logActivity('update', 'conference', `연자 포스터 템플릿·배치 저장`, { confId: CONF_ID, confTitle: confTitle() });
-        Toast.success('저장되었습니다. 아래에서 포스터를 생성하세요.');
-        generateAll();
-    }).catch(e => Toast.error('저장 실패: ' + e.message));
+    if (!POSTER || !POSTER.template) { Toast.warning('먼저 ‘🖼️ 배경 이미지 선택’으로 배경을 올려주세요.'); return; }
+    const btn = document.getElementById('posSaveBtn');
+    const approxKB = Math.round((POSTER.template.length || 0) / 1024);
+    // undefined 가 하나라도 있으면 Firebase set 이 즉시 예외를 던져 '아무 반응 없음'처럼 보임 → JSON 왕복으로 제거
+    let payload;
+    try {
+        payload = {
+            template: POSTER.template, w: POSTER.w, h: POSTER.h,
+            slots: JSON.parse(JSON.stringify(POSTER.slots || {})),
+            updatedAt: firebase.database.ServerValue.TIMESTAMP
+        };
+    } catch (e) { Toast.error('저장 데이터 생성 실패: ' + (e.message || e)); return; }
+    const restore = () => { if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || '💾 템플릿·배치 저장'; } };
+    if (btn) { btn.dataset.label = btn.textContent; btn.disabled = true; btn.textContent = '저장 중…'; }
+    const ref = database.ref('/adminConferences/' + CONF_ID + '/poster');
+    let setP;
+    try { setP = ref.set(payload); }
+    catch (e) { restore(); Toast.error('저장 실패(데이터 오류): ' + (e.message || e)); return; }
+    setP.then(() => ref.child('template').once('value'))   // 서버에 실제로 반영됐는지 재확인
+        .then(snap => {
+            restore();
+            if (!snap || !snap.exists()) {
+                Toast.error(`저장이 서버에 반영되지 않았습니다. 배경 용량(약 ${approxKB}KB) 또는 저장 권한을 확인해 주세요.`);
+                return;
+            }
+            posterDirty = false;
+            logActivity('update', 'conference', `연자 포스터 템플릿·배치 저장`, { confId: CONF_ID, confTitle: confTitle() });
+            Toast.success('저장되었습니다. 아래에 연자 포스터를 생성합니다.');
+            generateAll();
+        })
+        .catch(e => {
+            restore();
+            const code = String((e && (e.code || e.message)) || '');
+            if (/permission|denied/i.test(code)) Toast.error('저장 권한이 없습니다(Firebase 규칙). ‘poster’ 쓰기 허용이 필요합니다.');
+            else Toast.error(`저장 실패: ${e && e.message || e} (배경 약 ${approxKB}KB)`);
+        });
 };
 
 /* ---------- 연자 수집 ---------- */
@@ -313,17 +339,35 @@ window.generateAll = async function () {
         const canvas = document.createElement('canvas');
         await drawPoster(canvas, spk);
         const name = spk.nameKo || spk.nameEn;
-        GEN.push({ name, canvas });
+        const search = (name + ' ' + (spk.nameEn || '')).trim();
+        GEN.push({ name, canvas, search });
         if (!spk.photo) noPhoto.push(name);
-        grid.appendChild(posterCard(name, canvas, !spk.photo));
+        grid.appendChild(posterCard(name, canvas, !spk.photo, search));
     }
     document.getElementById('posCount').innerHTML =
         `총 <b>${list.length}</b>명 생성됨` + (noPhoto.length ? ` · <span style="color:#c0392b">사진 없음 ${noPhoto.length}명</span> (연자 관리에서 CV 사진 등록 권장)` : '');
+    filterPosters();   // 현재 검색어가 있으면 바로 반영
 };
 
-function posterCard(name, canvas, noPhoto) {
+// 연자 검색 — 생성된 카드 중 이름(국/영문)이 일치하는 것만 표시
+window.filterPosters = function () {
+    const el = document.getElementById('posSearch');
+    const q = (el && el.value || '').trim().toLowerCase();
+    let shown = 0, total = 0;
+    document.querySelectorAll('#posGrid .poster-card').forEach(card => {
+        total++;
+        const ok = !q || (card.dataset.search || '').toLowerCase().includes(q);
+        card.style.display = ok ? '' : 'none';
+        if (ok) shown++;
+    });
+    const cnt = document.getElementById('posCount');
+    if (cnt && q) cnt.innerHTML = `검색 “${escapeHtml(el.value.trim())}” — <b>${shown}</b>명 표시 (전체 ${total}명). 각 카드의 ⬇️ 저장으로 개별 저장하세요.`;
+};
+
+function posterCard(name, canvas, noPhoto, search) {
     const card = document.createElement('div');
     card.className = 'poster-card';
+    card.dataset.search = search || name || '';
     const img = document.createElement('img');
     img.className = 'poster-thumb'; img.src = canvas.toDataURL('image/png');
     card.appendChild(img);
@@ -369,13 +413,19 @@ async function shareCanvas(canvas, name) {
 window.downloadAllZip = async function () {
     if (!GEN.length) { Toast.warning('먼저 생성/새로고침을 눌러 포스터를 만드세요.'); return; }
     if (typeof JSZip === 'undefined') { Toast.error('ZIP 모듈 로드 실패'); return; }
+    // 검색어가 있으면 검색 결과만 ZIP (없으면 전체)
+    const el = document.getElementById('posSearch');
+    const q = (el && el.value || '').trim().toLowerCase();
+    const list = q ? GEN.filter(g => (g.search || g.name || '').toLowerCase().includes(q)) : GEN;
+    if (!list.length) { Toast.warning('검색 결과가 없습니다.'); return; }
     Toast.info('ZIP 생성 중…');
     const zip = new JSZip();
-    for (const g of GEN) { const blob = await canvasToBlob(g.canvas); zip.file(fileName(g.name), blob); }
+    for (const g of list) { const blob = await canvasToBlob(g.canvas); zip.file(fileName(g.name), blob); }
     const out = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(out);
-    const a = document.createElement('a'); a.href = url; a.download = `${(confTitle() || '행사').replace(/[\\/:*?"<>|]/g, '_')}_연자포스터.zip`;
+    const base = (confTitle() || '행사').replace(/[\\/:*?"<>|]/g, '_');
+    const a = document.createElement('a'); a.href = url; a.download = `${base}_연자포스터${q ? '_검색' : ''}.zip`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1500);
-    Toast.success(`${GEN.length}장 ZIP 다운로드`);
+    Toast.success(`${list.length}장 ZIP 다운로드${q ? ' (검색 결과)' : ''}`);
 };
