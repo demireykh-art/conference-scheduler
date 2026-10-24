@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>학회 스케줄러 카드뉴스</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14161c; --muted:#5b6170; --line:#e7e9ef;
+    --accent:#6C4CF1; --accent-ink:#4a2fd0; --accent-soft:#efeafe;
+    --card:#ffffff; --page:#0e1016;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{
+    font-family:'Noto Sans KR',system-ui,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    background:var(--page); color:var(--ink);
+    padding:28px 16px 60px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .intro{max-width:460px; margin:0 auto 26px; color:#cfd3de; text-align:center}
+  .intro h1{color:#fff; font-size:1.15rem; font-weight:900; margin-bottom:8px}
+  .intro p{font-size:0.82rem; color:#9aa0b0; line-height:1.6}
+  .deck{display:flex; flex-direction:column; align-items:center; gap:26px}
+
+  /* 인스타 세로 카드 4:5 (1080x1350 비율) */
+  .card{
+    width:100%; max-width:460px; aspect-ratio:4/5;
+    background:var(--card); border-radius:26px; overflow:hidden;
+    position:relative; display:flex; flex-direction:column;
+    padding:44px 40px; box-shadow:0 18px 50px rgba(0,0,0,.45);
+  }
+  .tagn{position:absolute; top:22px; right:26px; font-size:0.72rem; font-weight:700; color:var(--muted); letter-spacing:.02em}
+  .kicker{font-size:0.8rem; font-weight:800; color:var(--accent-ink); letter-spacing:.06em; margin-bottom:16px; text-transform:uppercase}
+  .card h2{font-size:1.9rem; font-weight:900; letter-spacing:-.02em; line-height:1.28}
+  .card h2 em{font-style:normal; color:var(--accent)}
+  .lead{margin-top:16px; font-size:1.02rem; color:var(--muted); font-weight:500}
+  .spacer{flex:1}
+  .foot{font-size:0.76rem; color:#9aa0b0; font-weight:600; border-top:1px solid var(--line); padding-top:14px}
+
+  ul.list{margin-top:22px; display:flex; flex-direction:column; gap:12px}
+  ul.list li{list-style:none; display:flex; gap:12px; align-items:flex-start; font-size:1.02rem; font-weight:600}
+  ul.list li b{font-weight:900}
+  .dot{flex:none; width:24px; height:24px; border-radius:8px; background:var(--accent-soft); color:var(--accent-ink);
+       display:grid; place-items:center; font-size:0.82rem; font-weight:900; margin-top:1px}
+
+  .flow{margin-top:26px; display:flex; flex-direction:column; gap:10px}
+  .flow .step{display:flex; align-items:center; gap:12px}
+  .flow .box{flex:1; background:var(--accent-soft); color:var(--accent-ink); font-weight:800;
+             border-radius:12px; padding:13px 16px; font-size:1.02rem}
+  .flow .box small{display:block; color:var(--muted); font-weight:600; font-size:0.76rem; margin-top:2px}
+  .flow .arrow{color:var(--accent); font-size:1.1rem; text-align:center}
+
+  .formula{margin-top:24px; background:#0f1320; color:#e8ebf5; border-radius:16px; padding:22px 20px; font-size:0.98rem; line-height:1.9}
+  .formula .c1{color:#8ee6a8} .formula .c2{color:#ffd27a} .formula .c3{color:#f0a6c0}
+
+  .pill{display:inline-block; background:var(--accent-soft); color:var(--accent-ink); font-weight:800;
+        border-radius:999px; padding:5px 13px; font-size:0.82rem; margin:0 6px 8px 0}
+
+  /* 강조(다크) 카드 */
+  .card.dark{background:linear-gradient(150deg,#6C4CF1,#4a2fd0); color:#fff}
+  .card.dark .kicker{color:#d9ccff}
+  .card.dark h2 em{color:#ffe27a}
+  .card.dark .lead{color:#e7e0ff}
+  .card.dark .foot{color:#c7bcff; border-top-color:rgba(255,255,255,.25)}
+  .card.dark .tagn{color:#cabcff}
+  .card.cover h2{font-size:2.3rem}
+  .card .big{font-size:3.2rem; font-weight:900; letter-spacing:-.03em; line-height:1}
+
+  .note{max-width:460px; margin:30px auto 0; color:#80869a; font-size:0.74rem; text-align:center; line-height:1.7}
+  @media print{ body{background:#fff; padding:0} .intro,.note{display:none} .card{box-shadow:none; page-break-after:always; border-radius:0; max-width:none} }
+</style>
+</head>
+<body>
+  <div class="intro">
+    <h1>학회 강의 배치 스케줄러 — 카드뉴스</h1>
+    <p>아래 8장을 각각 캡처하면 인스타 세로(4:5) 카드가 됩니다. 모든 이름·학회·일정은 가상입니다.</p>
+  </div>
+
+  <div class="deck">
+
+    <!-- 1 커버 -->
+    <section class="card cover dark">
+      <div class="tagn">1 / 8</div>
+      <div class="kicker">무료 샘플 템플릿</div>
+      <h2>학회 강의 배치,<br><em>엑셀로 그만</em> 싸우기</h2>
+      <p class="lead">여러 룸 동시 진행, 연자 겹침, 시간 계산…<br>규칙만 지키면 자동으로 끝납니다.</p>
+      <div class="spacer"></div>
+      <div class="foot">가상학회 2026 · 강의 30 · 연자 15 · 룸 3 · 1일 샘플</div>
+    </section>
+
+    <!-- 2 문제 -->
+    <section class="card">
+      <div class="tagn">2 / 8</div>
+      <div class="kicker">익숙한 악몽</div>
+      <h2>연자 한 명이<br><em>같은 시간 두 방</em>에?</h2>
+      <p class="lead">손으로 짜다 보면 꼭 터지는 사고.</p>
+      <ul class="list">
+        <li><span class="dot">✕</span><div>시간을 일일이 적다 <b>오타·밀림</b></div></li>
+        <li><span class="dot">✕</span><div>룸 옮기면 뒤 일정 <b>전부 재계산</b></div></li>
+        <li><span class="dot">✕</span><div>좌장·휴식까지 겹치면 <b>발견이 늦음</b></div></li>
+      </ul>
+      <div class="spacer"></div>
+      <div class="foot">→ 규칙을 코드로 박아두면 사라지는 문제들</div>
+    </section>
+
+    <!-- 3 구조 -->
+    <section class="card">
+      <div class="tagn">3 / 8</div>
+      <div class="kicker">4층 구조</div>
+      <h2>행사를 <em>4단</em>으로<br>쪼갠다</h2>
+      <div class="flow">
+        <div class="step"><div class="box">행사 <small>학회 전체</small></div></div>
+        <div class="arrow">▼</div>
+        <div class="step"><div class="box">룸 <small>날짜·시작시각 · 병렬 트랙</small></div></div>
+        <div class="arrow">▼</div>
+        <div class="step"><div class="box">세션 <small>주제 묶음 + 좌장</small></div></div>
+        <div class="arrow">▼</div>
+        <div class="step"><div class="box">강의 <small>연자 + 소요시간(분)</small></div></div>
+      </div>
+      <div class="spacer"></div>
+      <div class="foot">단위가 깔끔하면 자동화가 쉬워진다</div>
+    </section>
+
+    <!-- 4 규칙 -->
+    <section class="card">
+      <div class="tagn">4 / 8</div>
+      <div class="kicker">배치 규칙</div>
+      <h2>딱 <em>이 규칙</em>만<br>지키면 된다</h2>
+      <ul class="list">
+        <li><span class="dot">1</span><div><b>연자 중복 금지</b> — 같은 시간 두 곳 불가</div></li>
+        <li><span class="dot">2</span><div><b>룸 이동 10분</b> 버퍼 (같은 룸은 0분)</div></li>
+        <li><span class="dot">3</span><div>소요시간 <b>5분 단위</b></div></li>
+        <li><span class="dot">4</span><div><b>세션 = 주제</b> 묶음, 순서대로 연속</div></li>
+        <li><span class="dot">5</span><div><b>좌장 최대 2명</b>, 세션 전체 시간 점유</div></li>
+      </ul>
+      <div class="spacer"></div>
+      <div class="foot">현실 규칙 11개 중 핵심 5가지</div>
+    </section>
+
+    <!-- 5 자동 시간계산 -->
+    <section class="card">
+      <div class="tagn">5 / 8</div>
+      <div class="kicker">시각은 입력하지 않는다</div>
+      <h2>시간은 <em>자동</em>으로<br>쌓인다</h2>
+      <p class="lead">룸 시작시각부터 소요시간을 누적.</p>
+      <div class="formula">
+        <span class="c2">강의 시작</span> = 직전까지 누적시각<br>
+        <span class="c2">강의 종료</span> = 시작 + <span class="c1">소요시간(분)</span><br>
+        다음 강의 → 그대로 이어받기
+      </div>
+      <div class="spacer"></div>
+      <div class="foot">09:00 + 20분 + 20분 … 손 안 대도 시각 완성</div>
+    </section>
+
+    <!-- 6 충돌 감지 -->
+    <section class="card dark">
+      <div class="tagn">6 / 8</div>
+      <div class="kicker">충돌 자동 감지</div>
+      <h2>겹치면 <em>빨간 배지</em>로<br>바로 잡아낸다</h2>
+      <div class="formula">
+        같은 <span class="c3">날짜</span> · 공통 <span class="c1">연자</span> ·<br>
+        <span class="c2">시간 겹침</span>(+이동 10분)<br>
+        → <b style="color:#ff8a8a">중복!</b>
+      </div>
+      <p class="lead">강의를 옮기는 순간 실시간 재계산.<br>같은 세션 안 좌장↔연자는 예외 처리.</p>
+      <div class="spacer"></div>
+      <div class="foot">중복 · 미배치 · 연자 미지정까지 한눈에 집계</div>
+    </section>
+
+    <!-- 7 서사 -->
+    <section class="card">
+      <div class="tagn">7 / 8</div>
+      <div class="kicker">how it grew</div>
+      <h2>수식 <em>한 줄</em>에서<br>운영 도구로</h2>
+      <ul class="list">
+        <li><span class="dot">·</span><div>시작은 “두 방에 겹쳤나?” <b>겹침 함수 하나</b></div></li>
+        <li><span class="dot">·</span><div>시각을 <b>자동 누적</b>으로</div></li>
+        <li><span class="dot">·</span><div>좌장·휴식·이동·지정요일 → <b>규칙 11개</b></div></li>
+        <li><span class="dot">·</span><div>이제 <b>실시간 검증 + 변경이력</b>까지</div></li>
+      </ul>
+      <div class="spacer"></div>
+      <div class="foot">학회 하나를 통째로 굴리는 도구가 됐다</div>
+    </section>
+
+    <!-- 8 CTA -->
+    <section class="card dark">
+      <div class="tagn">8 / 8</div>
+      <div class="kicker">free template</div>
+      <h2>샘플 <em>명세서</em>,<br>무료로 가져가세요</h2>
+      <p class="lead">탭 구성 · 컬럼 · 배치규칙 · 충돌판정 ·<br>샘플 데이터(강의 30/연자 15/룸 3)까지.</p>
+      <div style="margin-top:20px">
+        <span class="pill">저장 📌</span><span class="pill">공유 ↗</span><span class="pill">DM “템플릿”</span>
+      </div>
+      <div class="spacer"></div>
+      <div class="foot">모든 이름·기관·제목·일정은 가상입니다</div>
+    </section>
+
+  </div>
+
+  <div class="note">캡처 팁: 각 카드를 화면에 꽉 채워 스크린샷하거나, 브라우저 인쇄(⌘/Ctrl+P)로 PDF 저장하면 카드별 1장씩 나옵니다.</div>
+</body>
+</html>

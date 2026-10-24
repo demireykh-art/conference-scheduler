@@ -21,7 +21,7 @@
                     <h1 class="main-title">연자 포스터 생성</h1>
                 </div>
                 <div style="display:flex;gap:8px">
-                    <button class="btn btn-primary" onclick="savePoster()">💾 템플릿·배치 저장</button>
+                    <button class="btn btn-primary" id="posSaveBtn" onclick="savePoster()">💾 템플릿·배치 저장</button>
                 </div>
             </div>
             <div class="main-body">
@@ -99,8 +99,12 @@
                             <b>2. 연자 포스터 생성</b>
                             <div style="display:flex;gap:6px">
                                 <button class="btn btn-sm" onclick="generateAll()">🔄 생성/새로고침</button>
-                                <button class="btn btn-sm btn-success" onclick="downloadAllZip()">⬇️ 전체 ZIP</button>
+                                <button class="btn btn-sm btn-success" onclick="downloadAllZip()">⬇️ ZIP</button>
                             </div>
+                        </div>
+                        <div class="pe-ctrl-row" style="margin:4px 0 8px">
+                            <input type="text" id="posSearch" oninput="filterPosters()" placeholder="🔍 연자 이름 검색 — 개별 저장/공유"
+                                style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.88rem">
                         </div>
                         <div id="posCount" style="font-size:0.82rem;color:var(--text-dim);margin:2px 0 10px"></div>
                         <div id="posGrid" class="poster-grid"></div>
