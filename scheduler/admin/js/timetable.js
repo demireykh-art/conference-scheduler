@@ -118,6 +118,25 @@ function poolSearchText(p) {
     return parts.filter(Boolean).join(' ').toLowerCase();
 }
 
+// 좌장/사회자(세션 단위)에서 이름이 일치하는 세션 수집
+function collectModeratorMatches(q) {
+    const out = [];
+    (orderedRooms() || []).forEach(room => {
+        Object.entries((CONF.rooms[room.id] || {}).sessions || {}).forEach(([sid, sess]) => {
+            const mods = sessionModArr(sess);
+            if (!mods.length) return;
+            const hay = mods.map(m => `${m.nameKo || ''} ${m.nameEn || ''} ${m.affiliationKo || ''}`).join(' ').toLowerCase();
+            if (!hay.includes(q)) return;
+            out.push({
+                roomId: room.id, roomName: room.name || '룸', date: room.date || '',
+                sessionId: sid, sessionName: sess.name || '(세션)',
+                mods: mods.map(m => m.nameKo || m.nameEn).filter(Boolean)
+            });
+        });
+    });
+    return out;
+}
+
 // 배치된 강의(모든 룸) 목록 수집
 function collectPlacedLectures() {
     const out = [];
@@ -153,10 +172,20 @@ function runTtSearch() {
             Object.values(sess.lectures || {}).forEach(lec => { if (lec.lectureId) placedPoolIds.add(lec.lectureId); })));
     const unplaced = POOL.filter(p => !placedPoolIds.has(p.id) && poolSearchText(p).includes(q));
 
+    const modMatches = collectModeratorMatches(q);
+
     const here = placed.filter(x => x.roomId === CURRENT_ROOM).length;
-    infoEl.innerHTML = `총 <b>${placed.length}</b>건 매칭 · 이 룸 ${here} · 미배치 <b>${unplaced.length}</b>건`;
+    infoEl.innerHTML = `총 <b>${placed.length}</b>건 매칭 · 이 룸 ${here}`
+        + (modMatches.length ? ` · 좌장/사회 <b>${modMatches.length}</b>` : '')
+        + ` · 미배치 <b>${unplaced.length}</b>건`;
 
     let html = '';
+    if (modMatches.length) {
+        html += `<div class="ttsr-group"><span class="ttsr-label mod">좌장/사회</span>${modMatches.map(m =>
+            `<button class="ttsr-chip ${m.roomId === CURRENT_ROOM ? 'here' : ''}" onclick="ttGotoSession('${m.roomId}','${m.sessionId}')" title="${escapeHtml(m.roomName)}${m.date ? ' · ' + escapeHtml(m.date) : ''} · ${escapeHtml(m.sessionName)}">
+                ${escapeHtml(m.sessionName)} · 좌장 ${escapeHtml(m.mods.join(', '))} <span class="ttsr-loc">${escapeHtml(m.roomName)}${m.date ? '·' + escapeHtml(m.date) : ''}</span>
+            </button>`).join('')}</div>`;
+    }
     if (placed.length) {
         html += `<div class="ttsr-group"><span class="ttsr-label">배치됨</span>${placed.map(x =>
             `<button class="ttsr-chip ${x.roomId === CURRENT_ROOM ? 'here' : ''}" onclick="ttGoto('${x.roomId}','${x.lecId}')" title="${escapeHtml(x.roomName)}${x.date ? ' · ' + escapeHtml(x.date) : ''} · ${escapeHtml(x.sessionName)}">
@@ -167,7 +196,7 @@ function runTtSearch() {
         html += `<div class="ttsr-group"><span class="ttsr-label warn">미배치</span>${unplaced.map(p =>
             `<span class="ttsr-chip unplaced" title="아직 시간표에 배치되지 않은 강의">${escapeHtml(p.titleKo || p.titleEn || '(제목 없음)')}${p.partnerKo ? ` <span class="ttsr-loc">${escapeHtml(p.partnerKo)}</span>` : ''}</span>`).join('')}</div>`;
     }
-    if (!placed.length && !unplaced.length) html = `<div class="ttsr-empty">일치하는 강의가 없습니다.</div>`;
+    if (!placed.length && !unplaced.length && !modMatches.length) html = `<div class="ttsr-empty">일치하는 강의·좌장/사회가 없습니다.</div>`;
     resEl.innerHTML = html;
 
     applyTtHighlight(q);
@@ -200,6 +229,19 @@ window.ttGoto = function (roomId, lecId) {
             row.scrollIntoView({ behavior: 'smooth', block: 'center' });
             row.classList.add('lec-flash');
             setTimeout(() => row.classList.remove('lec-flash'), 1600);
+        }
+    }, roomId !== CURRENT_ROOM ? 60 : 0);
+};
+
+// 좌장/사회 검색 결과 → 해당 룸·세션으로 이동(세션 블록 강조)
+window.ttGotoSession = function (roomId, sessionId) {
+    if (roomId !== CURRENT_ROOM) selectRoom(roomId);
+    setTimeout(() => {
+        const el = document.querySelector(`#sessions .session-block[data-session="${sessionId}"]`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('sess-flash');
+            setTimeout(() => el.classList.remove('sess-flash'), 1600);
         }
     }, roomId !== CURRENT_ROOM ? 60 : 0);
 };

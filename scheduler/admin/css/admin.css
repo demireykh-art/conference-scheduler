@@ -749,6 +749,7 @@ a { color: inherit; }
 .ttsr-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .ttsr-label { font-size: 0.74rem; font-weight: 700; color: var(--text-dim); flex-shrink: 0; }
 .ttsr-label.warn { color: #b26a00; }
+.ttsr-label.mod { color: #6b1f7a; }
 .ttsr-chip {
     display: inline-flex; align-items: center; gap: 6px; max-width: 360px;
     border: 1px solid var(--border); background: #fff; border-radius: 999px;
@@ -767,6 +768,8 @@ a { color: inherit; }
 .lecture-row.lec-dim { opacity: 0.4; }
 @keyframes lecFlash { 0%, 100% { background: transparent; } 30% { background: #fff2c4; } }
 .lecture-row.lec-flash { animation: lecFlash 1.5s ease; }
+@keyframes sessFlash { 0%, 100% { box-shadow: none; } 30% { box-shadow: 0 0 0 3px #d9b3e4; } }
+.session-block.sess-flash { animation: sessFlash 1.5s ease; }
 
 /* 연자/사회자 관리 — 일정 필터 & 강의/사회 목록 패널 */
 .cs-filterbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
