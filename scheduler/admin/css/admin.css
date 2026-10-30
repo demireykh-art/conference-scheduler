@@ -705,6 +705,7 @@ a { color: inherit; }
     background: #e6f7ee; border-radius: 5px; padding: 1px 6px;
 }
 .room-tab-pub { font-size: 0.72rem; }
+.room-tab-memo { font-size: 0.72rem; margin-left: 3px; cursor: help; }
 
 /* 홈페이지 공개 토글 (룸 설정) */
 .pub-toggle {

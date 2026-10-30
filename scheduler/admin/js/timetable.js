@@ -278,6 +278,7 @@ function renderRoomTabs(rooms) {
         <button class="room-tab ${r.id === CURRENT_ROOM ? 'active' : ''}" data-room="${r.id}"
             onclick="selectRoom('${r.id}')">
             <span class="grip" title="드래그하여 순서 변경">⋮⋮</span>${escapeHtml(r.name || '(이름 없음)')}
+            ${r.memo ? `<span class="room-tab-memo" title="메모: ${escapeHtml(r.memo)}">📝</span>` : ''}
             ${r.publicOpen ? '<span class="room-tab-pub" title="홈페이지 공개 중">🌐</span>' : ''}
             ${r.kmaSubmit ? '<span class="room-tab-kma" title="의협제출 대상">의협</span>' : ''}
             ${alerts ? `<span class="room-tab-alert" title="이 룸에서 최근 이동/삭제된 강의 ${alerts}건">🔔${alerts}</span>` : ''}
@@ -548,6 +549,10 @@ function renderRoomSettings() {
             <input type="text" list="agendaOwnerList" value="${escapeHtml(room.agendaOwner || '')}" placeholder="연자 이름 선택/입력" onchange="updateRoom('agendaOwner', this.value.trim())">
             <datalist id="agendaOwnerList">${agendaOwnerOptions()}</datalist>
         </div>
+        <div class="field grow" style="min-width:220px">
+            <label>📝 메모 <span class="hint-i" title="내부용 메모입니다. 홈페이지·출력물에는 표시되지 않습니다. 룸 이름에 섞어 적던 내용을 여기에 적으세요.">ⓘ</span></label>
+            <input type="text" value="${escapeHtml(room.memo || '')}" onchange="updateRoom('memo', this.value)" placeholder="내부용 메모 (예: GCP룸-업체 & 중국인허가)">
+        </div>
         <div class="field" style="min-width:160px">
             <label>홈페이지 공개</label>
             ${(AdminAuth.canPublish && AdminAuth.canPublish())
@@ -589,6 +594,7 @@ window.duplicateRoom = function () {
         kmaSubmit: !!room.kmaSubmit,
         lang: room.lang || 'ko',
         agendaOwner: room.agendaOwner || '',
+        memo: room.memo || '',
         order: orderedRooms().length,
         sessions: {}
     };
@@ -620,7 +626,7 @@ window.duplicateRoom = function () {
 };
 
 // 룸 설정 변경 이력용 — 항목명/표시값
-const ROOM_FIELD_LABEL = { name: '이름', nameEn: '이름(영문)', topic: '주제', topicEn: '주제(영문)', date: '날짜', startTime: '시작시간', lang: '표시언어', kmaSubmit: '의협제출', agendaOwner: '아젠다담당', visible: '표시여부', publicOpen: '홈페이지 공개', showNationality: '연자 소속 표시' };
+const ROOM_FIELD_LABEL = { name: '이름', nameEn: '이름(영문)', topic: '주제', topicEn: '주제(영문)', date: '날짜', startTime: '시작시간', lang: '표시언어', kmaSubmit: '의협제출', agendaOwner: '아젠다담당', memo: '메모', visible: '표시여부', publicOpen: '홈페이지 공개', showNationality: '연자 소속 표시' };
 function roomFieldDisp(field, v) {
     if (field === 'date') return v ? dayLabel(v) : '날짜미정';
     if (field === 'lang') return v === 'en' ? '영어(EN)' : '한글';
