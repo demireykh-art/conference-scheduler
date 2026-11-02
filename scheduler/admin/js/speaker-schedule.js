@@ -157,13 +157,14 @@ function collect() {
     // 특별행사(참석 명단) — 참석자별로 일정에 추가 (시간 겹침 계산엔 포함 안 함: start/end 없음)
     toOrderedArray(SPECIAL).forEach(ev => {
         if (ev.date) dates.add(ev.date);
+        const timeText = ev.startTime ? (ev.startTime + (ev.endTime ? ` ~ ${ev.endTime}` : '')) : (ev.time || '');
         (ev.attendees || []).forEach(a => {
             const info = { key: a.key || a.id || a.nameKo || a.nameEn, id: a.id || '', name: a.nameKo || '', nameEn: a.nameEn || '', aff: a.aff || '', affEn: '' };
             if (!info.key) return;
             getPerson(info).items.push({
                 rid: 'ssr' + (++RID), kind: 'special', date: ev.date || '', roomId: '', roomName: '',
                 sessionId: '', sessionName: '', start: null, end: null,
-                title: ev.name || '(특별행사)', timeText: ev.time || '', eventId: ev.id,
+                title: ev.name || '(특별행사)', timeText, eventId: ev.id,
                 conflict: false, confWith: []
             });
         });

@@ -93,7 +93,8 @@ window.addEvent = function () {
     const data = {
         name,
         date: document.getElementById('seDate').value || '',
-        time: document.getElementById('seTime').value.trim() || '',
+        startTime: document.getElementById('seStart').value || '',
+        endTime: document.getElementById('seEnd').value || '',
         memo: document.getElementById('seMemo').value.trim() || '',
         order: Object.keys(EVENTS).length,
         attendees: [],
@@ -102,7 +103,7 @@ window.addEvent = function () {
     };
     database.ref('/adminConferences/' + CONF_ID + '/specialEvents/' + id).set(data).then(() => {
         logActivity('create', 'conference', `특별행사 "${name}" 추가`, { confId: CONF_ID, confTitle: CONF_NAME });
-        ['seName', 'seDate', 'seTime', 'seMemo'].forEach(x => document.getElementById(x).value = '');
+        ['seName', 'seDate', 'seStart', 'seEnd', 'seMemo'].forEach(x => document.getElementById(x).value = '');
         Toast.success('특별행사를 추가했습니다. 아래에서 참석자를 지정하세요.');
     }).catch(e => Toast.error('추가 실패: ' + e.message));
 };
@@ -210,7 +211,7 @@ function eventCard(ev) {
             </div>
         </div>`;
     }
-    const metaLine = [ev.date ? fmtDayLabel(ev.date) : '', ev.time || ''].filter(Boolean).join(' · ');
+    const metaLine = [ev.date ? fmtDayLabel(ev.date) : '', timeLabel(ev)].filter(Boolean).join(' · ');
     return `<div class="card se-card">
         <div class="se-head">
             <input class="se-name" type="text" value="${escapeHtml(ev.name || '')}" placeholder="특별행사 이름 (예: MOU 체결식)" onchange="updateEvent('${ev.id}','name',this.value)">
@@ -219,7 +220,8 @@ function eventCard(ev) {
         </div>
         <div class="se-meta">
             <label>날짜 <input type="date" value="${escapeHtml(ev.date || '')}" onchange="updateEvent('${ev.id}','date',this.value)"></label>
-            <label>시간 <input type="text" value="${escapeHtml(ev.time || '')}" placeholder="예: 18:00~19:00" onchange="updateEvent('${ev.id}','time',this.value)"></label>
+            <label>시작 <input type="time" step="300" value="${escapeHtml(ev.startTime || '')}" onchange="updateEvent('${ev.id}','startTime',this.value)"></label>
+            <label>종료 <input type="time" step="300" value="${escapeHtml(ev.endTime || '')}" onchange="updateEvent('${ev.id}','endTime',this.value)"></label>
             <label class="grow">메모 <input type="text" value="${escapeHtml(ev.memo || '')}" placeholder="장소·비고 등" onchange="updateEvent('${ev.id}','memo',this.value)"></label>
         </div>
         <div class="se-confirmed"><b>확정 참석 ${att.length}명</b> <span class="se-chips">${chips}</span></div>
@@ -232,3 +234,8 @@ function eventCard(ev) {
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토'];
 function fmtDayLabel(d) { if (!d) return ''; const dt = new Date(d + 'T00:00:00'); return d + (isNaN(dt.getTime()) ? '' : ` (${DOW[dt.getDay()]})`); }
+// 시간 표시: startTime~endTime (구버전 time 텍스트 호환)
+function timeLabel(ev) {
+    if (ev.startTime) return ev.startTime + (ev.endTime ? ` ~ ${ev.endTime}` : '');
+    return ev.time || '';   // 이전 버전 호환
+}
