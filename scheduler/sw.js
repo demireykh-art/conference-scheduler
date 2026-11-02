@@ -1,7 +1,7 @@
 // 학술대회 스케줄러 — Service Worker
 // 앱 껍데기(shell)만 캐시, 데이터는 항상 Firebase에서 실시간 수신
 
-const CACHE_NAME = 'scheduler-v5';
+const CACHE_NAME = 'scheduler-v6';
 const SHELL = [
   '/conference-scheduler/scheduler/',
   '/conference-scheduler/scheduler/index.html',

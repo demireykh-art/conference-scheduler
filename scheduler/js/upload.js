@@ -6,6 +6,7 @@
     'use strict';
     
     let pendingUploadData = [];
+    let pendingAiNotes = null; // AI 입력일 때만: 강의별 확인 메모 [{note, speakerMatched, durationGuessed}]
     
     // ============================================
     // 모달 관리
@@ -28,6 +29,7 @@
     
     function clearUploadPreview() {
         pendingUploadData = [];
+        pendingAiNotes = null;
         const uploadPreview = document.getElementById('uploadPreview');
         const previewTableBody = document.getElementById('previewTableBody');
         const previewCount = document.getElementById('previewCount');
@@ -345,11 +347,76 @@
                     ${isDuplicate ? '<span title="중복 항목">🔄</span>' : ''}
                 </td>
                 <td style="padding: 0.4rem;">${lecture.category}</td>
-                <td style="padding: 0.4rem;">${lecture.titleKo.substring(0, 40)}${lecture.titleKo.length > 40 ? '...' : ''}</td>
-                <td style="padding: 0.4rem;">${lecture.speakerKo || '-'}</td>
-                <td style="padding: 0.4rem;">${lecture.duration}분</td>
+                <td style="padding: 0.4rem;">${esc(lecture.titleKo.substring(0, 40))}${lecture.titleKo.length > 40 ? '...' : ''}${aiInfoHtml(index, lecture)}</td>
+                <td style="padding: 0.4rem;">${esc(lecture.speakerKo || '-')}${aiSpeakerBadge(index, lecture)}</td>
+                <td style="padding: 0.4rem;">${lecture.duration}분${pendingAiNotes && pendingAiNotes[index] && pendingAiNotes[index].durationGuessed ? '<br><span style="color:#999;font-size:0.7rem;">(기본값)</span>' : ''}</td>
             </tr>
         `}).join('');
+    }
+
+    function esc(str) {
+        return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // AI 입력 미리보기 보조 표시 (영문 제목·업체·확인 메모)
+    function aiInfoHtml(index, lecture) {
+        if (!pendingAiNotes || !pendingAiNotes[index]) return '';
+        const parts = [];
+        if (lecture.titleEn) parts.push(`<div style="color:#666;font-size:0.72rem;">${esc(lecture.titleEn)}</div>`);
+        if (lecture.companyName || lecture.productName) {
+            parts.push(`<div style="color:#1565C0;font-size:0.72rem;">🏢 ${esc([lecture.companyName, lecture.productName].filter(Boolean).join(' · '))}</div>`);
+        }
+        if (pendingAiNotes[index].note) {
+            parts.push(`<div style="color:#E65100;font-size:0.72rem;">⚠️ ${esc(pendingAiNotes[index].note)}</div>`);
+        }
+        return parts.join('');
+    }
+
+    function aiSpeakerBadge(index, lecture) {
+        if (!pendingAiNotes || !pendingAiNotes[index] || !lecture.speakerKo) return '';
+        return pendingAiNotes[index].speakerMatched
+            ? ' <span title="기존 연자 목록과 일치" style="color:#27ae60;">✓</span>'
+            : '<br><span style="color:#E65100;font-size:0.7rem;">신규 연자?</span>';
+    }
+
+    /**
+     * AI가 뽑은 강의를 기존 업로드 미리보기에 올림 (ai-import.js에서 호출)
+     * 저장은 하지 않음 — 사람이 '업로드 확정'을 눌러야 저장
+     */
+    function previewAiLectures(aiLectures) {
+        const categories = window.AppState.categories || [];
+        const baseId = Date.now();
+        pendingAiNotes = [];
+        pendingUploadData = (aiLectures || [])
+            .filter(l => l && (String(l.titleKo || '').trim() || String(l.titleEn || '').trim()))
+            .map((l, i) => {
+                const dur = parseInt(l.duration, 10);
+                const cat = String(l.category || '').trim();
+                pendingAiNotes.push({
+                    note: String(l.note || '').trim() + (cat && !categories.includes(cat) ? ` (분류 '${cat}'는 목록에 없음)` : ''),
+                    speakerMatched: !!l.speakerMatched,
+                    durationGuessed: !(dur > 0)
+                });
+                const titleKo = String(l.titleKo || '').trim();
+                const titleEn = String(l.titleEn || '').trim();
+                return {
+                    id: baseId + i,
+                    category: cat || 'Others',
+                    titleKo: titleKo || titleEn,
+                    titleEn: titleEn,
+                    speakerKo: String(l.speakerKo || '').trim(),
+                    speakerEn: String(l.speakerEn || '').trim(),
+                    affiliation: String(l.affiliation || '').trim(),
+                    affiliationEn: String(l.affiliationEn || '').trim(),
+                    duration: dur > 0 ? dur : 15,
+                    companyName: String(l.companyName || '').trim(),
+                    productName: String(l.productName || '').trim(),
+                    isLuncheon: !!l.isLuncheon
+                };
+            });
+        displayUploadPreview();
+        const preview = document.getElementById('uploadPreview');
+        if (preview && preview.scrollIntoView) preview.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     
     // ============================================
@@ -1519,6 +1586,7 @@
     window.handleFileSelect = handleFileSelect;
     window.clearUploadPreview = clearUploadPreview;
     window.confirmUpload = confirmUpload;
+    window.previewAiLectures = previewAiLectures;
     
     window.openScheduleUploadModal = openScheduleUploadModal;
     window.closeScheduleUploadModal = closeScheduleUploadModal;
