@@ -1701,3 +1701,35 @@ html.modal-open, body.modal-open { overflow: hidden; }
 .orphan-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #fff; border: 1px solid #f0dca8; border-radius: 8px; padding: 9px 12px; }
 .orphan-info b { color: var(--text); }
 @media (max-width: 640px) { .orphan-row { flex-direction: column; align-items: flex-start; } }
+
+/* ===== ⚡ 빠른 강의 패널 (드래그 배치) ===== */
+.qp-launcher { position: fixed; right: 18px; bottom: 22px; z-index: 1200; background: #2f6fed; color: #fff; border: none; border-radius: 999px; padding: 11px 16px; font-size: 0.9rem; font-weight: 800; cursor: pointer; box-shadow: 0 6px 18px rgba(47,111,237,.38); font-family: inherit; }
+.qp-launcher:hover { background: #255fd6; }
+.qp-panel { position: fixed; right: 18px; bottom: 74px; z-index: 1201; width: 370px; max-width: calc(100vw - 24px); background: var(--card, #fff); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 16px 44px rgba(0,0,0,.28); display: flex; flex-direction: column; overflow: hidden; }
+.qp-head { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; background: #2f6fed; color: #fff; }
+.qp-close { background: rgba(255,255,255,.2); color: #fff; border: none; border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-size: 0.9rem; }
+.qp-sub { display: flex; align-items: center; gap: 8px; padding: 9px 12px 4px; }
+.qp-sub-label { font-size: 0.78rem; color: var(--text-dim); font-weight: 700; }
+.qp-sub select { flex: 1; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem; }
+.qp-search { margin: 6px 12px 8px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.88rem; }
+.qp-body { display: flex; align-items: stretch; gap: 6px; padding: 0 8px 8px 12px; }
+/* 약 7행 높이 고정 박스 (행 ≈ 54px) */
+.qp-list { flex: 1; height: 378px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; background: #fafbfc; padding: 4px; scroll-behavior: smooth; }
+.qp-scroll { display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+.qp-sbtn { width: 30px; height: 46px; border: 1px solid var(--border); background: #fff; border-radius: 8px; cursor: pointer; font-size: 0.8rem; color: var(--text); }
+.qp-sbtn:hover { background: #eef1f6; }
+.qp-row { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 8px; border: 1px solid transparent; cursor: grab; }
+.qp-row[draggable]:hover { background: #eef3ff; border-color: #cddffb; }
+.qp-row.dragging { opacity: .5; }
+.qp-row.placed { opacity: .62; }
+.qp-row-main { flex: 1; min-width: 0; }
+.qp-title { font-size: 0.86rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qp-dur { color: var(--text-dim); font-weight: 500; font-size: 0.78rem; }
+.qp-badge { font-size: 0.68rem; font-weight: 700; color: #1f7a3f; background: #e7f6ec; border-radius: 5px; padding: 1px 6px; }
+.qp-meta { font-size: 0.76rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.qp-grip { color: #9aa0b0; cursor: grab; font-size: 1rem; flex: none; }
+.qp-foot { padding: 8px 12px 11px; font-size: 0.78rem; color: var(--text); border-top: 1px solid var(--border); }
+.qp-empty { padding: 24px; text-align: center; color: var(--text-dim); font-size: 0.85rem; }
+/* 드롭 대상 세션 강조 */
+.session-block.qp-drop-hi { outline: 2px dashed #2f6fed; outline-offset: 2px; background: #f3f7ff; }
+@media (max-width: 640px) { .qp-panel { right: 8px; left: 8px; width: auto; bottom: 68px; } .qp-list { height: 320px; } }

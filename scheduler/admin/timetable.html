@@ -86,6 +86,28 @@
         </main>
     </div>
 
+    <!-- ================= ⚡ 빠른 강의 패널 (드래그로 세션에 배치) ================= -->
+    <button id="qpLauncher" class="qp-launcher" onclick="toggleQuickPanel()" title="강의 목록을 띄워 드래그로 빠르게 배치">⚡ 빠른 배치</button>
+    <div id="quickPanel" class="qp-panel" style="display:none">
+        <div class="qp-head">
+            <b>⚡ 빠른 강의 배치</b>
+            <button class="qp-close" onclick="toggleQuickPanel()" title="닫기">✕</button>
+        </div>
+        <div class="qp-sub">
+            <span class="qp-sub-label">행사</span>
+            <select id="qpConf" onchange="onQpConf(this.value)"></select>
+        </div>
+        <input type="text" id="qpSearch" class="qp-search" placeholder="🔍 제목·연자·태그 검색" oninput="renderQuickList()">
+        <div class="qp-body">
+            <div class="qp-list" id="qpList"></div>
+            <div class="qp-scroll">
+                <button class="qp-sbtn" onclick="qpScroll(-1)" title="위로 빠르게">▲</button>
+                <button class="qp-sbtn" onclick="qpScroll(1)" title="아래로 빠르게">▼</button>
+            </div>
+        </div>
+        <div class="qp-foot" id="qpFoot"></div>
+    </div>
+
     <!-- ================= 강의 배치 모달 (풀에서 검색·선택) ================= -->
     <div class="modal-overlay" id="placeModal">
         <div class="modal wide">
