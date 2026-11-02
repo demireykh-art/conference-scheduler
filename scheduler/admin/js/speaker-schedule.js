@@ -16,7 +16,8 @@ let CONF_ID = new URLSearchParams(location.search).get('id') || '';
 let CONF_NAME = '', CONF_START = '', CONF_END = '';
 let ROOMS = {};
 let POOL = {};
-let roomsRef = null, poolRef = null;
+let SPECIAL = {};   // 특별행사(참석 명단)
+let roomsRef = null, poolRef = null, specialRef = null;
 let RID = 0;   // 행 DOM id 카운터(중복 이동용)
 
 let FILTER_DATE = '';     // '' = 전체
@@ -54,14 +55,17 @@ window.changeConf = function (id) {
 function subscribeConf() {
     if (roomsRef) { roomsRef.off(); roomsRef = null; }
     if (poolRef) { poolRef.off(); poolRef = null; }
+    if (specialRef) { specialRef.off(); specialRef = null; }
     const c = CONF_LIST.find(x => x.id === CONF_ID);
     CONF_NAME = c ? c.title : ''; CONF_START = c ? c.startDate : ''; CONF_END = c ? c.endDate : '';
     document.getElementById('confName').textContent = CONF_NAME + (CONF_START ? ` · ${fmtDateRange(CONF_START, CONF_END)}` : '');
-    if (!CONF_ID) { ROOMS = {}; POOL = {}; render(); return; }
+    if (!CONF_ID) { ROOMS = {}; POOL = {}; SPECIAL = {}; render(); return; }
     roomsRef = database.ref('/adminConferences/' + CONF_ID + '/rooms');
     roomsRef.on('value', snap => { ROOMS = snap.val() || {}; render(); });
     poolRef = database.ref('/adminConferences/' + CONF_ID + '/lecturePool');
     poolRef.on('value', snap => { POOL = snap.val() || {}; render(); });
+    specialRef = database.ref('/adminConferences/' + CONF_ID + '/specialEvents');
+    specialRef.on('value', snap => { SPECIAL = snap.val() || {}; render(); });
 }
 
 /* ---------- 좌장(사회) 정규화 — 신형 moderators[](최대 2) + 구형 moderator{} ---------- */
@@ -150,6 +154,21 @@ function collect() {
         }));
     });
 
+    // 특별행사(참석 명단) — 참석자별로 일정에 추가 (시간 겹침 계산엔 포함 안 함: start/end 없음)
+    toOrderedArray(SPECIAL).forEach(ev => {
+        if (ev.date) dates.add(ev.date);
+        (ev.attendees || []).forEach(a => {
+            const info = { key: a.key || a.id || a.nameKo || a.nameEn, id: a.id || '', name: a.nameKo || '', nameEn: a.nameEn || '', aff: a.aff || '', affEn: '' };
+            if (!info.key) return;
+            getPerson(info).items.push({
+                rid: 'ssr' + (++RID), kind: 'special', date: ev.date || '', roomId: '', roomName: '',
+                sessionId: '', sessionName: '', start: null, end: null,
+                title: ev.name || '(특별행사)', timeText: ev.time || '', eventId: ev.id,
+                conflict: false, confWith: []
+            });
+        });
+    });
+
     // 중복(겹침) 계산 — 사람별로, 같은 날 · 다른 (룸,세션) · 시간겹침(+버퍼)
     persons.forEach(p => {
         const it = p.items;
@@ -164,9 +183,9 @@ function collect() {
                 a.confWith.push(b.rid); b.confWith.push(a.rid);   // 서로 이동용
             }
         }
-        // 미배치는 항상 뒤로, 그 외 날짜·시간순
-        it.sort((a, b) => (!!a.unplaced !== !!b.unplaced ? (a.unplaced ? 1 : -1)
-            : ((a.date || '').localeCompare(b.date || '') || ((a.start ?? 0) - (b.start ?? 0)))));
+        // 정렬: 강의/좌장(날짜·시간) → 특별행사(날짜) → 미배치
+        const grp = x => x.unplaced ? 2 : (x.kind === 'special' ? 1 : 0);
+        it.sort((a, b) => (grp(a) - grp(b)) || ((a.date || '').localeCompare(b.date || '')) || ((a.start ?? 0) - (b.start ?? 0)));
     });
     return { persons, noSpeakerLecs, dates: [...dates].sort(), totalLec, sessionCnt, unplacedCnt };
 }
@@ -234,7 +253,7 @@ function render() {
         const rows = visibleRows(p);
         if (!rows) return;
         shownPersons++;
-        const lecRows = rows.filter(a => a.kind === 'lec'), modRows = rows.filter(a => a.kind === 'mod');
+        const lecRows = rows.filter(a => a.kind === 'lec'), modRows = rows.filter(a => a.kind === 'mod'), specialRows = rows.filter(a => a.kind === 'special');
         shownLec += lecRows.length;
         rows.forEach(a => { if (a.conflict) { conflictN++; CONF_RIDS.push(a.rid); } });
         const nm = escapeHtml(p.name || p.nameEn || '(이름 없음)') + (p.nameEn && p.name ? ` <span class="ss-en">${escapeHtml(p.nameEn)}</span>` : '');
@@ -244,7 +263,7 @@ function render() {
             <div class="ss-card-h">
                 <div class="ss-name">${nm} ${aff}</div>
                 <div class="ss-head-right">
-                    <div class="ss-counts"><span class="ss-cnt lec">강의 ${lecRows.length}</span><span class="ss-cnt mod">좌장/사회 ${modRows.length}</span></div>
+                    <div class="ss-counts"><span class="ss-cnt lec">강의 ${lecRows.length}</span><span class="ss-cnt mod">좌장/사회 ${modRows.length}</span>${specialRows.length ? `<span class="ss-cnt special">특별 ${specialRows.length}</span>` : ''}</div>
                     <div class="ss-send">
                         <button class="ss-btn" title="이 연자 일정을 카톡/문자용으로 복사" onclick="ssCopy('${k}',this)">📋 복사</button>
                         <button class="ss-btn" title="이 연자에게 일정 메일(Gmail 작성창)" onclick="ssMail('${k}')">📧 메일</button>
@@ -298,15 +317,19 @@ function render() {
 
 function rowHtml(a) {
     const unplaced = !!a.unplaced;
-    const left = unplaced
-        ? '<span class="ss-unp-dt">미배치</span>'
-        : `<span class="ss-dt"><span class="ss-d">${escapeHtml(fmtDay(a.date))}</span><span class="ss-t">${formatTime(a.start)}–${formatTime(a.end)}</span></span>`;
-    const kindBadge = a.kind === 'mod' ? '<span class="ss-k mod">좌장/사회</span>' : (a.isPanel ? '<span class="ss-k panel">패널</span>' : '<span class="ss-k lec">강의</span>');
-    const confBadge = a.conflict ? `<span class="sch-badge dup ss-jump" title="겹치는 일정으로 이동" onclick="jumpConflict(event,'${(a.confWith && a.confWith[0]) || ''}')">중복 ⤵</span>` : '';
+    const special = a.kind === 'special';
+    const left = special
+        ? `<span class="ss-dt"><span class="ss-d">${escapeHtml(fmtDay(a.date)) || '특별행사'}</span>${a.timeText ? `<span class="ss-t">${escapeHtml(a.timeText)}</span>` : ''}</span>`
+        : unplaced
+            ? '<span class="ss-unp-dt">미배치</span>'
+            : `<span class="ss-dt"><span class="ss-d">${escapeHtml(fmtDay(a.date))}</span><span class="ss-t">${formatTime(a.start)}–${formatTime(a.end)}</span></span>`;
+    const kindBadge = special ? '<span class="ss-k special">특별행사</span>'
+        : a.kind === 'mod' ? '<span class="ss-k mod">좌장/사회</span>' : (a.isPanel ? '<span class="ss-k panel">패널</span>' : '<span class="ss-k lec">강의</span>');
+    const confBadge = (!special && a.conflict) ? `<span class="sch-badge dup ss-jump" title="겹치는 일정으로 이동" onclick="jumpConflict(event,'${(a.confWith && a.confWith[0]) || ''}')">중복 ⤵</span>` : '';
     const unpBadge = unplaced ? '<span class="ss-unp-badge" title="시간표에 아직 배치되지 않았습니다">미배치</span>' : '';
-    const loc = unplaced ? '' : `<span class="ss-loc">📍 ${escapeHtml(a.roomName)}${a.sessionName ? ' · ' + escapeHtml(a.sessionName) : ''}</span>`;
-    const canClick = !unplaced && a.roomId;
-    const cls = 'ss-row' + (canClick ? ' sch-link' : '') + (unplaced ? ' ss-row-unp' : '');
+    const loc = (special || unplaced) ? '' : `<span class="ss-loc">📍 ${escapeHtml(a.roomName)}${a.sessionName ? ' · ' + escapeHtml(a.sessionName) : ''}</span>`;
+    const canClick = !special && !unplaced && a.roomId;
+    const cls = 'ss-row' + (canClick ? ' sch-link' : '') + (unplaced ? ' ss-row-unp' : '') + (special ? ' ss-row-special' : '');
     const click = canClick ? ` title="시간표에서 보기" onclick="gotoTimetable('${a.roomId}','${a.lecId || ''}')"` : '';
     return `<div id="${a.rid}" class="${cls}"${click}>
         <span class="ss-left">${left}</span>
@@ -424,6 +447,7 @@ function buildVerifyText() {
     [...r.persons.values()].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko')).forEach(p => {
         lines.push(`- ${p.name}${p.nameEn ? ' (' + p.nameEn + ')' : ''}${p.aff ? ' / ' + p.aff : ''}`);
         p.items.forEach(a => {
+            if (a.kind === 'special') { lines.push(`   [특별행사] ${fmtDay(a.date)} ${a.timeText || '시간미정'} / ${a.title}`); return; }
             const t = (a.start != null) ? `${formatTime(a.start)}-${formatTime(a.end)}` : '시간미정';
             lines.push(`   [${a.kind === 'mod' ? 'M' : (a.isPanel ? 'L(패널)' : 'L')}] ${fmtDay(a.date)} ${t} / ${a.roomName} / ${a.sessionName} / ${a.title}${a.conflict ? ' [중복]' : ''}`);
         });
