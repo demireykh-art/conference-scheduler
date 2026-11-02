@@ -197,7 +197,7 @@ window.onRosterSearch = function (input) {
     });
 };
 
-window.saveAttend = function (id) {
+window.saveAttend = async function (id) {
     if (!AdminAuth.requireEdit()) return;
     if (!DRAFT) return;
     const ev = EVENTS[id] || {};
@@ -210,6 +210,14 @@ window.saveAttend = function (id) {
         attendees.push({ key: k, id: p.id || '', nameKo: p.name || p.nameKo || '', nameEn: p.nameEn || '', aff: p.aff || '' });
     });
     attendees.sort((a, b) => (a.nameKo || a.nameEn || '').localeCompare(b.nameKo || b.nameEn || '', 'ko'));
+
+    // 선택한 참석자 중 이 특별행사 시간과 겹치는(강의/좌장) 사람 경고
+    const conflicts = attendees.map(a => ({ a, c: evConflicts(a.key, ev) })).filter(x => x.c.length);
+    if (conflicts.length) {
+        const lines = conflicts.map(x => `• ${x.a.nameKo || x.a.nameEn}: ${x.c.map(s => s.label).join(' / ')}`).join('\n');
+        const ok = await confirmDialog(`⚠ 아래 ${conflicts.length}명은 이 특별행사 시간(${timeLabel(ev) || '시간'})에 다른 일정이 있습니다.\n\n${lines}\n\n그래도 저장할까요?`, { danger: true, okText: '그래도 저장' });
+        if (!ok) return;
+    }
     const ref = database.ref('/adminConferences/' + CONF_ID + '/specialEvents/' + id);
     ref.update({ attendees, updatedAt: firebase.database.ServerValue.TIMESTAMP }).then(() => {
         logActivity('update', 'conference', `특별행사 "${ev.name || ''}" 참석 명단 저장(${attendees.length}명)`, { confId: CONF_ID, confTitle: CONF_NAME });
