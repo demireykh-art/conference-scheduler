@@ -17,7 +17,7 @@ let DRAFT = null;     // 편집 중 참석 키 Set
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('special');
 Masters.init();
-document.addEventListener('masters-change', () => { buildRoster(); if (EDIT_ID) render(); });
+document.addEventListener('masters-change', () => { buildRoster(); render(); });
 
 /* ---------- 행사 선택 ---------- */
 if (!CONF_ID) { try { CONF_ID = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { } }
@@ -74,6 +74,9 @@ function buildRoster() {
         if (!map.has(key)) map.set(key, { key, id: id || '', name: nk, nameEn: ne, aff: af });
         else { const p = map.get(key); if (!p.name && nk) p.name = nk; if (!p.aff && af) p.aff = af; }
     };
+    // 연자 관리(전체 등록 연자) — 강의 배정과 무관하게 '시간 되는 사람'을 부를 수 있도록 모두 포함
+    (Masters.speakers || []).forEach(s => add(s.id, s.nameKo, s.nameEn, s.affiliationKo));
+    // 이 행사에 참여/배정된 사람(혹시 마스터에 없을 경우 대비)
     Object.keys(CONF_SPK || {}).forEach(id => add(id));
     Object.values(POOL || {}).forEach(l => (l.speakers || []).forEach(s => add(s.id, s.nameKo, s.nameEn, s.affiliationKo)));
     Object.values(ROOMS || {}).forEach(room => Object.values(room.sessions || {}).forEach(sess => {
