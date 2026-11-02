@@ -62,6 +62,44 @@ function modArr(session) {
     const m = session.moderator;
     return (m && (m.id || m.nameKo || m.nameEn)) ? [m] : [];
 }
+
+/* ---------- 시간표 일정 수집 + 특별행사 시간 겹침 체크 ----------
+   시간표(강의/좌장) 시간이 수정되면 구독으로 render가 재실행 → 겹침이 자동 재계산된다.   */
+const TRAVEL_BUF = 10;   // 다른 장소 이동 버퍼(분)
+let SCHED = new Map();    // personKey → [{date,start,end,label}]
+function personKeyOf(sp) {
+    sp = sp || {};
+    const id = sp.id || '';
+    const m = id && Masters.speaker ? Masters.speaker(id) : null;
+    const nk = (m && m.nameKo) || sp.nameKo || '';
+    const ne = (m && m.nameEn) || sp.nameEn || '';
+    return (id || nk || ne || '').toString();
+}
+function parseHM(t) { if (!t || typeof t !== 'string' || !t.includes(':')) return null; const [h, m] = t.split(':').map(Number); return (h || 0) * 60 + (m || 0); }
+function buildSchedule() {
+    const map = new Map();
+    const push = (k, slot) => { if (!k) return; if (!map.has(k)) map.set(k, []); map.get(k).push(slot); };
+    toOrderedArray(ROOMS).forEach(room => {
+        (computeRoom(room) || []).forEach(session => {
+            const panel = [];
+            (session.lectures || []).forEach(l => { if (l.isBreak || l.isPanel) return; (l.speakers || []).forEach(sp => panel.push(sp)); });
+            (session.lectures || []).forEach(lec => {
+                if (lec.isBreak) return;
+                const speakers = lec.isPanel ? panel : (lec.speakers || []);
+                speakers.forEach(sp => push(personKeyOf(sp), { date: room.date || '', start: lec._start, end: lec._end, label: (lec.titleKo || lec.titleEn || '강의') + ' (' + (room.name || '룸') + ')' }));
+            });
+            modArr(session).forEach(md => push(personKeyOf(md), { date: room.date || '', start: session._start, end: session._end, label: '좌장/사회: ' + (session.name || '세션') + ' (' + (room.name || '룸') + ')' }));
+        });
+    });
+    return map;
+}
+// 특별행사 시간과 겹치는 이 사람의 강의/좌장 일정 목록
+function evConflicts(key, ev) {
+    if (!ev.date) return [];
+    const s = parseHM(ev.startTime); if (s == null) return [];
+    const e = (ev.endTime) ? parseHM(ev.endTime) : s;
+    return (SCHED.get(key) || []).filter(x => x.date === ev.date && x.start != null && x.start < e + TRAVEL_BUF && s < x.end + TRAVEL_BUF);
+}
 function buildRoster() {
     const map = new Map();
     const add = (id, nameKo, nameEn, aff) => {
@@ -185,6 +223,7 @@ function render() {
     const host = document.getElementById('seList');
     if (!host) return;
     if (!CONF_ID) { host.innerHTML = '<div class="card empty-state">행사를 선택하세요.</div>'; return; }
+    SCHED = buildSchedule();   // 시간표 일정 수집(겹침 체크용) — 시간표 수정 시 자동 갱신
     const events = toOrderedArray(EVENTS);
     if (!events.length) { host.innerHTML = '<div class="card empty-state">아직 등록된 특별행사가 없습니다. 위 <b>＋ 특별행사 추가</b>로 만들어 보세요.</div>'; return; }
     host.innerHTML = events.map(eventCard).join('');
@@ -192,21 +231,31 @@ function render() {
 
 function eventCard(ev) {
     const att = ev.attendees || [];
+    let conflN = 0;
     const chips = att.length
-        ? att.map(a => `<span class="se-chip">${escapeHtml(a.nameKo || a.nameEn || '(이름)')}${a.aff ? ` <span class="se-aff">${escapeHtml(a.aff)}</span>` : ''}</span>`).join('')
+        ? att.map(a => {
+            const c = evConflicts(a.key, ev);
+            if (c.length) conflN++;
+            const title = c.length ? ` title="⚠ 이 시간에 다른 일정: ${escapeHtml(c.map(x => x.label).join(' / '))}"` : '';
+            return `<span class="se-chip${c.length ? ' warn' : ''}"${title}>${escapeHtml(a.nameKo || a.nameEn || '(이름)')}${a.aff ? ` <span class="se-aff">${escapeHtml(a.aff)}</span>` : ''}${c.length ? ' ⚠' : ''}</span>`;
+        }).join('')
         : '<span class="dim">아직 지정된 참석자가 없습니다. ‘참석자 지정’에서 명단을 켜세요.</span>';
     const editing = EDIT_ID === ev.id;
     let editor = '';
     if (editing) {
         const rosterHtml = ROSTER.length ? ROSTER.map(p => {
             const on = DRAFT.has(p.key);
-            const plain = (p.name || p.nameEn || '(이름)') + (p.aff ? ` · ${p.aff}` : '');
+            const conf = evConflicts(p.key, ev);
+            const busy = conf.length > 0;
+            const plain = (p.name || p.nameEn || '(이름)') + (p.aff ? ` · ${p.aff}` : '') + (busy ? ' ⚠' : '');
             const labelEsc = escapeHtml(plain);
             const search = ((p.name || '') + ' ' + (p.nameEn || '') + ' ' + (p.aff || '')).toLowerCase();
-            return `<button class="se-person ${on ? 'on' : ''}" data-key="${escapeHtml(p.key)}" data-label="${labelEsc}" data-search="${escapeHtml(search)}" onclick="toggleAttend(this)">${on ? '✓ ' : ''}${labelEsc}</button>`;
+            const title = busy ? ` title="⚠ 이 시간에 다른 일정: ${escapeHtml(conf.map(x => x.label).join(' / '))}"` : '';
+            return `<button class="se-person ${on ? 'on' : ''}${busy ? ' busy' : ''}"${title} data-key="${escapeHtml(p.key)}" data-label="${labelEsc}" data-search="${escapeHtml(search)}" onclick="toggleAttend(this)">${on ? '✓ ' : ''}${labelEsc}</button>`;
         }).join('') : '<div class="dim" style="padding:10px">명단이 없습니다. 강의/연자 관리에서 연자를 먼저 등록하세요.</div>';
         editor = `<div class="se-editor">
             <input class="se-rsearch" type="text" placeholder="🔍 연자/사회/좌장 이름·소속 검색" oninput="onRosterSearch(this)">
+            <div class="se-hint">⚠ 표시는 이 특별행사 시간에 <b>강의·좌장 일정이 있어 겹치는 분</b>입니다. (행사 날짜·시간이 있을 때만 체크)</div>
             <div class="se-roster">${rosterHtml}</div>
             <div class="se-editor-actions">
                 <span class="dim">참석 선택 <b class="se-selcount">${DRAFT.size}</b>명</span>
@@ -228,7 +277,7 @@ function eventCard(ev) {
             <label>종료 <input type="time" step="300" value="${escapeHtml(ev.endTime || '')}" onchange="updateEvent('${ev.id}','endTime',this.value)"></label>
             <label class="grow">메모 <input type="text" value="${escapeHtml(ev.memo || '')}" placeholder="장소·비고 등" onchange="updateEvent('${ev.id}','memo',this.value)"></label>
         </div>
-        <div class="se-confirmed"><b>확정 참석 ${att.length}명</b> <span class="se-chips">${chips}</span></div>
+        <div class="se-confirmed"><b>확정 참석 ${att.length}명</b>${conflN ? ` <span class="se-warn">⚠ 시간 겹침 ${conflN}명</span>` : ''} <span class="se-chips">${chips}</span></div>
         <div class="se-row">
             <button class="btn btn-sm ${editing ? 'btn-primary' : ''}" onclick="${editing ? 'cancelAttend()' : `openAttend('${ev.id}')`}">${editing ? '닫기' : '👥 참석자 지정/수정'}</button>
             <button class="btn btn-sm" title="행사·시간·참석자 명단을 복사(카톡 등에 붙여넣기)" onclick="copyEvent('${ev.id}',this)">📋 명단 복사</button>
