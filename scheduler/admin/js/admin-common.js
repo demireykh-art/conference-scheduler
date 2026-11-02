@@ -401,6 +401,7 @@ const SIDE_MENU = [
             { key: 'speakers', label: '🧑‍⚕️ 전체 연자 리스트', href: 'speakers.html' },
             { key: 'spkdupes', label: '🔍 중복 연자 점검', href: 'speaker-dupes.html' },
             { key: 'spksched', label: '🗂️ 연자별 강의 일정', href: 'speaker-schedule.html' },
+            { key: 'special', label: '🎟️ 특별행사 참석명단', href: 'special-events.html' },
             { key: 'partners', label: '🏢 행사별 참여사 관리', href: 'partners.html' },
             { key: 'booth', label: '🏅 부스 등급별 혜택', href: 'booth-benefits.html' },
             { key: 'sponsor', label: '🎤 스폰서 강의 점검', href: 'sponsor-roster.html' },

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>특별행사 참석명단 · ASLS 행사 관리</title>
+    <link rel="icon" type="image/png" href="assets/asls-logo.png">
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <div id="sidebarMount"></div>
+        <main class="main">
+            <div class="main-topbar">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+                    <div>
+                        <h1 class="main-title">특별행사 참석명단</h1>
+                        <div id="confName" style="font-size:0.82rem;color:var(--text-dim);margin-top:2px"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="main-body">
+                <div class="info-banner">
+                    <div class="info-ico">i</div>
+                    <div class="info-title">MOU 체결식·만찬 등 강의 일정에 없는 <b>특별행사</b>를 만들고, 연자·사회·좌장 명단에서 <b>참석</b>을 켜 참석자를 확정합니다. 확정된 참석자는 <b>연자별 강의 일정</b>에도 함께 표시됩니다.</div>
+                </div>
+
+                <div class="ss-bar">
+                    <span class="ss-bar-label">행사 선택</span>
+                    <select id="seConfSelect" onchange="changeConf(this.value)"></select>
+                </div>
+
+                <!-- 특별행사 추가 -->
+                <div class="card se-add">
+                    <b>＋ 특별행사 추가</b>
+                    <div class="se-add-grid">
+                        <label>행사명 <input type="text" id="seName" placeholder="예: MOU 체결식"></label>
+                        <label>날짜 <input type="date" id="seDate"></label>
+                        <label>시간 <input type="text" id="seTime" placeholder="예: 18:00~19:00 (수기)"></label>
+                        <label class="grow">메모 <input type="text" id="seMemo" placeholder="장소·비고 등 (선택)"></label>
+                        <button class="btn btn-primary" onclick="addEvent()">추가</button>
+                    </div>
+                </div>
+
+                <div id="seList"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="js/admin-common.js"></script>
+    <script src="js/version.js"></script>
+    <script src="js/admin-auth.js"></script>
+    <script src="js/masters.js"></script>
+    <script src="js/special-events.js"></script>
+</body>
+</html>
