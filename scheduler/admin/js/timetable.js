@@ -92,6 +92,7 @@ if (!CONF_ID) {
         POOL = toOrderedArray(snap.val());
         if (document.getElementById('placeModal').classList.contains('open')) renderPlaceList();
         if (ttQuery()) runTtSearch();
+        renderQuickIfOpen();
     });
 }
 
@@ -1179,6 +1180,10 @@ function renderSessions() {
     // 강의 드래그 (세션 내 순서변경 + 세션 간 이동 모두 지원)
     enableLectureDrag(room.id);
 
+    // 빠른 패널 드롭 대상 등록 + 패널 목록 갱신(배치됨 표시)
+    enableQuickDrop();
+    renderQuickIfOpen();
+
     // 검색 하이라이트 재적용 (재렌더 후에도 유지)
     if (typeof ttQuery === 'function' && ttQuery()) applyTtHighlight(ttQuery());
 }
@@ -1749,12 +1754,14 @@ function renderPlaceList() {
     }).join('');
 }
 
-window.placeLecture = async function (poolId) {
-    if (!AdminAuth.requireEdit()) return;
-    const { roomId, sessionId } = placingTarget;
-    const pool = POOL.find(l => l.id === poolId);
-    if (!pool) { Toast.error('강의를 찾을 수 없습니다.'); return; }
-    if (!(await confirmSpecChange(pool, getRoom(roomId)))) return;   // 지정 요일·시간과 다르면 경고
+// 풀 강의(pool)를 특정 세션에 배치하는 공통 로직 — 배치 모달/빠른 패널 드래그 공용
+async function doPlace(roomId, sessionId, pool) {
+    if (!AdminAuth.requireEdit()) return false;
+    if (!pool) { Toast.error('강의를 찾을 수 없습니다.'); return false; }
+    if (!(CONF && CONF.rooms && CONF.rooms[roomId] && CONF.rooms[roomId].sessions && CONF.rooms[roomId].sessions[sessionId])) {
+        Toast.error('세션을 찾을 수 없습니다.'); return false;
+    }
+    if (!(await confirmSpecChange(pool, getRoom(roomId)))) return false;   // 지정 요일·시간과 다르면 경고
 
     // 중복이어도 배치는 허용 — 중복은 시간표에서 빨간 '중복' 배지로 표시됨
     const data = {
@@ -1772,15 +1779,125 @@ window.placeLecture = async function (poolId) {
     };
     // 위치(룸·날짜·시간) 요약은 쓰기 전에 계산 — 쓰기 후엔 로컬 캐시가 이미 새 강의를 포함해 시작시각이 틀어짐
     const placeLoc = lecLocLabel(roomId, sessionId, data.duration);
-    confRef().child(`rooms/${roomId}/sessions/${sessionId}/lectures/${uuid()}`).set(data)
-        .then(() => {
-            // 배치된 강의의 연자를 이 행사 연자/사회자 목록에 자동 추가
-            (pool.speakers || []).forEach(s => { if (s && s.id) ensureConfSpeaker(s.id, '연자'); });
-            logActivity('place', 'lecture', `${placeLoc ? placeLoc + ' — ' : ''}강의 "${data.titleKo}" 배치`, { confId: CONF_ID, confTitle: ctitle(), entityId: pool.id });
-            Toast.success(`"${data.titleKo}" 배치됨`); renderPlaceList();
-        })
-        .catch(e => Toast.error('배치 실패: ' + e.message));
+    try {
+        await confRef().child(`rooms/${roomId}/sessions/${sessionId}/lectures/${uuid()}`).set(data);
+        (pool.speakers || []).forEach(s => { if (s && s.id) ensureConfSpeaker(s.id, '연자'); });
+        logActivity('place', 'lecture', `${placeLoc ? placeLoc + ' — ' : ''}강의 "${data.titleKo}" 배치`, { confId: CONF_ID, confTitle: ctitle(), entityId: pool.id });
+        Toast.success(`"${data.titleKo}" 배치됨`);
+        return true;
+    } catch (e) { Toast.error('배치 실패: ' + e.message); return false; }
+}
+
+window.placeLecture = async function (poolId) {
+    const { roomId, sessionId } = placingTarget;
+    const pool = POOL.find(l => l.id === poolId);
+    if (await doPlace(roomId, sessionId, pool)) renderPlaceList();
 };
+
+// 빠른 패널에서 드래그 → 세션에 배치
+window.placeFromQuick = async function (roomId, sessionId, poolId) {
+    const pool = POOL.find(l => l.id === poolId);
+    await doPlace(roomId, sessionId, pool);
+};
+
+/* ============================================================
+   ⚡ 빠른 강의 패널 — 풀 전체를 띄워 검색 + 드래그로 세션에 배치
+   ============================================================ */
+let QUICK_CONF = CONF_ID;   // 패널에서 보는 행사(기본=현재)
+let QUICK_POOL = [];        // 다른 행사 선택 시 그 행사의 풀(보기 전용)
+let QUICK_DRAG = null;      // { poolId } 드래그 중
+
+function quickPanelOpen() { const p = document.getElementById('quickPanel'); return p && p.style.display !== 'none'; }
+function renderQuickIfOpen() { if (quickPanelOpen() && QUICK_CONF === CONF_ID) renderQuickList(); }
+
+window.toggleQuickPanel = function () {
+    const p = document.getElementById('quickPanel');
+    if (!p) return;
+    if (quickPanelOpen()) { p.style.display = 'none'; return; }
+    const sel = document.getElementById('qpConf');
+    if (sel && !sel.dataset.init) {
+        sel.innerHTML = CONFS.map(c => `<option value="${c.id}" ${c.id === CONF_ID ? 'selected' : ''}>${escapeHtml(c.title || '(제목 없음)')}</option>`).join('');
+        sel.dataset.init = '1'; QUICK_CONF = CONF_ID;
+    }
+    p.style.display = '';
+    renderQuickList();
+};
+
+window.onQpConf = function (id) {
+    QUICK_CONF = id;
+    if (id === CONF_ID) { QUICK_POOL = []; renderQuickList(); return; }
+    database.ref('/adminConferences/' + id + '/lecturePool').once('value')
+        .then(s => { QUICK_POOL = toOrderedArray(s.val()); renderQuickList(); })
+        .catch(() => { QUICK_POOL = []; renderQuickList(); });
+};
+
+window.qpScroll = function (dir) {
+    const box = document.getElementById('qpList');
+    if (!box) return;
+    const row = box.querySelector('.qp-row');
+    const h = row ? row.offsetHeight : 54;
+    box.scrollBy({ top: dir * h * 5, behavior: 'smooth' });
+};
+
+function renderQuickList() {
+    const box = document.getElementById('qpList');
+    if (!box) return;
+    const isCur = QUICK_CONF === CONF_ID;
+    const q = (document.getElementById('qpSearch').value || '').trim().toLowerCase();
+    const src = isCur ? (POOL || []) : (QUICK_POOL || []);
+    let list = src.slice().sort((a, b) => (a.titleKo || '').localeCompare(b.titleKo || '', 'ko'));
+    const placed = isCur ? placedLectureIdSet() : new Set();
+    if (q) list = list.filter(l => {
+        const hay = [l.titleKo, l.titleEn, ...(l.tags || []), ...(l.categories || []), ...(l.types || []),
+        ...((l.speakers || []).map(s => s.nameKo + ' ' + s.nameEn)), l.partnerKo, l.productKo].join(' ').toLowerCase();
+        return hay.includes(q);
+    });
+    const foot = document.getElementById('qpFoot');
+    if (foot) foot.innerHTML = isCur
+        ? `강의 <b>${list.length}</b>개 · <span class="dim">행을 세션으로 드래그해 배치</span>`
+        : `강의 <b>${list.length}</b>개 · <span class="dim">보기 전용 — 현재 행사로 바꾸면 드래그 배치</span>`;
+    if (!list.length) { box.innerHTML = `<div class="qp-empty">강의가 없습니다.</div>`; return; }
+    box.innerHTML = list.map(l => {
+        const spk = (l.speakers || []).map(s => escapeHtml(s.nameKo || s.nameEn)).join(', ') || '미정';
+        const isPlaced = placed.has(l.id);
+        return `<div class="qp-row${isPlaced ? ' placed' : ''}" ${isCur ? `draggable="true" data-pool="${escapeHtml(l.id)}"` : ''} title="${escapeHtml(l.titleKo || '')}">
+            <div class="qp-row-main">
+                <div class="qp-title">${escapeHtml(l.titleKo || '(제목 없음)')} <span class="qp-dur">${l.duration || 0}분</span>${isPlaced ? ' <span class="qp-badge">배치됨</span>' : ''}</div>
+                <div class="qp-meta">${spk}${l.partnerKo ? ' · ' + escapeHtml(l.partnerKo) : ''}</div>
+            </div>
+            ${isCur ? '<span class="qp-grip" title="드래그해서 세션에 배치">⠿</span>' : ''}
+        </div>`;
+    }).join('');
+    if (isCur) box.querySelectorAll('.qp-row[draggable]').forEach(row => {
+        row.addEventListener('dragstart', e => {
+            QUICK_DRAG = { poolId: row.getAttribute('data-pool') };
+            row.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'copy';
+            try { e.dataTransfer.setData('text/plain', ''); } catch (x) { }
+        });
+        row.addEventListener('dragend', () => {
+            QUICK_DRAG = null; row.classList.remove('dragging');
+            document.querySelectorAll('.session-block.qp-drop-hi').forEach(x => x.classList.remove('qp-drop-hi'));
+        });
+    });
+}
+
+// 세션 블록을 빠른 패널 드롭 대상으로 — renderSessions 이후 호출
+function enableQuickDrop() {
+    document.querySelectorAll('#sessions .session-block[data-session]').forEach(block => {
+        block.addEventListener('dragover', e => { if (!QUICK_DRAG) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; block.classList.add('qp-drop-hi'); });
+        block.addEventListener('dragleave', e => { if (e.target === block) block.classList.remove('qp-drop-hi'); });
+        block.addEventListener('drop', e => {
+            if (!QUICK_DRAG) return;
+            e.preventDefault(); e.stopPropagation();
+            block.classList.remove('qp-drop-hi');
+            const sid = block.getAttribute('data-session');
+            const pid = QUICK_DRAG.poolId;
+            QUICK_DRAG = null;
+            if (sid && pid) placeFromQuick(CURRENT_ROOM, sid, pid);
+        });
+    });
+}
 
 // 고아(목록에서 삭제된) 배치 강의를 강의관리(풀)에 다시 등록 — 같은 lectureId 유지로 재연결.
 // 시간표 배치는 전혀 바꾸지 않는다(lecturePool 에만 기록).
