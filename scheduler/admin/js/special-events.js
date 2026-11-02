@@ -230,6 +230,7 @@ function eventCard(ev) {
         <div class="se-confirmed"><b>확정 참석 ${att.length}명</b> <span class="se-chips">${chips}</span></div>
         <div class="se-row">
             <button class="btn btn-sm ${editing ? 'btn-primary' : ''}" onclick="${editing ? 'cancelAttend()' : `openAttend('${ev.id}')`}">${editing ? '닫기' : '👥 참석자 지정/수정'}</button>
+            <button class="btn btn-sm" title="행사·시간·참석자 명단을 복사(카톡 등에 붙여넣기)" onclick="copyEvent('${ev.id}',this)">📋 명단 복사</button>
         </div>
         ${editor}
     </div>`;
@@ -237,6 +238,35 @@ function eventCard(ev) {
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토'];
 function fmtDayLabel(d) { if (!d) return ''; const dt = new Date(d + 'T00:00:00'); return d + (isNaN(dt.getTime()) ? '' : ` (${DOW[dt.getDay()]})`); }
+
+/* ---------- 명단 복사(카톡 등 수동 전달용) ---------- */
+function buildEventText(ev) {
+    const att = ev.attendees || [];
+    let t = `[${CONF_NAME}] ${ev.name || '특별행사'}\n`;
+    const dt = [ev.date ? '📅 ' + fmtDayLabel(ev.date) : '', timeLabel(ev) ? '⏰ ' + timeLabel(ev) : ''].filter(Boolean).join('  ');
+    if (dt) t += dt + '\n';
+    if (ev.memo) t += '📍 ' + ev.memo + '\n';
+    t += `\n■ 참석자 (${att.length}명)\n`;
+    t += att.length
+        ? att.map(a => `- ${a.nameKo || a.nameEn || '(이름)'}${a.aff ? ` (${a.aff})` : ''}`).join('\n')
+        : '- (아직 지정된 참석자가 없습니다)';
+    return t;
+}
+window.copyEvent = function (id, btn) {
+    const ev = EVENTS[id]; if (!ev) return;
+    if (btn && btn.classList.contains('se-copied')) return;
+    const text = buildEventText(ev);
+    const orig = btn ? btn.innerHTML : '';
+    const done = () => { if (!btn) return; btn.classList.add('se-copied'); btn.innerHTML = '✓ 복사 완료'; setTimeout(() => { btn.classList.remove('se-copied'); btn.innerHTML = orig; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(() => seFallbackCopy(text, done));
+    else seFallbackCopy(text, done);
+};
+function seFallbackCopy(text, done) {
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { if (window.Toast) Toast.error('복사 실패 — 직접 선택해 복사하세요.'); }
+    ta.remove();
+}
 // 시간 표시: startTime~endTime (구버전 time 텍스트 호환)
 function timeLabel(ev) {
     if (ev.startTime) return ev.startTime + (ev.endTime ? ` ~ ${ev.endTime}` : '');
