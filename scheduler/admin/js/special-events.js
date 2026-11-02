@@ -71,6 +71,7 @@ function buildRoster() {
         const af = (m && m.affiliationKo) || aff || '';
         const key = (id || nk || ne || '').toString();
         if (!key.trim()) return;
+        if (!nk && !ne) return;   // 이름이 비어 있는 항목은 후보 명단에서 제외
         if (!map.has(key)) map.set(key, { key, id: id || '', name: nk, nameEn: ne, aff: af });
         else { const p = map.get(key); if (!p.name && nk) p.name = nk; if (!p.aff && af) p.aff = af; }
     };
