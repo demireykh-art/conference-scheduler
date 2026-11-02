@@ -1665,6 +1665,11 @@ html.modal-open, body.modal-open { overflow: hidden; }
 .se-editor-actions .dim { margin-right: auto; }
 .se-row { margin-top: 2px; display: flex; gap: 6px; flex-wrap: wrap; }
 .se-row .btn.se-copied { background: #e7f6ec; border-color: #38a169; color: #1f7a3f; }
+.se-chip.warn { background: #fdeaea; color: #c0392b; }
+.se-warn { color: #c0392b; font-weight: 800; font-size: 0.82rem; margin-left: 4px; }
+.se-person.busy { border-color: #e6a23c; }
+.se-person.busy.on { background: #fdeaea; border-color: #c0392b; color: #c0392b; }
+.se-hint { font-size: 0.76rem; color: var(--text-dim); margin-bottom: 8px; }
 .ss-jump { cursor: pointer; }
 .ss-jump:hover { filter: brightness(0.94); }
 .ss-unp-badge { display: inline-block; margin-left: 6px; font-size: 0.7rem; font-weight: 800; border-radius: 5px; padding: 1px 7px; background: #fff3e0; color: #b45309; border: 1px solid #f6d08a; }
