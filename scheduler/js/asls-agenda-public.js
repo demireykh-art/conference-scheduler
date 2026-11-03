@@ -108,7 +108,7 @@
                     title: lec.titleKo != null ? lec.titleKo : (lec.title || ''),
                     titleEn: lec.titleEn != null ? lec.titleEn : (lec.subtitle || ''),
                     speakers: type === 'lecture' ? normSpeakers(lec, speakerMap, showNat) : [],
-                    memo: lec.memo || ''
+                    memo: lec.memoPublic ? (lec.memo || '') : ''   // 메모는 기본 비공개, '홈페이지 공개' 체크 시에만 노출
                     // 주의: 파트너사(회사)·제품 정보는 공개 피드에서 의도적으로 제외
                 };
             });

@@ -171,7 +171,7 @@
             return `<span class="ag-spk">${nm}${aff}</span>`;
         }).join('<span class="ag-sep">, </span>') : '';
         // 파트너사·제품은 공개 화면에서 제외 (내부 확인용 정보)
-        const memo = lec.memo ? `<div class="ag-memo">📝 ${esc(lec.memo)}</div>` : '';
+        const memo = (lec.memoPublic && lec.memo) ? `<div class="ag-memo">📝 ${esc(lec.memo)}</div>` : '';   // 메모 기본 비공개, 공개 체크 시만
         return `<div class="ag-lec">
             <div class="ag-time">${time}</div>
             <div class="ag-lec-main">

@@ -85,8 +85,11 @@
             </div>
 
             <div class="modal-field">
-                <label>메모</label>
-                <input type="text" id="lecMemo" placeholder="메모 (강의 목록·시간표에 함께 표시)">
+                <label>메모 <span style="font-weight:400;color:var(--text-dim);font-size:0.78rem">(기본: 내부 전용 — 홈페이지 비공개)</span></label>
+                <input type="text" id="lecMemo" placeholder="메모 (강의 목록·시간표에만 표시, 홈페이지 비공개)">
+                <label class="check-inline" style="margin-top:6px;font-size:0.85rem">
+                    <input type="checkbox" id="lecMemoPublic"> 이 메모를 홈페이지에도 공개
+                </label>
             </div>
 
             <div class="modal-field">
