@@ -617,6 +617,7 @@ window.openLectureModal = function () {
     document.getElementById('lecTitleKo').value = '';
     document.getElementById('lecTitleEn').value = '';
     document.getElementById('lecMemo').value = '';
+    document.getElementById('lecMemoPublic').checked = false;
     document.getElementById('lecDuration').value = 20;
     catDraft = []; tagDraft = []; spkDraft = []; partnerDraft = null;
     setTypes([]);
@@ -639,6 +640,7 @@ window.editLecture = function (id) {
     document.getElementById('lecTitleKo').value = l.titleKo || '';
     document.getElementById('lecTitleEn').value = l.titleEn || '';
     document.getElementById('lecMemo').value = l.memo || '';
+    document.getElementById('lecMemoPublic').checked = !!l.memoPublic;
     document.getElementById('lecDuration').value = l.duration ?? 20;
     catDraft = [...(l.categories || [])];
     tagDraft = [...(l.tags || [])];
@@ -682,6 +684,7 @@ function buildLectureData() {
         titleKo: document.getElementById('lecTitleKo').value.trim(),
         titleEn: document.getElementById('lecTitleEn').value.trim(),
         memo: document.getElementById('lecMemo').value.trim(),
+        memoPublic: document.getElementById('lecMemoPublic').checked,   // 메모 홈페이지 공개 여부(기본 false)
         duration: Number(document.getElementById('lecDuration').value) || 0,
         categories: [...catDraft],
         tags: [...tagDraft],
