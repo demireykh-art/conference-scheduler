@@ -21,7 +21,7 @@
     const VENUE_DEFAULTS = { 'fa976df5-fa3a-4ae0-b206-132e448769a8': COEX3F };
     const ALIAS = { ol1: 'ola', ol2: 'olb', '오픈렉처1': 'ola', '오픈렉처2': 'olb' };
 
-    let VENUE_DB = null, venueRef = null, venueConf = '';
+    let VENUE_DB = null, venueRef = null, venueConf = '', venueLoaded = false;
     const imgCache = {};
     let RM = null;   // 현재 모달 상태 { key, date, pinEdit }
 
@@ -42,14 +42,15 @@
     function watchVenue() {
         if (venueConf === CONF_ID) return;
         if (venueRef) venueRef.off();
-        venueConf = CONF_ID; VENUE_DB = null;
+        venueConf = CONF_ID; VENUE_DB = null; venueLoaded = false;
         if (!CONF_ID) return;
         venueRef = database.ref('/adminConferences/' + CONF_ID + '/venueMap');
-        venueRef.on('value', s => { VENUE_DB = s.val() || null; if (RM) draw(); });
+        venueRef.on('value', s => { VENUE_DB = s.val() || null; venueLoaded = true; if (RM) draw(); });
     }
     function venue() {
-        const def = VENUE_DEFAULTS[CONF_ID];
         const db = VENUE_DB || {};
+        // 행사설정에서 지도를 올렸으면 그 지도 + 그 지도에 찍은 위치만 사용. 없으면 내장 기본 지도.
+        const def = db.imageUrl ? null : VENUE_DEFAULTS[CONF_ID];
         const image = db.imageUrl || (def && def.image);
         if (!image) return null;
         const pins = Object.assign({}, def ? def.pins : {});
@@ -253,7 +254,8 @@
         const keys = new Map();
         toOrderedArray(ROOMS).forEach(r => { const k = placeKey(r.name); if (k && !keys.has(k)) keys.set(k, roomLabel(r.name)); });
         sel.innerHTML = [...keys].map(([k, lb]) => `<option value="${escapeHtml(k)}">${v.pins[k] ? '' : '⚠ '}${escapeHtml(lb)}</option>`).join('');
-        if (cur && keys.has(cur)) sel.value = cur;
+        if (RM.advance) { RM.advance = false; const miss = [...keys.keys()].find(k => !v.pins[k]); sel.value = miss || cur; }
+        else if (cur && keys.has(cur)) sel.value = cur;
         else { const miss = [...keys.keys()].find(k => !v.pins[k]); if (miss) sel.value = miss; }
     }
     function onCanvasClick(e) {
@@ -263,6 +265,7 @@
         if (y > LASTDRAW.H) return;
         const k = document.getElementById('rmPinSel').value; if (!k) return;
         const val = { x: +(x / LASTDRAW.W).toFixed(4), y: +(y / LASTDRAW.H).toFixed(4) };
+        RM.advance = true;   // 저장 후 다음 미지정 방으로 자동 이동
         database.ref('/adminConferences/' + CONF_ID + '/venueMap/pins/' + k.replace(/[.#$\[\]\/]/g, '_')).set(val)
             .then(() => { database.ref('/adminConferences/' + CONF_ID + '/venueMap/updatedAt').set(Date.now()); if (window.Toast) Toast.success('위치를 저장했습니다.'); })
             .catch(err => { if (window.Toast) Toast.error('저장 실패: ' + (err && err.message || err)); });
@@ -272,16 +275,18 @@
         return `ASLS_${RM.date.slice(5).replace('-', '')}_${(p.name || p.nameEn || '연자').replace(/[\\/:*?"<>|\s]/g, '')}_동선.png`;
     }
 
-    window.ssRouteMap = function (key) {
+    window.ssRouteMap = async function (key) {
         watchVenue();
+        for (let i = 0; i < 40 && !venueLoaded; i++) await new Promise(r => setTimeout(r, 100));   // 지도 설정 로드 대기(최대 4초)
         const p = getPersonByKey(key); if (!p) return;
-        if (!venue()) { if (window.Toast) Toast.warning('이 행사는 동선 지도가 아직 설정되지 않았습니다.'); return; }
+        if (!venue()) { if (window.Toast) Toast.warning("이 행사는 지도가 없습니다. '행사 개설/관리 › 행사설정'에서 행사장 지도를 올려주세요."); return; }
         const date = pickDate(p);
         if (!date) { if (window.Toast) Toast.info('배치된 일정이 없습니다.'); return; }
         RM = { key, date, pinEdit: false };
         const m = ensureModal(); m.style.display = 'flex';
         document.getElementById('rmPinBar').style.display = 'none';
         document.getElementById('rmPinBtn').classList.remove('btn-primary');
+        if (!Object.keys(venue().pins).length) { window.rmTogglePin(); if (window.Toast) Toast.info('새 지도입니다. 룸을 고르고 지도에서 그 방을 탭해 위치를 찍어주세요.'); }
         draw();
     };
     window.rmClose = function () { RM = null; const m = document.getElementById('rmModal'); if (m) m.style.display = 'none'; };

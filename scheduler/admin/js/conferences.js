@@ -9,6 +9,7 @@ let CONFS = [];          // [{id, ...}]
 let CURRENT_TAB = 'public';
 let EDIT_ID = null;      // 수정 중인 행사 id (null=신규)
 let posterData = '';     // 업로드한 포스터 data URL (파일 업로드 시에만 채워짐)
+let mapData = '', mapChanged = false;   // 행사장 지도(동선이미지용) data URL / 이번 모달에서 바뀌었는지
 
 /* ---------- 초기화 ---------- */
 document.getElementById('sidebarMount').innerHTML = renderSidebar('events');
@@ -165,6 +166,7 @@ window.openConferenceModal = function () {
     document.getElementById('cfEnd').value = '';
     document.getElementById('cfLocation').value = '';
     setPosterFromValue('');
+    setVenueMapFromValue('');
     setSubmitConfigFields({});
     const _pubNew = document.getElementById('cfPublic'); if (_pubNew) _pubNew.checked = true;
     document.getElementById('confModal').classList.add('open');
@@ -182,6 +184,7 @@ window.editConference = function (id) {
     document.getElementById('cfEnd').value = c.endDate || '';
     document.getElementById('cfLocation').value = c.location || '';
     setPosterFromValue(c.posterUrl || '');
+    setVenueMapFromValue((c.venueMap && c.venueMap.imageUrl) || '');
     setSubmitConfigFields(c.submitConfig || {});
     const _pubEdit = document.getElementById('cfPublic'); if (_pubEdit) _pubEdit.checked = c.visibility !== 'private';
     document.getElementById('confModal').classList.add('open');
@@ -232,6 +235,8 @@ window.saveConference = function () {
         visibility: (document.getElementById('cfPublic') || { checked: true }).checked ? 'public' : 'private',
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     };
+    // 지도는 바뀐 경우에만 저장 — 새 지도면 기존 방 위치(pins)는 맞지 않으므로 함께 초기화
+    if (mapChanged) data.venueMap = mapData ? { imageUrl: mapData, updatedAt: Date.now() } : null;
 
     if (EDIT_ID) {
         CONF_ROOT.child(EDIT_ID).update(data)
@@ -405,3 +410,39 @@ window.downloadPoster = function (id) {
     const c = CONFS.find(x => x.id === id);
     if (c) downloadPosterValue(c.posterUrl, c.title);
 };
+
+/* ============================================================
+   행사장 지도 (연자별 강의 일정 › 동선이미지 배경)
+   데이터: /adminConferences/<id>/venueMap = { imageUrl(data URL), pins{placeKey:{x,y}}, updatedAt }
+   ============================================================ */
+function setVenueMapFromValue(v) {
+    mapData = v || ''; mapChanged = false;
+    const fi = document.getElementById('cfMapFile'); if (fi) fi.value = '';
+    refreshVenueMapPreview();
+}
+function refreshVenueMapPreview() {
+    const img = document.getElementById('cfMapPreview'), empty = document.getElementById('cfMapEmpty'), clr = document.getElementById('cfMapClear');
+    if (!img) return;
+    if (mapData) { img.src = mapData; img.style.display = ''; empty.style.display = 'none'; clr.style.display = ''; }
+    else { img.removeAttribute('src'); img.style.display = 'none'; empty.style.display = ''; clr.style.display = 'none'; }
+}
+window.clearVenueMap = function () {
+    mapData = ''; mapChanged = true; refreshVenueMapPreview();
+};
+(function () {
+    const fi = document.getElementById('cfMapFile');
+    if (!fi) return;
+    fi.addEventListener('change', async e => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) { Toast.warning('이미지 파일만 업로드할 수 있습니다.'); e.target.value = ''; return; }
+        try {
+            mapData = await compressImage(file, 1400, 0.88);   // 지도 글자가 읽히도록 포스터보다 크게
+            mapChanged = true;
+            refreshVenueMapPreview();
+            const kb = Math.round((mapData.length * 3 / 4) / 1024);
+            Toast.success(`지도 이미지가 추가되었습니다 (약 ${kb}KB). 저장 후 동선이미지에서 방 위치를 찍어주세요.`);
+        } catch (err) { Toast.error('이미지 처리 실패: ' + err.message); }
+        e.target.value = '';
+    });
+})();
