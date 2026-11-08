@@ -3,8 +3,8 @@
 // 캐시 버전: 날짜 기반 자동 관리 (YYYYMMDD-N 형식)
 // 파일을 수정할 때 BUILD_DATE 또는 BUILD_NUM을 올리면 캐시 자동 갱신
 // ============================================
-const BUILD_DATE = '20260709';  // 오늘 날짜로 갱신
-const BUILD_NUM  = 2;               // 같은 날 여러 번 배포 시 증가
+const BUILD_DATE = '20261108';  // 오늘 날짜로 갱신
+const BUILD_NUM  = 1;               // 같은 날 여러 번 배포 시 증가
 const CACHE_VERSION = `scheduler-${BUILD_DATE}-${BUILD_NUM}`;
 const OFFLINE_URL   = '/conference-scheduler/scheduler/offline.html';
 
