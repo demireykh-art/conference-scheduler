@@ -92,6 +92,19 @@
                 </div>
                 <input type="text" id="cfPoster" placeholder="또는 이미지 URL 직접 입력 (https://...)" style="margin-top:8px">
             </div>
+            <div class="modal-field">
+                <label>행사장 지도 (선택 · 연자 동선이미지용)</label>
+                <div style="display:flex;gap:12px;align-items:flex-start">
+                    <img id="cfMapPreview" class="poster-preview" style="display:none;object-fit:contain;background:#fff" alt="지도 미리보기">
+                    <div id="cfMapEmpty" class="poster-preview poster-empty">지도</div>
+                    <div style="display:flex;flex-direction:column;gap:6px;flex:1">
+                        <input type="file" id="cfMapFile" accept="image/*" style="display:none">
+                        <button type="button" class="btn btn-sm" onclick="document.getElementById('cfMapFile').click()">🗺 지도 이미지 선택</button>
+                        <button type="button" class="btn btn-sm btn-danger-ghost" id="cfMapClear" onclick="clearVenueMap()" style="display:none">✕ 제거</button>
+                        <div id="cfMapNote" style="font-size:0.72rem;color:var(--text-dim);line-height:1.4">층별 배치도에서 강의실이 보이는 부분만 잘라 올려주세요. 새 지도를 올리면 '연자별 강의 일정 › 🗺 동선이미지 › 📍 위치 수정'에서 방 위치를 한 번 찍어야 합니다.</div>
+                    </div>
+                </div>
+            </div>
 
             <div style="border-top:1px solid var(--border);margin:10px 0 14px"></div>
             <div style="font-size:0.92rem;font-weight:700;margin-bottom:4px">📄 원고·CV 접수 설정</div>

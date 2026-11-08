@@ -267,6 +267,7 @@ function render() {
                     <div class="ss-counts"><span class="ss-cnt lec">강의 ${lecRows.length}</span><span class="ss-cnt mod">좌장/사회 ${modRows.length}</span>${specialRows.length ? `<span class="ss-cnt special">특별 ${specialRows.length}</span>` : ''}</div>
                     <div class="ss-send">
                         <button class="ss-btn" title="이 연자 일정을 카톡/문자용으로 복사" onclick="ssCopy('${k}',this)">📋 복사</button>
+                        <button class="ss-btn" title="행사장 지도에 이 연자의 동선을 그린 이미지" onclick="ssRouteMap('${k}')">🗺 동선이미지</button>
                         <button class="ss-btn" title="이 연자에게 일정 메일(Gmail 작성창)" onclick="ssMail('${k}')">📧 메일</button>
                         <button class="ss-btn" title="카카오톡으로 일정 카드 보내기" onclick="ssKakao('${k}')">💬 카톡</button>
                     </div>
