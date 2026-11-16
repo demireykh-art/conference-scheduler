@@ -8,6 +8,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
@@ -31,7 +32,13 @@
                         <select id="ptnSort" style="padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.84rem"></select>
                         <span style="color:var(--text-dim);font-size:0.85rem">총 <span id="ptnCount">0</span>개사</span>
                     </div>
-                    <button class="btn btn-primary" onclick="openPartnerModal()">+ 파트너사 등록</button>
+                    <div style="display:flex;gap:6px;align-items:center">
+                        <button class="btn btn-sm" title="참여사 가져오기 엑셀 양식을 내려받습니다" onclick="downloadPartnerTemplate()">📥 양식 다운로드</button>
+                        <label class="btn btn-sm" title="엑셀(양식)로 참여사를 한 번에 등록합니다 — 위에서 '행사'를 먼저 선택하세요">📤 엑셀 가져오기
+                            <input type="file" id="ptnImportFile" accept=".xlsx,.xls" style="display:none" onchange="handlePartnerImportFile(this)">
+                        </label>
+                        <button class="btn btn-primary" onclick="openPartnerModal()">+ 파트너사 등록</button>
+                    </div>
                 </div>
                 <div class="conf-participation-bar">
                     <span class="cpb-label">행사 선택</span>

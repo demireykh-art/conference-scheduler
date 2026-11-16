@@ -532,3 +532,122 @@ window.deletePartner = async function (id) {
 };
 
 // 배경 클릭으로는 닫지 않음 — 닫기/취소 버튼으로만 닫힘 (입력 보호)
+
+/* ============================================================
+   참여사 엑셀 — 양식 다운로드 + 가져오기(일괄 등록)
+   양식: 회사명(국문)* | 회사명(영문) | 담당이사 | 담당자 | 연락처 | 이메일 | 부스수 | 참여여부 | 비고
+   - 회사명(국문) 기준으로 마스터 파트너사 upsert(없으면 생성)
+   - 담당자/연락처/이메일/담당이사 → 선택 행사 담당자(partnerContacts)
+   - 참여여부가 '참여확정/신청완료/참여' 등이면 선택 행사 '참가', '검토중/연락예정/논의중'이면 '신청전'
+   ============================================================ */
+const PTN_IMPORT_HEAD = ['회사명(국문)', '회사명(영문)', '담당이사', '담당자', '연락처', '이메일', '부스수', '참여여부', '비고'];
+
+window.downloadPartnerTemplate = function () {
+    if (typeof XLSX === 'undefined') { Toast.error('엑셀 모듈을 불러오지 못했습니다. 새로고침 후 다시 시도하세요.'); return; }
+    const example = ['원텍', 'WONTECH', '이민호', '엄희철 차장', '010-0000-0000', 'name@example.com', '2', '참여확정', '요청사항(선택)'];
+    const ws = XLSX.utils.aoa_to_sheet([PTN_IMPORT_HEAD, example]);
+    ws['!cols'] = [{ wch: 16 }, { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 24 }, { wch: 8 }, { wch: 12 }, { wch: 28 }];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '참여사');
+    XLSX.writeFile(wb, '참여사_가져오기_양식.xlsx');
+};
+
+function ptnNorm(s) { return String(s == null ? '' : s).replace(/\s/g, '').toLowerCase(); }
+function splitMulti(s) { return String(s == null ? '' : s).split(/[\n;]+/).map(x => x.trim()).filter(Boolean); }
+function classifyStatus(v) {
+    const s = String(v == null ? '' : v).replace(/\s/g, '');
+    if (/(참여확정|신청완료|참여$|^참여|참가확정|확정|^Y$|^O$)/i.test(s)) return 'join';
+    if (/(검토중|연락예정|논의중|대기|예정)/.test(s)) return 'pre';
+    return '';
+}
+function buildImportContacts(row) {
+    const names = splitMulti(row.manager), tels = splitMulti(row.phone), mails = String(row.email || '').split(/[\s;]+/).map(x => x.trim()).filter(Boolean);
+    const out = [];
+    if (row.director) out.push({ name: '[이사] ' + row.director, phone: '', email: '' });
+    const n = Math.max(names.length, tels.length, mails.length);
+    for (let i = 0; i < n; i++) out.push({ name: names[i] || '', phone: tels[i] || '', email: mails[i] || '' });
+    return out.filter(c => c.name || c.phone || c.email);
+}
+
+function parsePartnerRows(aoa) {
+    if (!aoa || !aoa.length) return [];
+    let hi = aoa.findIndex(r => r.some(c => String(c || '').includes('회사명')));
+    if (hi < 0) hi = 0;
+    const H = aoa[hi].map(c => ptnNorm(c));
+    const find = (keys, ex) => H.findIndex(h => keys.some(k => h.includes(k)) && !(ex || []).some(e => h.includes(e)));
+    const ci = {
+        ko: find(['회사명', '업체'], ['영문', '현지']), en: find(['영문', '현지명']),
+        dir: find(['이사']), mgr: find(['담당자']), tel: find(['연락처', '전화']), mail: find(['이메일', 'email']),
+        booth: find(['부스']), stat: find(['참여여부', '참여', '참가']), note: find(['비고', '요청'])
+    };
+    const g = (r, i) => (i >= 0 && i < r.length && r[i] != null) ? String(r[i]).trim() : '';
+    const out = [];
+    for (let i = hi + 1; i < aoa.length; i++) {
+        const r = aoa[i]; const ko = g(r, ci.ko);
+        if (!ko || /^(total|소계|합계)$/i.test(ko)) continue;
+        out.push({ nameKo: ko, nameEn: g(r, ci.en), director: g(r, ci.dir), manager: g(r, ci.mgr), phone: g(r, ci.tel), email: g(r, ci.mail), booth: g(r, ci.booth), participate: g(r, ci.stat), note: g(r, ci.note) });
+    }
+    return out;
+}
+
+window.handlePartnerImportFile = function (input) {
+    const f = input.files && input.files[0]; input.value = '';
+    if (!f) return;
+    if (!AdminAuth.requireEdit()) return;
+    if (typeof XLSX === 'undefined') { Toast.error('엑셀 모듈을 불러오지 못했습니다.'); return; }
+    if (!PLACED_CONF_ID) { Toast.warning('먼저 위 ‘행사 선택’에서 가져올 행사를 고르세요.'); return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' });
+            const rows = parsePartnerRows(aoa);
+            importPartners(rows);
+        } catch (x) { Toast.error('엑셀 파싱 실패: ' + (x.message || x)); }
+    };
+    reader.readAsArrayBuffer(f);
+};
+
+async function importPartners(rows) {
+    if (!rows.length) { Toast.warning('가져올 데이터가 없습니다. 양식(회사명 열)을 확인하세요.'); return; }
+    const byName = new Map(PARTNERS.map(p => [ptnNorm(p.nameKo), p]));
+    let created = 0, joined = 0, pre = 0, withContacts = 0;
+    rows.forEach(r => {
+        if (!byName.has(ptnNorm(r.nameKo))) created++;
+        const st = classifyStatus(r.participate);
+        if (st === 'join') joined++; else if (st === 'pre') pre++;
+        if (buildImportContacts(r).length) withContacts++;
+    });
+    const ok = await confirmDialog(
+        `행사: ${PLACED_CONF_NAME}\n\n총 ${rows.length}개사를 가져옵니다.\n· 신규 파트너사 등록: ${created}개사\n· 참가로 표시: ${joined}개사 · 신청전: ${pre}개사\n· 담당자 저장: ${withContacts}개사\n\n※ 같은 회사명은 기존 파트너사에 연결되고, 담당자 정보는 이 행사 기준으로 덮어씁니다.\n계속할까요?`,
+        { okText: '가져오기' });
+    if (!ok) return;
+
+    const ptnUpdates = {};   // 마스터 신규 생성
+    const confUpdates = {};  // 선택 행사: 참가/신청전/담당자
+    let idx = PARTNERS.length;
+    rows.forEach(r => {
+        let p = byName.get(ptnNorm(r.nameKo));
+        let pid;
+        if (p) pid = p.id;
+        else {
+            pid = PTN_ROOT.push().key;
+            const rec = { nameKo: r.nameKo, nameEn: r.nameEn || '', grade: '', products: [], order: idx++, createdAt: firebase.database.ServerValue.TIMESTAMP };
+            ptnUpdates[pid] = rec;
+            byName.set(ptnNorm(r.nameKo), { id: pid, ...rec });
+        }
+        const contacts = buildImportContacts(r);
+        if (contacts.length) confUpdates['partnerContacts/' + pid] = contacts;
+        const st = classifyStatus(r.participate);
+        const meta = { booth: r.booth || '', status: r.participate || '', director: r.director || '', note: r.note || '' };
+        if (st === 'join') confUpdates['confPartners/' + pid] = Object.assign({ order: 0, grade: '' }, meta);
+        else if (st === 'pre') confUpdates['prePartners/' + pid] = Object.assign({ order: 0 }, meta);
+    });
+
+    try {
+        if (Object.keys(ptnUpdates).length) await PTN_ROOT.update(ptnUpdates);
+        if (Object.keys(confUpdates).length) await database.ref('/adminConferences/' + PLACED_CONF_ID).update(confUpdates);
+        logActivity('create', 'partner', `참여사 엑셀 가져오기 — ${rows.length}개사(신규 ${created}, 참가 ${joined})`, { confId: PLACED_CONF_ID, confTitle: PLACED_CONF_NAME });
+        Toast.success(`가져오기 완료: ${rows.length}개사 (신규 ${created} · 참가 ${joined} · 신청전 ${pre})`);
+    } catch (e) { Toast.error('가져오기 실패: ' + (e.message || e)); }
+}
