@@ -1215,6 +1215,7 @@ tr.lec-dup-row > td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
     padding: 24px;
     animation: pop 0.14s ease;
     max-height: 90vh;               /* 화면 높이 초과 시 */
+    max-height: 90dvh;              /* iOS: 브라우저 툴바 높이 반영(저장 버튼 가림 방지) */
     overflow-y: auto;               /* 내부 스크롤 → 하단 저장 버튼 항상 접근 가능 */
     margin: auto 0;
 }
@@ -1530,8 +1531,10 @@ tr.lec-dup-row > td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
 .check-inline input[type="checkbox"] { width: auto; flex: 0 0 auto; margin: 0; }
 /* 모바일 모달: 여백 축소 + 가로 넘침 차단(흔들림 방지) */
 @media (max-width: 640px) {
-    .modal-overlay { padding: 4vh 10px; }
-    .modal { padding: 18px 16px; overflow-x: hidden; }
+    .modal-overlay { padding: 3vh 10px; padding: 3dvh 10px calc(3dvh + env(safe-area-inset-bottom, 0px)); }
+    .modal { padding: 18px 16px; overflow-x: hidden; max-height: 92dvh; }
+    /* 하단 저장 버튼이 iOS 툴바에 가리지 않도록 모달 안쪽 아래 여백 확보 */
+    .modal-actions { position: sticky; bottom: 0; background: #fff; padding-top: 12px; margin-top: 16px; padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -8px 12px -8px rgba(0,0,0,0.12); }
     /* 관계자 구분 체크박스: 좁은 화면에선 세로 1열로 (겹침 방지) */
     .role-check-row { display: block; }
     .role-check-row .check-inline { display: flex; justify-content: flex-start; margin-bottom: 12px; white-space: nowrap; }
