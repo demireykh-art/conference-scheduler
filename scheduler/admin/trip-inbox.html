@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="assets/favicon-64.png">
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-title" content="ASLS 행사 관리">
+    <title>연자 일정 제출함 · ASLS 행사 관리</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <div id="sidebarMount"></div>
+        <main class="main">
+            <div class="main-topbar">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <button class="mobile-menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+                    <h1 class="main-title">연자 일정 제출함 (해외)</h1>
+                </div>
+            </div>
+            <div class="main-body">
+                <div class="info-banner">
+                    <div class="info-ico">i</div>
+                    <div class="info-title">해외 연자가 제출한 <b>여행 일정·강의</b>를 검토하고 <b>승인·반영</b>합니다. 승인 시 여행 일정은 행사에 저장되고, 강의 제목은 강의풀에 생성됩니다(연자 연결).</div>
+                </div>
+                <div id="tiNotice" class="info-banner" style="display:none"></div>
+                <div id="tiList"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="js/admin-common.js"></script>
+    <script src="js/version.js"></script>
+    <script src="js/admin-auth.js"></script>
+    <script src="js/trip-inbox.js"></script>
+</body>
+</html>
