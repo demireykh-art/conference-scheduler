@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="assets/favicon-64.png">
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+    <title>ASLS · Speaker Travel & Lecture</title>
+    <meta property="og:title" content="ASLS · Speaker Travel & Lecture">
+    <meta property="og:description" content="Submit your travel schedule and lecture title for ASLS.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://demireykh-art.github.io/conference-scheduler/scheduler/admin/assets/app-icon.png">
+    <meta name="theme-color" content="#6E2B7B">
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="css/admin.css">
+    <style>
+        body { background: #f1f3f5; }
+        .tp-wrap { max-width: 600px; margin: 0 auto; padding: 22px 16px 70px; }
+        .tp-card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 22px 20px; box-shadow: var(--shadow-md); }
+        .tp-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+        .tp-title { font-size: 1.22rem; font-weight: 800; margin: 0 0 4px; }
+        .tp-sub { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 16px; }
+        .tp-lang { flex: none; display: flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+        .tp-lang button { border: none; background: #fff; padding: 5px 11px; font-size: 0.8rem; font-weight: 700; cursor: pointer; color: var(--text-dim); }
+        .tp-lang button.on { background: var(--primary); color: #fff; }
+        .tp-sec { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 14px; }
+        .tp-sec-t { font-size: 0.95rem; font-weight: 800; margin-bottom: 10px; }
+        .tp-field { margin-bottom: 12px; }
+        .tp-field label { display: block; font-size: 0.82rem; font-weight: 700; margin-bottom: 5px; }
+        .tp-field input, .tp-field textarea, .tp-field select { width: 100%; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; font-size: 0.93rem; font-family: inherit; }
+        .tp-field input:focus, .tp-field textarea:focus, .tp-field select:focus { border-color: var(--primary); outline: none; }
+        .tp-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        @media (max-width: 480px) { .tp-grid2 { grid-template-columns: 1fr; } }
+        .tp-radio { display: flex; gap: 8px; }
+        .tp-radio label { flex: 1; border: 1px solid var(--border); border-radius: 9px; padding: 10px; text-align: center; font-weight: 700; font-size: 0.88rem; cursor: pointer; margin: 0; }
+        .tp-radio input { display: none; }
+        .tp-radio input:checked + span { color: var(--primary); }
+        .tp-radio label.on { border-color: var(--primary); background: #f3ecf6; }
+        .tp-lec { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; position: relative; }
+        .tp-lec-del { position: absolute; top: 8px; right: 8px; border: none; background: none; color: var(--danger); cursor: pointer; font-size: 0.9rem; }
+        .tp-add { border: 1px dashed var(--primary); color: var(--primary); background: #fff; border-radius: 9px; padding: 9px; width: 100%; cursor: pointer; font-weight: 700; }
+        .tp-nights { font-size: 0.82rem; color: var(--primary); font-weight: 800; }
+        .tp-submit { width: 100%; padding: 14px; font-size: 1rem; font-weight: 800; border: none; border-radius: 10px; background: var(--primary); color: #fff; cursor: pointer; margin-top: 8px; }
+        .tp-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+        .tp-msg { font-size: 0.82rem; margin-top: 8px; min-height: 18px; }
+        .tp-err { color: var(--danger); }
+        .tp-done { text-align: center; padding: 34px 10px; }
+        .tp-done .ico { font-size: 3rem; }
+        .tp-hint { font-size: 0.74rem; color: var(--text-dim); margin-top: 3px; }
+    </style>
+</head>
+<body>
+    <div class="tp-wrap">
+        <div class="tp-card" id="tpCard">
+            <div class="tp-head">
+                <div>
+                    <h1 class="tp-title" id="tpTitle">Speaker Travel &amp; Lecture</h1>
+                </div>
+                <div class="tp-lang">
+                    <button id="tpLangEn" class="on" onclick="setLang('en')">EN</button>
+                    <button id="tpLangKo" onclick="setLang('ko')">한</button>
+                </div>
+            </div>
+            <div class="tp-sub" id="tpSub">Loading…</div>
+
+            <div id="tpForm" style="display:none">
+                <!-- 연자 정보 -->
+                <div class="tp-sec" style="border-top:none;margin-top:0;padding-top:0">
+                    <div class="tp-sec-t" data-en="Your information" data-ko="연자 정보">Your information</div>
+                    <div class="tp-grid2">
+                        <div class="tp-field"><label data-en="Name (English)" data-ko="이름 (영문)">Name (English)</label><input id="tpNameEn"></div>
+                        <div class="tp-field"><label data-en="Name (Korean)" data-ko="이름 (국문)">Name (Korean)</label><input id="tpNameKo"></div>
+                    </div>
+                    <div class="tp-grid2">
+                        <div class="tp-field"><label data-en="Affiliation / Hospital" data-ko="소속/병원">Affiliation / Hospital</label><input id="tpAffEn"></div>
+                        <div class="tp-field"><label data-en="Country" data-ko="국가">Country</label><input id="tpNat"></div>
+                    </div>
+                    <div class="tp-grid2">
+                        <div class="tp-field"><label data-en="Email" data-ko="이메일">Email</label><input id="tpEmail" type="email"></div>
+                        <div class="tp-field"><label data-en="Mobile / Messenger" data-ko="연락처/메신저">Mobile / Messenger</label><input id="tpPhone"></div>
+                    </div>
+                </div>
+
+                <!-- 여행 일정 -->
+                <div class="tp-sec">
+                    <div class="tp-sec-t" data-en="✈️ Travel schedule" data-ko="✈️ 여행 일정">✈️ Travel schedule</div>
+                    <div class="tp-field">
+                        <label data-en="Is your flight schedule confirmed?" data-ko="항공 일정이 확정되었나요?">Is your flight schedule confirmed?</label>
+                        <div class="tp-radio" id="tpStatus">
+                            <label class="on" data-val="confirmed"><input type="radio" name="tpst" value="confirmed" checked onchange="onStatus()"><span data-en="Confirmed" data-ko="확정">Confirmed</span></label>
+                            <label data-val="undecided"><input type="radio" name="tpst" value="undecided" onchange="onStatus()"><span data-en="Not decided yet" data-ko="미정">Not decided yet</span></label>
+                        </div>
+                    </div>
+                    <div id="tpDates">
+                        <div class="tp-grid2">
+                            <div class="tp-field"><label data-en="Arrival date" data-ko="도착일">Arrival date</label><input id="tpArrDate" type="date" onchange="calcNights()"></div>
+                            <div class="tp-field"><label data-en="Arrival time (optional)" data-ko="도착 시각(선택)">Arrival time (optional)</label><input id="tpArrTime" type="time"></div>
+                        </div>
+                        <div class="tp-grid2">
+                            <div class="tp-field"><label data-en="Departure date" data-ko="출발일">Departure date</label><input id="tpDepDate" type="date" onchange="calcNights()"></div>
+                            <div class="tp-field"><label data-en="Departure time (optional)" data-ko="출발 시각(선택)">Departure time (optional)</label><input id="tpDepTime" type="time"></div>
+                        </div>
+                        <div class="tp-field"><span class="tp-nights" id="tpNights"></span></div>
+                        <div class="tp-field"><label data-en="Flight info (optional)" data-ko="항공편 정보(선택)">Flight info (optional)</label><input id="tpFlight" placeholder="e.g. KE123 / arr 14:30"></div>
+                    </div>
+                    <div class="tp-grid2">
+                        <div class="tp-field"><label data-en="Companions (number)" data-ko="동반자 수">Companions (number)</label><input id="tpComp" type="number" min="0" value="0"></div>
+                        <div class="tp-field"><label data-en="Nights (manual, if not sure)" data-ko="숙박 박수(미정 시 수기)">Nights</label><input id="tpNightsManual" type="number" min="0" placeholder="e.g. 2"></div>
+                    </div>
+                    <div class="tp-field"><label data-en="Requests (hotel, dietary, etc.)" data-ko="요청사항(숙소·식이 등)">Requests</label><textarea id="tpReq" rows="2"></textarea></div>
+                </div>
+
+                <!-- 강의 -->
+                <div class="tp-sec">
+                    <div class="tp-sec-t" data-en="🎤 Lecture(s)" data-ko="🎤 강의">🎤 Lecture(s)</div>
+                    <div id="tpLectures"></div>
+                    <button type="button" class="tp-add" onclick="addLecture()" data-en="+ Add another lecture" data-ko="+ 강의 추가">+ Add another lecture</button>
+                </div>
+
+                <!-- 기타 -->
+                <div class="tp-sec">
+                    <div class="tp-field"><label data-en="Anything else to let us know?" data-ko="기타 전달사항">Anything else?</label><textarea id="tpNote" rows="2"></textarea></div>
+                </div>
+
+                <button class="tp-submit" id="tpSubmitBtn" onclick="submitTrip()" data-en="Submit" data-ko="제출">Submit</button>
+                <div class="tp-msg" id="tpMsg"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="js/trip-submit.js"></script>
+</body>
+</html>

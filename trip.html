@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASLS · Speaker Travel &amp; Lecture</title>
+    <link rel="icon" type="image/png" href="scheduler/admin/assets/favicon-64.png">
+    <meta property="og:title" content="ASLS · Speaker Travel &amp; Lecture">
+    <meta property="og:description" content="Submit your travel schedule and lecture title for ASLS.">
+    <meta property="og:image" content="https://demireykh-art.github.io/conference-scheduler/scheduler/admin/assets/app-icon.png">
+    <meta name="theme-color" content="#6E2B7B">
+    <script>
+        // 짧은 링크(trip.html?t=…) → 실제 제출 폼으로 쿼리 그대로 전달
+        location.replace('scheduler/admin/trip-submit.html' + location.search);
+    </script>
+</head>
+<body style="font-family:sans-serif;padding:40px;text-align:center;color:#555">
+    Redirecting… / 이동 중입니다…
+    <a id="go" href="scheduler/admin/trip-submit.html">여기 / here</a>
+    <script>document.getElementById('go').search = location.search;</script>
+</body>
+</html>

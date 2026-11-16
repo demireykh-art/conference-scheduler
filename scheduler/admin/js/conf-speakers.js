@@ -353,6 +353,7 @@ function render() {
             <div class="cv-group">
                 <button class="btn btn-sm" title="${m.email ? 'CV 등록 요청 메일(Gmail 작성창)' : '이메일이 없습니다 — 연자 정보에 이메일을 추가하세요'}" onclick="requestCV('${e.id}')">✉️ CV요청 메일보내기</button>
                 <button class="btn btn-sm" title="CV 등록 링크 복사(카톡·문자 등에 붙여넣기)" onclick="copyCVLink('${e.id}')">🔗 CV요청 링크복사</button>
+                <button class="btn btn-sm" title="해외 연자 여행·강의 제출 링크 복사 (영문 폼)" onclick="copyTripLink('${e.id}')">✈️ 일정요청 링크</button>
                 <button class="btn btn-sm btn-danger-ghost" onclick="removePerson('${e.id}')">제거</button>
             </div>
         </div>
@@ -374,6 +375,14 @@ function cvLink(id) {
     database.ref('/cvTokens/' + t).set({ c: CONF_ID, s: id }).catch(() => { });   // 매핑 저장(멱등)
     // 저장소 루트의 짧은 진입 페이지로 연결: .../conference-scheduler/cv.html?t=<t>
     const base = new URL('../../cv.html', location.href);
+    base.searchParams.set('t', t);
+    return base.href;
+}
+// 해외 연자 여행·강의 제출 링크 (trip.html?t=<t>) — /tripTokens/<t> = {c,s}
+function tripLink(id) {
+    const t = shortToken(id);
+    database.ref('/tripTokens/' + t).set({ c: CONF_ID, s: id }).catch(() => { });   // 매핑 저장(멱등)
+    const base = new URL('../../trip.html', location.href);
     base.searchParams.set('t', t);
     return base.href;
 }
@@ -458,6 +467,14 @@ window.requestCV = function (id) {
 window.copyCVLink = function (id) {
     const url = 'ASLS 연자 정보 · CV 제출\n' + cvLink(id);
     const done = () => Toast.success('제출 링크를 복사했습니다. 원하는 곳에 붙여넣으세요.');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(done).catch(() => fallbackCopy(url, done));
+    } else { fallbackCopy(url, done); }
+};
+/* 해외 연자 여행·강의 제출 링크 복사 (영문 폼) */
+window.copyTripLink = function (id) {
+    const url = 'ASLS · Speaker Travel & Lecture\n' + tripLink(id);
+    const done = () => Toast.success('일정요청 링크를 복사했습니다. 해외 연자에게 보내세요.');
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(done).catch(() => fallbackCopy(url, done));
     } else { fallbackCopy(url, done); }
