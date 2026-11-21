@@ -36,15 +36,34 @@ function maybeAutoGenerate() {
 function confTitle() { return (CONF_RAW && CONF_RAW.title) || (CONFS.find(c => c.id === CONF_ID) || {}).title || '행사'; }
 
 /* ---------- 행사 선택 ---------- */
-database.ref('/adminConferences').once('value').then(snap => {
-    CONFS = toOrderedArray(snap.val());
+// 행사 선택 목록: 제목만 가볍게 조회(포스터 배경·지도 등 대용량 필드 제외).
+// shallow 키 목록 + 각 title만 REST로 읽어 탭 진입 시 다운로드를 최소화. 실패 시 전체 읽기로 폴백.
+const POSTER_DB = (window.AppConfig && AppConfig.firebase && AppConfig.firebase.databaseURL) || '';
+function fillConfOptions() {
     const sel = document.getElementById('posConfSelect');
-    if (!CONFS.length) { sel.innerHTML = '<option value="">등록된 행사가 없습니다</option>'; return; }
-    if (!CONF_ID) { try { CONF_ID = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { } }
-    if (!CONF_ID || !CONFS.find(c => c.id === CONF_ID)) CONF_ID = CONFS[0].id;
-    sel.innerHTML = CONFS.map(c => `<option value="${c.id}" ${c.id === CONF_ID ? 'selected' : ''}>${escapeHtml(c.title || '(제목 없음)')}</option>`).join('');
-    loadConf();
-});
+    const finish = () => {
+        if (!CONFS.length) { sel.innerHTML = '<option value="">등록된 행사가 없습니다</option>'; return; }
+        if (!CONF_ID) { try { CONF_ID = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { } }
+        if (!CONF_ID || !CONFS.find(c => c.id === CONF_ID)) CONF_ID = CONFS[0].id;
+        sel.innerHTML = CONFS.map(c => `<option value="${c.id}" ${c.id === CONF_ID ? 'selected' : ''}>${escapeHtml(c.title || '(제목 없음)')}</option>`).join('');
+        loadConf();
+    };
+    fetch(POSTER_DB + '/adminConferences.json?shallow=true&_=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(keyMap => {
+            if (!keyMap) throw new Error('shallow unavailable');
+            const ids = Object.keys(keyMap);
+            return Promise.all(ids.map(id =>
+                fetch(POSTER_DB + '/adminConferences/' + id + '/title.json?_=' + Date.now(), { cache: 'no-store' })
+                    .then(r => r.ok ? r.json() : '').catch(() => '')
+                    .then(title => ({ id, title: title || '' }))
+            )).then(list => { CONFS = list.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'ko')); finish(); });
+        })
+        .catch(() => {   // 폴백: 기존 전체 읽기
+            database.ref('/adminConferences').once('value').then(snap => { CONFS = toOrderedArray(snap.val()); finish(); });
+        });
+}
+fillConfOptions();
 
 window.onPosConfChange = function () {
     CONF_ID = document.getElementById('posConfSelect').value;
@@ -58,8 +77,16 @@ function loadConf() {
     document.getElementById('posGrid').innerHTML = '';
     document.getElementById('posCount').textContent = '';
     renderStage();
-    database.ref('/adminConferences/' + CONF_ID).once('value').then(snap => {
-        CONF_RAW = snap.val() || {};
+    // 포스터에 필요한 필드만 조회(venueMap·rooms 등 대용량 제외)
+    const cref = database.ref('/adminConferences/' + CONF_ID);
+    Promise.all([
+        cref.child('title').once('value'),
+        cref.child('poster').once('value'),
+        cref.child('posterUrl').once('value'),
+        cref.child('confSpeakers').once('value'),
+        cref.child('lecturePool').once('value')
+    ]).then(([title, poster, posterUrl, confSpeakers, lecturePool]) => {
+        CONF_RAW = { title: title.val(), poster: poster.val(), posterUrl: posterUrl.val(), confSpeakers: confSpeakers.val(), lecturePool: lecturePool.val() };
         const p = CONF_RAW.poster;
         if (p && p.template && p.w && p.h) {
             // ① 연자 포스터용으로 저장해 둔 배경·배치가 있으면 그것 사용
