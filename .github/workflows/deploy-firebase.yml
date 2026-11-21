@@ -2,8 +2,8 @@ name: Deploy Firebase (DB rules + functions)
 
 # main 에 push 되면 자동 배포
 #  - database.rules.json 변경 → Realtime Database 보안 규칙
-#  - functions/** 변경 → 연자 제목 수정 함수(editLectureTitle, myLectures)
-#    (aiExtractLectures 는 Claude API 키 Secret 이 필요해서 여기서 배포하지 않음)
+#  - functions-speaker/** 변경 → 연자 제목 수정 함수(codebase speaker: editLectureTitle, myLectures)
+#    (functions/ 의 aiExtractLectures 는 Claude API 키 Secret 이 필요해서 여기서 배포하지 않음)
 # 필요: 저장소 Settings → Secrets → FIREBASE_TOKEN (firebase login:ci 로 발급, 스케줄러 프로젝트 권한 계정)
 # 함수 배포에는 Firebase 요금제 Blaze 필요. 수동 재실행: Actions 탭 → 이 워크플로 → Run workflow
 
@@ -12,7 +12,7 @@ on:
     branches: [main]
     paths:
       - 'database.rules.json'
-      - 'functions/**'
+      - 'functions-speaker/**'
       - 'firebase.json'
       - '.github/workflows/deploy-firebase.yml'
   workflow_dispatch: {}
@@ -39,10 +39,10 @@ jobs:
           set -o pipefail
           firebase deploy --only database --project conference-scheduler-a5656 --non-interactive --token "$FIREBASE_TOKEN" 2>&1 | tee rules.log || { echo "::error title=DB 규칙 배포 실패::$(grep -iE 'error|denied|permission|invalid' rules.log | tail -6 | tr '\n' ' ' | cut -c1-900)"; exit 1; }
       - name: Install function deps
-        run: cd functions && npm ci
+        run: cd functions-speaker && npm ci
       - name: Deploy functions (title edit)
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
           set -o pipefail
-          firebase deploy --only functions:editLectureTitle,functions:myLectures --project conference-scheduler-a5656 --non-interactive --force --token "$FIREBASE_TOKEN" 2>&1 | tee fn.log || { echo "::error title=함수 배포 실패::$(grep -iE 'error|denied|permission|billing|blaze|enable|invalid' fn.log | tail -8 | tr '\n' ' ' | cut -c1-900)"; exit 1; }
+          firebase deploy --only functions:speaker --project conference-scheduler-a5656 --non-interactive --force --token "$FIREBASE_TOKEN" 2>&1 | tee fn.log || { echo "::error title=함수 배포 실패::$(grep -iE 'error|denied|permission|billing|blaze|enable|invalid' fn.log | tail -8 | tr '\n' ' ' | cut -c1-900)"; exit 1; }
