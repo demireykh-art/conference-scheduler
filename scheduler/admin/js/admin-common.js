@@ -328,6 +328,9 @@ window.exportSpeakersBackup = function () {
     // 페이지 상태와 무관하게 DB(/adminSpeakers)에서 직접 읽어 백업 — id를 키로 한 오브젝트(복원 가능 형태)
     database.ref('/adminSpeakers').once('value').then(snap => {
         const byId = snap.val() || {};
+        // 비공개 칸의 연락처도 백업에 합침 (복원 시 연락처가 빠지지 않게)
+        const pc = (window.Contacts && Contacts.spk) || {};
+        Object.entries(pc).forEach(([id, c]) => { if (byId[id] && c) { if (c.email) byId[id].email = c.email; if (c.phone) byId[id].phone = c.phone; } });
         const n = Object.keys(byId).length;
         if (!n) { if (window.Toast) Toast.warning('백업할 연자 데이터가 없습니다.'); return; }
         const d = new Date();

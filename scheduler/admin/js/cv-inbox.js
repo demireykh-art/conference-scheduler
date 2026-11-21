@@ -99,9 +99,9 @@ window.approveSub = async function (id) {
     }
     apply.updatedAt = firebase.database.ServerValue.TIMESTAMP;
 
-    const p = !isNew
-        ? database.ref('/adminSpeakers/' + sid).update(apply)
-        : (function () { apply.order = Masters.speakers.length; apply.createdAt = firebase.database.ServerValue.TIMESTAMP; return database.ref('/adminSpeakers/' + sid).set(apply); })();
+    const p = Contacts.splitSpeaker(sid, apply).then(ap => !isNew
+        ? database.ref('/adminSpeakers/' + sid).update(ap)
+        : (function () { ap.order = Masters.speakers.length; ap.createdAt = firebase.database.ServerValue.TIMESTAMP; return database.ref('/adminSpeakers/' + sid).set(ap); })());
 
     p.then(() => database.ref('/cvSubmissions/' + id).remove())
         .then(() => {

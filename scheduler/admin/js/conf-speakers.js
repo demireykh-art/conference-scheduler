@@ -559,7 +559,7 @@ window.saveNewSpeaker = function () {
         createdAt: firebase.database.ServerValue.TIMESTAMP,
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     };
-    database.ref('/adminSpeakers/' + id).set(data)
+    Contacts.splitSpeaker(id, data).then(d => database.ref('/adminSpeakers/' + id).set(d))
         .then(() => {
             logActivity('create', 'speaker', `연자 "${nameKo}" 등록`, { entityId: id });
             closeSpeakerModal();

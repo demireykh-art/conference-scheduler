@@ -11,8 +11,8 @@ window.Masters = {
 
     init() {
         database.ref('/adminSpeakers').on('value', snap => {
-            this.speakers = toOrderedArray(snap.val())
-                .sort((a, b) => (a.nameKo || '').localeCompare(b.nameKo || '', 'ko'));
+            this.speakers = Contacts.merge(toOrderedArray(snap.val())
+                .sort((a, b) => (a.nameKo || '').localeCompare(b.nameKo || '', 'ko')));
             this.ready = true;
             document.dispatchEvent(new CustomEvent('masters-change'));
         });
@@ -22,6 +22,10 @@ window.Masters = {
             document.dispatchEvent(new CustomEvent('masters-change'));
         });
     },
+
+    _contactsHooked: (document.addEventListener('contacts-change', () => {   // 비공개 연락처가 늦게 도착하면 다시 합침
+        Contacts.merge(window.Masters.speakers); document.dispatchEvent(new CustomEvent('masters-change'));
+    }), true),
 
     speaker(id) { return this.speakers.find(s => s.id === id) || null; },
     partner(id) { return this.partners.find(p => p.id === id) || null; }
