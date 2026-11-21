@@ -4,7 +4,7 @@
  * 데이터: /tripSubmissions/<id> = { confId, speakerId, nameEn, nameKo, affiliationEn, nationality, email, phone,
  *           travel{...}, lectures[], note, lang, status, submittedAt }
  * 승인 시:
- *   - /adminConferences/<confId>/speakerTrips/<speakerId> = { ...travel, nameEn, companions, updatedAt }
+ *   - /adminSpeakerTrips/<confId>/<speakerId> = { ...travel, nameEn, email, phone, cvFileUrl, updatedAt }  (비공개)
  *   - 강의 제목 → /adminConferences/<confId>/lecturePool/<newId> (연자 연결)
  *   - /adminConferences/<confId>/confSpeakers/<speakerId> = { role:'연자', order }
  */
@@ -128,8 +128,9 @@ window.approveTrip = async function (id) {
     if (!ok) return;
     const base = '/adminConferences/' + s.confId;
     const updates = {};
-    // 여행 일정(+ 항공권·CV 첨부 URL) — 이사회 앱(국내 연자) 제출은 여행 일정이 없으므로 건너뜀
-    if (!board) updates['speakerTrips/' + s.speakerId] = Object.assign({}, s.travel || {}, {
+    // 여행 일정(+ 항공권·CV·연락처) → 비공개 칸 /adminSpeakerTrips/<confId>/<speakerId> (관리자·편집자만 읽음)
+    // 이사회 앱(국내 연자) 제출은 여행 일정이 없으므로 건너뜀
+    const trip = board ? null : Object.assign({}, s.travel || {}, {
         nameEn: s.nameEn || '', nameKo: s.nameKo || '', email: s.email || '', phone: s.phone || '',
         cvFileUrl: s.cvFileUrl || '',
         updatedAt: firebase.database.ServerValue.TIMESTAMP
@@ -155,6 +156,14 @@ window.approveTrip = async function (id) {
         };
     });
     try {
+        if (trip) {   // 비공개 칸 저장이 막히면(규칙 미추가) 공개 위치로 대신 쓰지 않고 중단
+            try { await database.ref(`/adminSpeakerTrips/${s.confId}/${s.speakerId}`).set(trip); }
+            catch (e) { Toast.error('여행 일정 저장 실패 — DB 규칙에 adminSpeakerTrips 가 있는지 확인해 주세요. (' + (e.message || e) + ')'); return; }
+            // 연락처는 연자 비공개 연락처에도 채움 (기존 값이 있으면 유지)
+            const cur = (window.Contacts && Contacts.spk[s.speakerId]) || {};
+            const c = { email: cur.email || s.email || '', phone: cur.phone || s.phone || '' };
+            if ((c.email || c.phone) && window.Contacts && Contacts.ready) await database.ref('/adminSpeakerContacts/' + s.speakerId).set(c).catch(() => { });
+        }
         await database.ref(base).update(updates);
         await TI_REF.child(id + '/status').set('approved');
         logActivity('update', 'speaker', board ? `이사회 앱 강의 제출 "${s.nameKo || s.nameEn}" 승인·반영` : `해외 연자 "${s.nameEn || s.nameKo}" 일정·강의 제출 승인·반영`, { confId: s.confId, confTitle: CONF_TITLES[s.confId] || '', entityId: s.speakerId });
