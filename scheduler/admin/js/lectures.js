@@ -94,12 +94,35 @@ database.ref('/adminConferences').once('value').then(snap => {
     subscribeConf();
 });
 
+// 승인 대기 제출 안내: 제출함(이사회 앱·해외 연자)에 들어온 강의는 승인해야 이 목록에 들어온다
+let SUB_PENDING = {};   // confId → 건수
+function renderSubHint() {
+    const el = document.getElementById('subHint'); if (!el) return;
+    const here = SUB_PENDING[CONF_ID] || 0;
+    const others = Object.entries(SUB_PENDING).filter(([c, n]) => c !== CONF_ID && n);
+    if (!here && !others.length) { el.style.display = 'none'; return; }
+    const title = id => escapeHtml((CONFS.find(c => c.id === id) || {}).title || '다른 행사');
+    el.innerHTML = (here ? `📨 이 행사에 <b>승인 대기 강의 제출 ${here}건</b>이 있습니다. 제출함에서 승인하면 아래 목록에 들어옵니다. ` : '')
+        + (others.length ? `<span class="dim">${here ? '· ' : '📨 '}다른 행사 대기: ${others.map(([c, n]) => `<a href="#" onclick="document.getElementById('confSelect').value='${c}';onConfChange();return false">${title(c)} ${n}건</a>`).join(', ')}</span> ` : '')
+        + `<a class="btn btn-sm" href="trip-inbox.html" style="margin-left:6px">제출함 열기</a>`;
+    el.style.display = '';
+}
+AdminAuth.onReady(() => {
+    if (!AdminAuth.user) return;
+    database.ref('/tripSubmissions').on('value', snap => {
+        SUB_PENDING = {};
+        Object.values(snap.val() || {}).forEach(s => { if (s && s.confId && s.status !== 'approved' && s.status !== 'rejected') SUB_PENDING[s.confId] = (SUB_PENDING[s.confId] || 0) + 1; });
+        renderSubHint();
+    }, () => { });
+});
+
 window.onConfChange = function () {
     CONF_ID = document.getElementById('confSelect').value;
     const url = new URL(location);
     url.searchParams.set('id', CONF_ID);
     history.replaceState(null, '', url);
     subscribeConf();
+    renderSubHint();
 };
 
 let _poolSub = null, _roomsSub = null, _boothSub = null;

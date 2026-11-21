@@ -456,7 +456,7 @@ const SIDE_MENU = [
     {
         group: '관리', items: [
             { key: 'cvinbox', label: '📥 CV 제출함', href: 'cv-inbox.html' },
-            { key: 'tripinbox', label: '✈️ 연자 일정 제출함', href: 'trip-inbox.html' },
+            { key: 'tripinbox', label: '📨 강의·일정 제출함 (승인)', href: 'trip-inbox.html' },
             { key: 'activity', label: '🕘 변경이력', href: 'activity.html' },
             { key: 'users', label: '👥 사용자 관리', href: 'users.html', adminOnly: true },
             { key: 'guide', label: '📘 스케쥴러 사용방법', href: 'https://app.notion.com/p/3a28bb6212958047bfc7cdff64b732bf', external: true }
