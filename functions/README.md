@@ -36,7 +36,7 @@
 
 ---
 
-# 연자 본인 강의 제목 수정 (editLectureTitle · myLectures)
+# 연자 본인 강의 제목 수정 (editLectureTitle · myLectures) — 소스: functions-speaker/
 
 - 이사회 앱(asls-board) 이사: 이사회 앱 로그인 토큰 + 이사회 앱에서 연결한 연자 ID로 본인 확인
 - 외부 연자: 행사별 연자 화면의 [✏️ 제목 수정 링크] → `mylectures.html?t=<비밀토큰>` (`/lectureEditTokens`)
@@ -52,6 +52,6 @@
    firebase login                     # 스케줄러 프로젝트 소유 계정
    git clone https://github.com/demireykh-art/conference-scheduler && cd conference-scheduler
    cd functions && npm install && cd ..
-   firebase deploy --only functions:editLectureTitle,functions:myLectures --project conference-scheduler-a5656
+   firebase deploy --only functions:speaker --project conference-scheduler-a5656   # GitHub Actions 가 자동 배포
    ```
 3. DB 규칙에 `lectureEditTokens` (관리자·편집자 전용) 포함된 완성본 게시

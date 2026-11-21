@@ -4,6 +4,11 @@
       "source": "functions",
       "codebase": "default",
       "runtime": "nodejs22"
+    },
+    {
+      "source": "functions-speaker",
+      "codebase": "speaker",
+      "runtime": "nodejs22"
     }
   ],
   "database": {
