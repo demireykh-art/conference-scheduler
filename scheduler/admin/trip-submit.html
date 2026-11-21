@@ -14,6 +14,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
     <link rel="stylesheet" href="css/admin.css">
     <style>
         body { background: #f1f3f5; }
@@ -110,6 +111,7 @@
                         <div class="tp-field"><label data-en="Nights (manual, if not sure)" data-ko="숙박 박수(미정 시 수기)">Nights</label><input id="tpNightsManual" type="number" min="0" placeholder="e.g. 2"></div>
                     </div>
                     <div class="tp-field"><label data-en="Requests (hotel, dietary, etc.)" data-ko="요청사항(숙소·식이 등)">Requests</label><textarea id="tpReq" rows="2"></textarea></div>
+                    <div class="tp-field"><label data-en="Flight ticket capture (image/PDF, optional)" data-ko="항공권 캡처(이미지/PDF, 선택)">Flight ticket</label><input id="tpTicket" type="file" accept="image/*,application/pdf"><div class="tp-hint" data-en="Upload a screenshot of your e-ticket if available." data-ko="항공권(e-ticket) 캡처가 있으면 올려주세요.">Upload a screenshot of your e-ticket if available.</div></div>
                 </div>
 
                 <!-- 강의 -->
@@ -117,6 +119,13 @@
                     <div class="tp-sec-t" data-en="🎤 Lecture(s)" data-ko="🎤 강의">🎤 Lecture(s)</div>
                     <div id="tpLectures"></div>
                     <button type="button" class="tp-add" onclick="addLecture()" data-en="+ Add another lecture" data-ko="+ 강의 추가">+ Add another lecture</button>
+                </div>
+
+                <!-- 서류 -->
+                <div class="tp-sec">
+                    <div class="tp-sec-t" data-en="📄 Documents (optional)" data-ko="📄 서류(선택)">📄 Documents</div>
+                    <div class="tp-field"><label data-en="CV (image/PDF)" data-ko="CV (이미지/PDF)">CV</label><input id="tpCv" type="file" accept="image/*,application/pdf"></div>
+                    <div class="tp-hint" data-en="Lecture abstract can be attached under each lecture above." data-ko="강의 초록은 위의 각 강의 항목에서 첨부할 수 있습니다.">Lecture abstract can be attached under each lecture above.</div>
                 </div>
 
                 <!-- 기타 -->
