@@ -378,12 +378,11 @@ function cvLink(id) {
     base.searchParams.set('t', t);
     return base.href;
 }
-// 해외 연자 여행·강의 제출 링크 (trip.html?t=<t>) — /tripTokens/<t> = {c,s}
+// 해외 연자 여행·강의 제출 링크 — 토큰 없이 행사·연자 ID를 직접 전달(별도 규칙 불필요)
 function tripLink(id) {
-    const t = shortToken(id);
-    database.ref('/tripTokens/' + t).set({ c: CONF_ID, s: id }).catch(() => { });   // 매핑 저장(멱등)
     const base = new URL('../../trip.html', location.href);
-    base.searchParams.set('t', t);
+    base.searchParams.set('c', CONF_ID);
+    base.searchParams.set('s', id);
     return base.href;
 }
 
