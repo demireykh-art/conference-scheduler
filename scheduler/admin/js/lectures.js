@@ -315,7 +315,7 @@ function renderPool() {
             : '<span class="badge badge-upcoming">미배치</span>';
         return `
         <tr class="${isDup ? 'lec-dup-row' : ''}">
-            <td data-label="제목"><b>${escapeHtml(l.titleKo || '(제목 없음)')}</b>${l.titleEn ? `<div class="dim" style="font-size:0.8rem">${escapeHtml(l.titleEn)}</div>` : ''}</td>
+            <td data-label="제목"><b>${escapeHtml(l.titleKo || '(제목 없음)')}</b> ${titleEditBadge(CONF_ID, l)}${l.titleEn ? `<div class="dim" style="font-size:0.8rem">${escapeHtml(l.titleEn)}</div>` : ''}</td>
             <td data-label="분류·태그"><div class="chips" style="margin:0">${types || ''}${cats || ''}${tags || ''}</div>${memoHtml}</td>
             <td data-label="연자">${spk}</td>
             <td data-label="파트너·제품" class="dim" style="font-size:0.82rem">${pp}</td>

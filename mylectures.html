@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASLS · 내 강의 제목 수정 / My Lecture Titles</title>
+<link rel="icon" type="image/png" href="scheduler/admin/assets/asls-logo.png">
+<meta property="og:title" content="ASLS · 내 강의 제목 수정">
+<meta property="og:description" content="연자 본인 강의 제목을 수정하면 학회 시간표에 바로 반영됩니다.">
+<meta property="og:image" content="https://demireykh-art.github.io/conference-scheduler/scheduler/admin/assets/asls-logo.png">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#6E2B7B">
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
+<style>
+  :root { --p:#6E2B7B; --b:#e3e5ea; --dim:#6b7280; --ok:#1a7a4a; --err:#c62828; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#f1f3f5; font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif; color:#1a1a1a; }
+  .wrap { max-width:600px; margin:0 auto; padding:24px 16px 60px; }
+  h1 { font-size:1.3rem; margin:0 0 4px; } .sub { color:var(--dim); font-size:.9rem; margin-bottom:18px; line-height:1.5; }
+  .card { background:#fff; border:1px solid var(--b); border-radius:14px; padding:16px; margin-bottom:12px; }
+  .conf { font-size:.78rem; font-weight:700; color:var(--p); margin-bottom:6px; }
+  label { display:block; font-size:.78rem; font-weight:700; color:var(--dim); margin:10px 0 4px; }
+  textarea { width:100%; padding:10px 12px; border:1px solid var(--b); border-radius:9px; font-size:.95rem; font-family:inherit; resize:vertical; }
+  textarea:focus { outline:none; border-color:var(--p); }
+  .row { display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+  button { padding:10px 16px; border:none; border-radius:9px; background:var(--p); color:#fff; font-weight:700; font-size:.92rem; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .meta { font-size:.8rem; color:var(--dim); } .msg { font-size:.84rem; } .ok { color:var(--ok); } .err { color:var(--err); }
+  .lang { float:right; } .lang button { background:#fff; color:var(--p); border:1px solid var(--p); padding:5px 10px; font-size:.78rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="lang"><button onclick="setLang(LANG === 'ko' ? 'en' : 'ko')" id="langBtn">English</button></div>
+  <h1 id="ttl">내 강의 제목 수정</h1>
+  <div class="sub" id="sub">불러오는 중…</div>
+  <div id="list"></div>
+</div>
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyBzV50mjOaEnUS86sS8zOhBH0i9OePnDhM",
+  authDomain: "conference-scheduler-a5656.firebaseapp.com",
+  databaseURL: "https://conference-scheduler-a5656-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "conference-scheduler-a5656",
+  appId: "1:592497469624:web:66012149580a0e144eec4d"
+});
+const fn = firebase.app().functions('asia-northeast3');
+if (location.hostname === 'localhost' && location.search.includes('emu')) fn.useEmulator('127.0.0.1', 5001);   // 로컬 테스트 전용
+const TOKEN = new URLSearchParams(location.search).get('t') || '';
+const AUTH = { type: 'token', token: TOKEN };
+let LANG = (navigator.language || 'ko').startsWith('ko') ? 'ko' : 'en', DATA = null;
+const T = {
+  ko: { ttl: '내 강의 제목 수정', sub: n => `<b>${n}</b> 선생님 강의입니다. 제목을 고치고 <b>저장</b>을 누르면 학회 시간표에 바로 반영되고, 사무국에 수정 사실이 표시됩니다.`, ko: '국문 제목', en: '영문 제목 (선택)', save: '저장', saved: '저장했어요 — 시간표에 반영됐습니다.', none: '등록된 강의가 없습니다.', bad: '링크가 올바르지 않습니다. 학회 사무국에 문의해 주세요.', saving: '저장 중…', same: '바뀐 내용이 없어요.', btn: 'English', min: '분' },
+  en: { ttl: 'My Lecture Titles', sub: n => `Lectures of <b>${n}</b>. Edit the title and press <b>Save</b> — it is applied to the program immediately and the committee is notified.`, ko: 'Title (Korean)', en: 'Title (English, optional)', save: 'Save', saved: 'Saved — the program is updated.', none: 'No lectures registered.', bad: 'Invalid link. Please contact the committee.', saving: 'Saving…', same: 'No changes.', btn: '한국어', min: 'min' }
+};
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function setLang(l) { LANG = l; render(); }
+function render() {
+  const t = T[LANG];
+  document.getElementById('ttl').textContent = t.ttl; document.getElementById('langBtn').textContent = t.btn;
+  if (!DATA) return;
+  const s = DATA.speaker || {};
+  document.getElementById('sub').innerHTML = t.sub(esc(LANG === 'en' ? (s.nameEn || s.nameKo) : (s.nameKo || s.nameEn)));
+  const L = DATA.lectures || [];
+  document.getElementById('list').innerHTML = L.length ? L.map((l, i) => `<div class="card">
+      <div class="conf">${esc(l.confTitle)}${l.startDate ? ' · ' + esc(l.startDate) : ''}</div>
+      <div class="meta">${l.duration ? l.duration + t.min : ''}${l.partner ? ' · ' + esc(l.partner) : ''}</div>
+      <label>${t.ko}</label><textarea id="ko${i}" rows="2">${esc(l.titleKo)}</textarea>
+      <label>${t.en}</label><textarea id="en${i}" rows="2">${esc(l.titleEn)}</textarea>
+      <div class="row"><button id="b${i}" onclick="save(${i})">${t.save}</button><span class="msg" id="m${i}"></span></div></div>`).join('')
+    : `<div class="card">${t.none}</div>`;
+}
+async function save(i) {
+  const t = T[LANG], l = DATA.lectures[i], b = document.getElementById('b' + i), m = document.getElementById('m' + i);
+  const titleKo = document.getElementById('ko' + i).value.trim(), titleEn = document.getElementById('en' + i).value.trim();
+  b.disabled = true; m.className = 'msg'; m.textContent = t.saving;
+  try {
+    const r = (await fn.httpsCallable('editLectureTitle')({ auth: AUTH, confId: l.confId, lectureId: l.lectureId, titleKo, titleEn })).data;
+    l.titleKo = titleKo; l.titleEn = titleEn;
+    m.className = 'msg ok'; m.textContent = r && r.unchanged ? t.same : t.saved;
+  } catch (e) { m.className = 'msg err'; m.textContent = e.message || String(e); }
+  b.disabled = false;
+}
+(async () => {
+  render();
+  if (!TOKEN) { document.getElementById('sub').innerHTML = `<span class="err">${T[LANG].bad}</span>`; return; }
+  try { DATA = (await fn.httpsCallable('myLectures')({ auth: AUTH })).data; render(); }
+  catch (e) { document.getElementById('sub').innerHTML = `<span class="err">${esc(e.message || T[LANG].bad)}</span>`; }
+})();
+</script>
+</body>
+</html>

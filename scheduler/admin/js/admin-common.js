@@ -313,6 +313,38 @@ window.logActivity = function (action, entity, summary, extra) {
     } catch (e) { /* 로깅 실패는 무시 (본 작업에 영향 없음) */ }
 };
 
+
+/* ---------- 연자 제목 수정 표시 (서버 함수 editLectureTitle 이 lecturePool/<id>/titleEdit 에 기록) ---------- */
+window.titleEditBadge = function (confId, lec) {
+    const t = lec && lec.titleEdit;
+    if (!t || t.ack) return '';
+    const d = t.at ? new Date(t.at) : null, p = n => String(n).padStart(2, '0');
+    const when = d ? `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}` : '';
+    const tip = `연자가 제목을 수정했습니다 (${when})\n수정: ${t.by || ''}\n이전 제목: ${t.prevKo || '(없음)'}${t.prevEn ? '\n이전 영문: ' + t.prevEn : ''}\n\n클릭하면 확인 처리(표시 해제)됩니다.`;
+    return `<span class="badge badge-title-edit" title="${escapeHtml(tip)}" onclick="event.stopPropagation();ackTitleEdit('${confId}','${lec.id}')">✏️ 연자 수정 ${escapeHtml(when)}</span>`;
+};
+window.ackTitleEdit = function (confId, lid) {
+    if (!AdminAuth.requireEdit()) return;
+    const ref = database.ref(`/adminConferences/${confId}/lecturePool/${lid}/titleEdit`);
+    ref.once('value').then(s => {
+        const t = s.val(); if (!t) return;
+        return ref.update({ ack: true, ackAt: firebase.database.ServerValue.TIMESTAMP, ackBy: (AdminAuth.user && (AdminAuth.user.displayName || AdminAuth.user.email)) || '' })
+            .then(() => { logActivity('update', 'lecture', `연자 제목 수정 확인: "${t.prevKo || ''}" → 현재 제목`, { confId, entityId: lid }); Toast.success('확인 처리했습니다.'); });
+    }).catch(e => Toast.error('확인 실패: ' + e.message));
+};
+// 연자 개인 제목 수정 링크: 비밀 토큰 /lectureEditTokens/<token> = { s, c, createdAt, by } (관리자·편집자만 읽음)
+window.lectureEditLink = async function (speakerId, confId) {
+    const all = (await database.ref('/lectureEditTokens').once('value')).val() || {};
+    let tok = Object.keys(all).find(k => all[k] && all[k].s === speakerId && (all[k].c || '') === (confId || '') && !all[k].revoked);
+    if (!tok) {
+        const a = new Uint8Array(18); crypto.getRandomValues(a);
+        tok = btoa(String.fromCharCode(...a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        await database.ref('/lectureEditTokens/' + tok).set({ s: speakerId, c: confId || '', createdAt: firebase.database.ServerValue.TIMESTAMP, by: (AdminAuth.user && AdminAuth.user.email) || '' });
+    }
+    const u = new URL('../../mylectures.html', location.href); u.searchParams.set('t', tok);
+    return u.href;
+};
+
 /* ------------------------------------------------------------
    JSON 다운로드 + 연자 데이터 백업 (위험 작업 전 스냅샷)
    ------------------------------------------------------------ */

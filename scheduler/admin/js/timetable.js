@@ -1370,6 +1370,7 @@ function renderLectureRow(roomId, sessionId, lec, lang) {
                 ${(n.types || []).map(t => `<span class="chip type">${escapeHtml(t)}</span>`).join('')}
                 ${CONFLICT_IDS.has(lec.id) ? conflictBadge(lec.id) : ''}
                 ${lec.lectureId && DUP_PLACE_IDS.has(lec.lectureId) ? '<span class="dup-badge dup-place" title="같은 강의가 다른 룸/세션에도 배치됨 (중복배치)">중복배치</span>' : ''}
+                ${pool ? titleEditBadge(CONF_ID, pool) : ''}
                 ${isOrphan ? '<span class="dup-badge orphan-badge" title="강의 관리 목록에서 삭제된 강의입니다. ‘목록복원’을 누르면 강의관리에 다시 등록되어 수정할 수 있어요. (시간표 배치는 그대로 유지)">강의목록에 없음</span>' : ''}
             </div>
             <div class="lec-title">${title}</div>
