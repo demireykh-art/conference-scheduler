@@ -78,10 +78,11 @@ function render() {
     }).join('');
 }
 
-window.approveSub = function (id) {
+window.approveSub = async function (id) {
     if (!AdminAuth.requireEdit()) return;
     const s = SUBS.find(x => x.id === id); if (!s) return;
-    let sid = s.speakerId;
+    const isNew = !s.speakerId;
+    const sid = s.speakerId || uuid();
     const apply = {};
     if (s.nameKo) apply.nameKo = s.nameKo;
     if (s.nameEn) apply.nameEn = s.nameEn;
@@ -89,12 +90,18 @@ window.approveSub = function (id) {
     if (s.affiliationEn) apply.affiliationEn = s.affiliationEn;
     if (s.email) apply.email = s.email;
     if (s.cv) apply.cv = s.cv;
-    if (s.photo) apply.photo = s.photo;
+    // 제출 사진(base64) → Storage 업로드 후 URL 저장(미설정 시 base64 폴백)
+    if (s.photo) {
+        let url = null;
+        try { url = await uploadSpeakerPhoto(sid, s.photo); } catch (e) { }
+        if (url) { apply.photoURL = url; apply.photo = null; }
+        else { apply.photo = s.photo; }
+    }
     apply.updatedAt = firebase.database.ServerValue.TIMESTAMP;
 
-    const p = sid
+    const p = !isNew
         ? database.ref('/adminSpeakers/' + sid).update(apply)
-        : (function () { sid = uuid(); apply.order = Masters.speakers.length; apply.createdAt = firebase.database.ServerValue.TIMESTAMP; return database.ref('/adminSpeakers/' + sid).set(apply); })();
+        : (function () { apply.order = Masters.speakers.length; apply.createdAt = firebase.database.ServerValue.TIMESTAMP; return database.ref('/adminSpeakers/' + sid).set(apply); })();
 
     p.then(() => database.ref('/cvSubmissions/' + id).remove())
         .then(() => {

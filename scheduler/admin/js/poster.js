@@ -312,7 +312,7 @@ function collectSpeakers() {
         const nk = (m && m.nameKo) || nameKo || '';
         const ne = (m && m.nameEn) || nameEn || '';
         if (!nk && !ne) return;
-        map.set(key, { id: id || '', nameKo: nk, nameEn: ne, photo: (m && m.photo) || '' });
+        map.set(key, { id: id || '', nameKo: nk, nameEn: ne, photo: (m && (m.photoURL || m.photo)) || '' });
     };
     Object.keys(CONF_RAW.confSpeakers || {}).forEach(id => add(id));
     Object.values(CONF_RAW.lecturePool || {}).forEach(lec =>

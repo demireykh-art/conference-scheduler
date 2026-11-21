@@ -198,12 +198,32 @@ window.setupAutocomplete = function (input, listEl, getItems, onPick) {
     input.addEventListener('blur', () => setTimeout(close, 150));
 };
 
+// 연자 사진 소스(Storage URL 우선, 없으면 레거시 base64) — 모든 표시 지점 공용
+window.speakerPhotoSrc = function (s) { return (s && (s.photoURL || s.photo)) || ''; };
+
 // 연자 원형 아바타 HTML (사진 없으면 이름 첫 글자)
 window.speakerAvatar = function (s, px) {
     px = px || 28;
-    if (s && s.photo) return `<img class="spk-avatar" style="width:${px}px;height:${px}px" src="${escapeHtml(s.photo)}" alt="">`;
+    const src = speakerPhotoSrc(s);
+    if (src) return `<img class="spk-avatar" style="width:${px}px;height:${px}px" src="${escapeHtml(src)}" loading="lazy" alt="">`;
     const ch = ((s && (s.nameKo || s.nameEn)) || '?').trim().charAt(0);
     return `<span class="spk-avatar" style="width:${px}px;height:${px}px">${escapeHtml(ch)}</span>`;
+};
+
+/* ------------------------------------------------------------
+   연자 사진 Storage 업로드 — base64 dataURL → Firebase Storage → 다운로드 URL
+   Storage SDK 미로드/미설정 시 null 반환(호출측에서 base64 폴백).
+   ------------------------------------------------------------ */
+window.storageReady = function () { return !!(window.firebase && firebase.storage && window.storage); };
+window.uploadSpeakerPhoto = async function (speakerId, dataUrl) {
+    if (!storageReady() || !speakerId) return null;
+    if (!/^data:/.test(dataUrl || '')) return null;   // 이미 URL이거나 빈 값이면 업로드 대상 아님
+    const blob = await (await fetch(dataUrl)).blob();
+    const ext = (blob.type && blob.type.indexOf('png') >= 0) ? 'png' : 'jpg';
+    const ref = storage.ref('speakerPhotos/' + speakerId + '.' + ext);
+    // 1년 캐시(불변) — 브라우저·CDN 캐시로 재다운로드 최소화
+    await ref.put(blob, { contentType: blob.type || 'image/jpeg', cacheControl: 'public, max-age=31536000, immutable' });
+    return await ref.getDownloadURL();
 };
 
 window.uuid = function () {

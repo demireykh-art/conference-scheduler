@@ -175,7 +175,7 @@ window.editSpeaker = function (id) {
     document.getElementById('spkRoleAdvisor').checked = !!s.roleAdvisor;
     document.getElementById('spkRoleAmb').checked = !!s.roleAmb;
     document.getElementById('spkRoleModerator').checked = !!s.roleModerator;
-    spkPhotoData = s.photo || '';
+    spkPhotoData = s.photoURL || s.photo || '';
     document.getElementById('spkPhotoFile').value = '';
     refreshSpkPhotoPreview();
     document.getElementById('spkModal').classList.add('open');
@@ -184,7 +184,7 @@ window.editSpeaker = function (id) {
 window.closeSpeakerModal = function () { document.getElementById('spkModal').classList.remove('open'); };
 
 // 저장 처리 → 저장된 연자 id를 resolve. closeAfter=false면 모달 유지(CV 요청 발송용).
-function doSaveSpeaker(closeAfter) {
+async function doSaveSpeaker(closeAfter) {
     if (!AdminAuth.requireEdit()) return Promise.reject(new Error('권한 없음'));
     const nameKo = document.getElementById('spkNameKo').value.trim();
     if (!nameKo) { Toast.warning('연자 이름(국문)을 입력하세요.'); return Promise.reject(new Error('이름 없음')); }
@@ -194,6 +194,22 @@ function doSaveSpeaker(closeAfter) {
     const dup = SPEAKERS.find(s => s.id !== SPK_EDIT_ID
         && (s.nameKo || '').trim() === nameKo && (s.affiliationKo || '').trim() === affKo);
     if (dup) { Toast.warning('이미 같은 이름·소속의 연자가 등록되어 있습니다.'); return Promise.reject(new Error('중복')); }
+
+    const sid = SPK_EDIT_ID || uuid();
+
+    // 사진: 새로 올린 base64면 Storage 업로드 → photoURL, 이미 URL이면 그대로, 비었으면 제거.
+    //  - Storage 미설정/업로드 실패 시 base64로 폴백(기존 동작 유지).
+    let photoURL = '', photoLegacy = null;
+    if (spkPhotoData) {
+        if (/^https?:/.test(spkPhotoData)) {
+            photoURL = spkPhotoData;
+        } else if (/^data:/.test(spkPhotoData)) {
+            try {
+                const url = await uploadSpeakerPhoto(sid, spkPhotoData);
+                if (url) photoURL = url; else photoLegacy = spkPhotoData;
+            } catch (e) { photoLegacy = spkPhotoData; }
+        }
+    }
 
     const data = {
         nameKo,
@@ -209,34 +225,63 @@ function doSaveSpeaker(closeAfter) {
         roleAdvisor: document.getElementById('spkRoleAdvisor').checked,
         roleAmb: document.getElementById('spkRoleAmb').checked,
         roleModerator: document.getElementById('spkRoleModerator').checked,
-        photo: spkPhotoData || '',
+        photoURL: photoURL,       // Storage 다운로드 URL(공개 사진)
+        photo: photoLegacy,       // null이면 레거시 base64 제거(용량 절감)
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     };
 
     if (SPK_EDIT_ID) {
-        return SPK_ROOT.child(SPK_EDIT_ID).update(data)
+        return SPK_ROOT.child(sid).update(data)
             .then(() => {
-                logActivity('update', 'speaker', `연자 "${nameKo}" 수정`, { entityId: SPK_EDIT_ID });
+                logActivity('update', 'speaker', `연자 "${nameKo}" 수정`, { entityId: sid });
                 if (closeAfter) { Toast.success('저장되었습니다.'); closeSpeakerModal(); }
-                return SPK_EDIT_ID;
+                return sid;
             })
             .catch(e => { Toast.error('저장 실패: ' + e.message); throw e; });
     } else {
         data.order = SPEAKERS.length;
         data.createdAt = firebase.database.ServerValue.TIMESTAMP;
-        const id = uuid();
-        return SPK_ROOT.child(id).set(data)
+        return SPK_ROOT.child(sid).set(data)
             .then(() => {
-                logActivity('create', 'speaker', `연자 "${nameKo}" 등록`, { entityId: id });
-                SPK_EDIT_ID = id;   // 이후 편집/재발송이 같은 연자에 반영되도록
+                logActivity('create', 'speaker', `연자 "${nameKo}" 등록`, { entityId: sid });
+                SPK_EDIT_ID = sid;   // 이후 편집/재발송이 같은 연자에 반영되도록
                 document.getElementById('spkModalTitle').textContent = '연자 수정';
                 if (closeAfter) { Toast.success('연자가 등록되었습니다.'); closeSpeakerModal(); }
-                return id;
+                return sid;
             })
             .catch(e => { Toast.error('등록 실패: ' + e.message); throw e; });
     }
 }
 window.saveSpeaker = function () { doSaveSpeaker(true).catch(() => { }); };
+
+/* ---------- 사진 Storage 일괄 이전 (레거시 base64 → Firebase Storage URL) ----------
+   DB에 base64로 저장된 연자 사진을 Storage로 옮기고 photoURL 저장 + base64 제거.
+   홈페이지/임베드가 사진을 CDN에서 받아 다운로드 사용량을 크게 줄인다. (1회 실행) */
+window.migratePhotosToStorage = async function () {
+    if (!AdminAuth.requireEdit()) return;
+    if (!storageReady()) {
+        Toast.error('Firebase Storage가 아직 설정되지 않았습니다. 콘솔에서 Storage 사용 설정 후 다시 시도하세요.');
+        return;
+    }
+    const targets = SPEAKERS.filter(s => /^data:/.test(s.photo || '') && !/^https?:/.test(s.photoURL || ''));
+    if (!targets.length) { Toast.info('이전할 base64 사진이 없습니다. (이미 모두 Storage로 이전됨)'); return; }
+    const ok = await confirmDialog(`연자 사진 ${targets.length}명을 Firebase Storage로 이전할까요?\n(기존 base64는 제거되고 Storage URL로 교체됩니다. 안전을 위해 먼저 "💾 연자 백업"을 권장)`, { okText: '이전 시작' });
+    if (!ok) return;
+    const btn = document.getElementById('spkMigrateBtn'); if (btn) btn.disabled = true;
+    let done = 0, fail = 0;
+    for (const s of targets) {
+        try {
+            const url = await uploadSpeakerPhoto(s.id, s.photo);
+            if (!url) { fail++; continue; }
+            await SPK_ROOT.child(s.id).update({ photoURL: url, photo: null, updatedAt: firebase.database.ServerValue.TIMESTAMP });
+            done++;
+            if (done % 5 === 0 || done === targets.length) Toast.info(`이전 중… ${done}/${targets.length}`);
+        } catch (e) { fail++; }
+    }
+    if (btn) btn.disabled = false;
+    logActivity('update', 'speaker', `연자 사진 Storage 이전 ${done}건${fail ? ` (실패 ${fail})` : ''}`, {});
+    Toast.success(`사진 이전 완료: ${done}건${fail ? ` · 실패 ${fail}건(다시 시도 가능)` : ''}`);
+};
 
 /* ---------- CV 요청 (메일 / 링크복사) — 저장 후 발송 ---------- */
 const ORG_NAME = '대한미용성형레이저의학회(ASLS)';
