@@ -196,12 +196,22 @@
         setLang(l) { LANG = l; render(); }
     };
 
-    /* ---------- 구독 ---------- */
+    /* ---------- 구독 ----------
+       ⚠️ 데이터 절약: 행사 노드 전체(posterUrl·venueMap 등 대용량 base64 포함)를
+       내려받지 않고, 공개 프로그램 렌더에 필요한 필드(rooms + 제목/기간)만 구독한다.
+       (예전엔 /adminConferences/<id> 전체를 .on('value') 로 받아 다운로드 폭증) */
     function start() {
         if (!CONF_ID) { render(); return; }
-        database.ref('/adminConferences/' + CONF_ID).on('value', snap => {
-            CONF = snap.val();
-            render();
+        const base = database.ref('/adminConferences/' + CONF_ID);
+        CONF = CONF || {};
+        let roomsReady = false;
+        // 작은 메타 필드 — 실시간
+        ['title', 'titleEn', 'startDate', 'endDate'].forEach(f => {
+            base.child(f).on('value', s => { CONF[f] = s.val(); if (roomsReady) render(); });
+        });
+        // 프로그램 본문(rooms)만 실시간 — 대용량 이미지 필드는 제외됨
+        base.child('rooms').on('value', s => {
+            CONF.rooms = s.val(); roomsReady = true; render();
         }, () => { $('agenda').innerHTML = msg('프로그램을 불러올 수 없습니다.', '잠시 후 다시 시도해 주세요.'); });
     }
     if (window.database) start();
