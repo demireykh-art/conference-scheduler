@@ -25,23 +25,29 @@ function board() {
 }
 const cleanTitle = (v, max) => (typeof v === 'string' ? v.replace(/\r/g, '').trim() : '').slice(0, max);
 
+
+// 이사회 앱 로그인 토큰 → 이사회 앱 회원 정보 (본인 토큰으로 본인 문서만 읽음)
+async function boardUser(idTokenRaw) {
+  const idToken = String(idTokenRaw || '');
+  let dec;
+  try { dec = await board().auth().verifyIdToken(idToken); }
+  catch (e) { throw new HttpsError('unauthenticated', '이사회 앱 로그인이 만료됐어요. 앱을 새로고침해 주세요.'); }
+  const r = await fetch(`https://firestore.googleapis.com/v1/projects/${BOARD_PROJECT}/databases/(default)/documents/users/${dec.uid}`,
+    { headers: { Authorization: 'Bearer ' + idToken } });
+  if (!r.ok) throw new HttpsError('permission-denied', '이사회 앱 회원 정보를 읽지 못했습니다.');
+  const f = (await r.json()).fields || {};
+  const sv = k => (f[k] && f[k].stringValue) || '';
+  return { uid: dec.uid, email: dec.email || '', name: sv('name') || dec.name || '', clinic: sv('clinic'), status: sv('status'), role: sv('role'), tier: sv('tier'), speakerId: sv('speakerId') };
+}
+
 // 호출자 → { speakerId, who, via, confId? }
 async function resolveCaller(auth) {
   if (!auth || typeof auth !== 'object') throw new HttpsError('unauthenticated', '연자 확인 정보가 없습니다.');
   if (auth.type === 'board') {
-    const idToken = String(auth.idToken || '');
-    let dec;
-    try { dec = await board().auth().verifyIdToken(idToken); }
-    catch (e) { throw new HttpsError('unauthenticated', '이사회 앱 로그인이 만료됐어요. 앱을 새로고침해 주세요.'); }
-    // 이사회 앱 규칙상 본인 문서는 본인 토큰으로 읽을 수 있음 → 연결한 연자 ID 확인
-    const r = await fetch(`https://firestore.googleapis.com/v1/projects/${BOARD_PROJECT}/databases/(default)/documents/users/${dec.uid}`,
-      { headers: { Authorization: 'Bearer ' + idToken } });
-    if (!r.ok) throw new HttpsError('permission-denied', '이사회 앱 회원 정보를 읽지 못했습니다.');
-    const f = (await r.json()).fields || {};
-    const sv = k => (f[k] && f[k].stringValue) || '';
-    if (sv('status') !== 'active') throw new HttpsError('permission-denied', '승인된 이사만 수정할 수 있어요.');
-    if (!sv('speakerId')) throw new HttpsError('failed-precondition', '이사회 앱에서 연자 연결을 먼저 해주세요.');
-    return { speakerId: sv('speakerId'), who: `${sv('name') || dec.name || ''}${sv('clinic') ? ' ' + sv('clinic') : ''} (이사회 앱 · ${dec.email || dec.uid})`, via: 'board' };
+    const u = await boardUser(auth.idToken);
+    if (u.status !== 'active') throw new HttpsError('permission-denied', '승인된 이사만 수정할 수 있어요.');
+    if (!u.speakerId) throw new HttpsError('failed-precondition', '이사회 앱에서 연자 연결을 먼저 해주세요.');
+    return { speakerId: u.speakerId, who: `${u.name}${u.clinic ? ' ' + u.clinic : ''} (이사회 앱 · ${u.email})`, via: 'board' };
   }
   if (auth.type === 'token') {
     const t = String(auth.token || '');
@@ -117,4 +123,99 @@ exports.editLectureTitle = onCall({ region: 'asia-northeast3', timeoutSeconds: 3
   });
   console.log('editLectureTitle', { confId, lectureId, via: caller.via, speakerId: caller.speakerId, placed });
   return { ok: true, placed };
+});
+
+
+/* ============================================================
+ * 이사회 앱 관리자·사무국의 확인(컨펌) — boardReview
+ *   이사회 앱에서 role=admin 또는 tier=사무국 인 활성 회원만
+ *   list   : 승인 대기 강의·일정 제출 + 확인 전 연자 제목 수정
+ *   approve: 제출 승인 → 강의풀 생성·행사 연자 등록 (해외 연자는 여행 일정 비공개 저장)
+ *   reject : 제출 반려
+ *   ack    : 연자 제목 수정 확인(표시 해제)
+ * 스케줄러 「강의·일정 제출함」 승인과 같은 결과를 만든다.
+ * ============================================================ */
+const isBoardSub = s => !!s && (s.source === 'board' || (s.travel && s.travel.status === 'domestic') || /^\[ASLS 이사회 앱\]/.test(s.note || ''));
+exports.boardReview = onCall({ region: 'asia-northeast3', timeoutSeconds: 60 }, async (request) => {
+  const d = request.data || {};
+  const u = await boardUser(d.idToken);
+  if (u.status !== 'active' || !(u.role === 'admin' || u.tier === '사무국')) throw new HttpsError('permission-denied', '이사회 앱 관리자·사무국만 확인할 수 있어요.');
+  const who = `${u.name}${u.clinic ? ' ' + u.clinic : ''} (이사회 앱 관리자 · ${u.email})`;
+  const db = admin.database();
+  const now = ServerValue.TIMESTAMP;
+  const log = (summary, extra) => db.ref('/adminActivityLog').push(Object.assign({ ts: now, uid: 'board:' + u.uid, userName: who, action: 'update', entity: 'lecture', summary }, extra || {}));
+  const titleOf = async cid => (await db.ref(`/adminConferences/${cid}/title`).once('value')).val() || '';
+
+  if (d.action === 'list') {
+    const subs = (await db.ref('/tripSubmissions').orderByChild('submittedAt').limitToLast(300).once('value')).val() || {};
+    const pending = Object.entries(subs).filter(([, v]) => v && v.status !== 'approved' && v.status !== 'rejected')
+      .map(([id, v]) => ({ id, confId: v.confId || '', nameKo: v.nameKo || v.nameEn || '', board: isBoardSub(v), submittedAt: v.submittedAt || 0,
+        lectures: (v.lectures || []).map(l => ({ title: l.title || '', type: l.type || '', sponsor: l.sponsor || '', duration: l.duration || 0, lang: l.lang || '' })), note: v.note || '' }));
+    const confs = (await db.ref('/adminConferences').once('value')).val() || {};
+    const edits = [];
+    Object.entries(confs).forEach(([cid, c]) => Object.entries((c && c.lecturePool) || {}).forEach(([lid, l]) => {
+      if (l && l.titleEdit && !l.titleEdit.ack) edits.push({ confId: cid, confTitle: c.title || '', lectureId: lid, titleKo: l.titleKo || '', prevKo: l.titleEdit.prevKo || '', by: l.titleEdit.by || '', at: l.titleEdit.at || 0 });
+    }));
+    const ct = Object.fromEntries(Object.entries(confs).map(([cid, c]) => [cid, (c && c.title) || '']));
+    pending.forEach(p => { p.confTitle = ct[p.confId] || ''; });
+    pending.sort((a, b) => b.submittedAt - a.submittedAt); edits.sort((a, b) => b.at - a.at);
+    return { pending, edits };
+  }
+
+  if (d.action === 'reject') {
+    const id = String(d.id || ''); if (!/^[\w-]{4,80}$/.test(id)) throw new HttpsError('invalid-argument', '잘못된 요청');
+    const s = (await db.ref('/tripSubmissions/' + id).once('value')).val(); if (!s) throw new HttpsError('not-found', '제출을 찾을 수 없어요.');
+    await db.ref('/tripSubmissions/' + id + '/status').set('rejected');
+    await log(`강의·일정 제출 반려 "${s.nameKo || s.nameEn || ''}" (이사회 앱)`, { confId: s.confId || '', confTitle: await titleOf(s.confId), entityId: s.speakerId || '' });
+    return { ok: true };
+  }
+
+  if (d.action === 'ack') {
+    const cid = String(d.confId || ''), lid = String(d.lectureId || '');
+    if (!/^[\w-]{4,80}$/.test(cid) || !/^[\w-]{4,80}$/.test(lid)) throw new HttpsError('invalid-argument', '잘못된 요청');
+    const ref = db.ref(`/adminConferences/${cid}/lecturePool/${lid}/titleEdit`);
+    const t = (await ref.once('value')).val(); if (!t) return { ok: true };
+    await ref.update({ ack: true, ackAt: now, ackBy: who });
+    await log(`연자 제목 수정 확인: "${t.prevKo || ''}" → 현재 제목 (이사회 앱)`, { confId: cid, confTitle: await titleOf(cid), entityId: lid });
+    return { ok: true };
+  }
+
+  if (d.action === 'approve') {
+    const id = String(d.id || ''); if (!/^[\w-]{4,80}$/.test(id)) throw new HttpsError('invalid-argument', '잘못된 요청');
+    const s = (await db.ref('/tripSubmissions/' + id).once('value')).val(); if (!s) throw new HttpsError('not-found', '제출을 찾을 수 없어요.');
+    if (s.status === 'approved') return { ok: true, already: true };
+    const boardSub = isBoardSub(s);
+    let sid = s.speakerId || '';
+    if (!sid && s.nameKo) {
+      const all = (await db.ref('/adminSpeakers').once('value')).val() || {};
+      const hit = Object.entries(all).filter(([, v]) => v && (v.nameKo || '').trim() === s.nameKo.trim());
+      if (hit.length !== 1) throw new HttpsError('failed-precondition', hit.length ? `연자 리스트에 "${s.nameKo}"가 ${hit.length}명이라 자동 연결할 수 없어요. 스케줄러 제출함에서 처리해 주세요.` : `연자 리스트에 "${s.nameKo}"가 없어요. 스케줄러에서 연자를 먼저 등록해 주세요.`);
+      sid = hit[0][0];
+    }
+    if (!s.confId || !sid) throw new HttpsError('failed-precondition', '행사·연자 정보가 없어 반영할 수 없어요.');
+    const base = db.ref('/adminConferences/' + s.confId);
+    const up = {};
+    if (!(await base.child('confSpeakers/' + sid).once('value')).exists()) up['confSpeakers/' + sid] = { role: '연자', order: 999 };
+    const spk = { id: sid, nameKo: s.nameKo || '', nameEn: s.nameEn || '', affiliationKo: '', affiliationEn: s.affiliationEn || '' };
+    (s.lectures || []).filter(l => l && (l.title || l.type)).forEach((l, i) => {
+      const lid = base.child('lecturePool').push().key;
+      up['lecturePool/' + lid] = {
+        titleKo: l.title || l.type || '(제목 미정)', titleEn: '', duration: Number(l.duration) || 0,
+        categories: l.type ? [l.type] : [], tags: [], types: [], speakers: [spk],
+        partnerId: '', partnerKo: l.sponsor || '', partnerEn: '', productKo: '', productEn: '', productCategory: '', productDesc: '',
+        abstractUrl: l.abstractUrl || '', memo: l.note || '', order: 9000 + i, createdAt: now, updatedAt: now
+      };
+    });
+    if (!boardSub) {   // 해외 연자: 여행 일정·연락처는 비공개 칸
+      await db.ref(`/adminSpeakerTrips/${s.confId}/${sid}`).set(Object.assign({}, s.travel || {}, { nameEn: s.nameEn || '', nameKo: s.nameKo || '', email: s.email || '', phone: s.phone || '', cvFileUrl: s.cvFileUrl || '', updatedAt: now }));
+      const cur = (await db.ref('/adminSpeakerContacts/' + sid).once('value')).val() || {};
+      const c = { email: cur.email || s.email || '', phone: cur.phone || s.phone || '' };
+      if (c.email || c.phone) await db.ref('/adminSpeakerContacts/' + sid).set(c);
+    }
+    await base.update(up);
+    await db.ref('/tripSubmissions/' + id).update({ status: 'approved', speakerId: sid });
+    await log(`${boardSub ? '이사회 앱 강의 제출' : '해외 연자 일정·강의 제출'} "${s.nameKo || s.nameEn || ''}" 승인·반영 (이사회 앱)`, { confId: s.confId, confTitle: await titleOf(s.confId), entityId: sid });
+    return { ok: true };
+  }
+  throw new HttpsError('invalid-argument', '알 수 없는 요청');
 });
