@@ -1736,3 +1736,7 @@ html.modal-open, body.modal-open { overflow: hidden; }
 /* 드롭 대상 세션 강조 */
 .session-block.qp-drop-hi { outline: 2px dashed #2f6fed; outline-offset: 2px; background: #f3f7ff; }
 @media (max-width: 640px) { .qp-panel { right: 8px; left: 8px; width: auto; bottom: 68px; } .qp-list { height: 320px; } }
+
+/* 연자 제목 수정 표시 */
+.badge-title-edit { background: #fff4e5; color: #b4580a; border: 1px solid #f3c48a; cursor: pointer; margin-left: 4px; font-weight: 700; }
+.badge-title-edit:hover { background: #ffe8cc; }
