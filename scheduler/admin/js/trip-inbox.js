@@ -69,9 +69,23 @@ function card(s) {
     const name = escapeHtml(s.nameEn || s.nameKo || '(이름 없음)') + (s.nameKo && s.nameEn ? ` <span class="dim">${escapeHtml(s.nameKo)}</span>` : '');
     const aff = [s.affiliationEn, s.nationality].filter(Boolean).map(escapeHtml).join(' · ');
     const contact = [s.email, s.phone].filter(Boolean).map(escapeHtml).join(' · ');
+    const lecLine = l => {
+        const t = escapeHtml(l.title || (l.type ? '[' + l.type + ']' : '(제목 미정)'));
+        const bits = [];
+        if (l.type && l.title) bits.push('종류: ' + escapeHtml(l.type));
+        if (l.sponsor) bits.push('스폰서: ' + escapeHtml(l.sponsor));
+        if (l.duration) bits.push(l.duration + '분');
+        if (l.lang) bits.push(escapeHtml(l.lang));
+        const abs = l.abstractUrl ? ` <a href="${escapeHtml(l.abstractUrl)}" target="_blank" rel="noopener">📎 초록</a>` : '';
+        return `<li>🎤 <b>${t}</b>${bits.length ? ' · ' + bits.join(' · ') : ''}${l.note ? ` <span class="dim">(${escapeHtml(l.note)})</span>` : ''}${abs}</li>`;
+    };
     const lecs = (s.lectures || []).length
-        ? `<ul class="ti-lecs">${s.lectures.map(l => `<li>🎤 <b>${escapeHtml(l.title)}</b>${l.duration ? ` · ${l.duration}분` : ''}${l.lang ? ` · ${escapeHtml(l.lang)}` : ''}${l.note ? ` <span class="dim">(${escapeHtml(l.note)})</span>` : ''}</li>`).join('')}</ul>`
-        : '<div class="dim" style="margin:6px 0">강의 제목 없음</div>';
+        ? `<ul class="ti-lecs">${s.lectures.map(lecLine).join('')}</ul>`
+        : '<div class="dim" style="margin:6px 0">강의 없음</div>';
+    const docs = [];
+    if (s.travel && s.travel.ticketUrl) docs.push(`<a href="${escapeHtml(s.travel.ticketUrl)}" target="_blank" rel="noopener">✈️ 항공권</a>`);
+    if (s.cvFileUrl) docs.push(`<a href="${escapeHtml(s.cvFileUrl)}" target="_blank" rel="noopener">📄 CV</a>`);
+    const docsLine = docs.length ? `<div class="ti-docs" style="font-size:0.84rem;margin-top:4px">첨부: ${docs.join(' · ')}</div>` : '';
     const badge = s.status === 'approved' ? '<span class="badge badge-ongoing">반영됨</span>' : (s.status === 'rejected' ? '<span class="badge badge-ended">반려</span>' : '');
     const actions = (s.status === 'approved' || s.status === 'rejected') ? ''
         : `<div class="ti-actions"><button class="btn btn-sm btn-success" onclick="approveTrip('${s.id}')">✔ 승인·반영</button>
@@ -81,6 +95,7 @@ function card(s) {
             <div class="dim" style="font-size:0.78rem;text-align:right">${escapeHtml(CONF_TITLES[s.confId] || s.confId || '')}<br>${fmtTs(s.submittedAt)} · ${s.lang === 'ko' ? '국문' : 'EN'}</div></div>
         <div class="ti-travel">${travelLine(s.travel)}</div>
         ${(s.travel && s.travel.requests) ? `<div class="dim" style="font-size:0.84rem;margin-top:4px">요청: ${escapeHtml(s.travel.requests)}</div>` : ''}
+        ${docsLine}
         ${lecs}
         ${s.note ? `<div class="dim" style="font-size:0.84rem">메모: ${escapeHtml(s.note)}</div>` : ''}
         ${actions}
@@ -96,25 +111,28 @@ window.approveTrip = async function (id) {
     if (!AdminAuth.requireEdit()) return;
     const s = SUBS.find(x => x.id === id); if (!s) return;
     if (!s.confId || !s.speakerId) { Toast.error('행사/연자 정보가 없어 반영할 수 없습니다. (제출 링크 확인)'); return; }
-    const ok = await confirmDialog(`"${s.nameEn || s.nameKo}" 제출을 승인·반영할까요?\n- 여행 일정 저장\n- 강의 ${(s.lectures || []).filter(l => l.title).length}건 강의풀 생성\n- 이 행사 연자로 등록`, { okText: '승인·반영' });
+    const lecList = (s.lectures || []).filter(l => l.title || l.type);
+    const ok = await confirmDialog(`"${s.nameEn || s.nameKo}" 제출을 승인·반영할까요?\n- 여행 일정·항공권·CV 저장\n- 강의 ${lecList.length}건 강의풀 생성\n- 이 행사 연자로 등록`, { okText: '승인·반영' });
     if (!ok) return;
     const base = '/adminConferences/' + s.confId;
     const updates = {};
-    // 여행 일정
+    // 여행 일정(+ 항공권·CV 첨부 URL)
     updates['speakerTrips/' + s.speakerId] = Object.assign({}, s.travel || {}, {
         nameEn: s.nameEn || '', nameKo: s.nameKo || '', email: s.email || '', phone: s.phone || '',
+        cvFileUrl: s.cvFileUrl || '',
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     });
     // 연자 참여 등록
     updates['confSpeakers/' + s.speakerId] = { role: '연자', order: 0 };
-    // 강의풀 생성
+    // 강의풀 생성 (제목 없으면 종류를 제목 대신 사용, 종류→카테고리, 스폰서→파트너명, 초록 URL 보관)
     const spk = { id: s.speakerId, nameKo: s.nameKo || '', nameEn: s.nameEn || '', affiliationKo: '', affiliationEn: s.affiliationEn || '' };
-    (s.lectures || []).filter(l => l.title).forEach((l, i) => {
+    lecList.forEach((l, i) => {
         const lid = database.ref(base + '/lecturePool').push().key;
         updates['lecturePool/' + lid] = {
-            titleKo: l.title, titleEn: '', duration: Number(l.duration) || 0,
-            categories: [], tags: [], types: [], speakers: [spk],
-            partnerId: '', partnerKo: '', partnerEn: '', productKo: '', productEn: '', productCategory: '', productDesc: '',
+            titleKo: l.title || l.type || '(제목 미정)', titleEn: '', duration: Number(l.duration) || 0,
+            categories: l.type ? [l.type] : [], tags: [], types: [], speakers: [spk],
+            partnerId: '', partnerKo: l.sponsor || '', partnerEn: '', productKo: '', productEn: '', productCategory: '', productDesc: '',
+            abstractUrl: l.abstractUrl || '',
             memo: l.note || '', order: 9000 + i,
             createdAt: firebase.database.ServerValue.TIMESTAMP, updatedAt: firebase.database.ServerValue.TIMESTAMP
         };
