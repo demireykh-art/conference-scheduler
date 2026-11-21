@@ -325,16 +325,17 @@ window.downloadJson = function (filename, obj) {
     setTimeout(() => URL.revokeObjectURL(a.href), 1500);
 };
 window.exportSpeakersBackup = function () {
-    const arr = (window.Masters && Masters.speakers) || [];
-    if (!arr.length) { if (window.Toast) Toast.warning('연자 데이터가 아직 로드되지 않았습니다. 잠시 후 다시 시도하세요.'); return; }
-    const d = new Date();
-    const p = n => String(n).padStart(2, '0');
-    const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
-    // 실제 DB에 되돌릴 수 있도록 id를 키로 하는 오브젝트 형태로 저장
-    const byId = {};
-    arr.forEach(s => { const { id, ...rest } = s; if (id) byId[id] = rest; });
-    window.downloadJson(`adminSpeakers_backup_${stamp}.json`, byId);
-    if (window.Toast) Toast.success(`연자 ${arr.length}명 백업(JSON)을 저장했습니다.`);
+    // 페이지 상태와 무관하게 DB(/adminSpeakers)에서 직접 읽어 백업 — id를 키로 한 오브젝트(복원 가능 형태)
+    database.ref('/adminSpeakers').once('value').then(snap => {
+        const byId = snap.val() || {};
+        const n = Object.keys(byId).length;
+        if (!n) { if (window.Toast) Toast.warning('백업할 연자 데이터가 없습니다.'); return; }
+        const d = new Date();
+        const p = x => String(x).padStart(2, '0');
+        const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+        window.downloadJson(`adminSpeakers_backup_${stamp}.json`, byId);
+        if (window.Toast) Toast.success(`연자 ${n}명 백업(JSON)을 저장했습니다.`);
+    }).catch(e => { if (window.Toast) Toast.error('백업 실패: ' + (e && e.message || e)); });
 };
 
 /* ------------------------------------------------------------
