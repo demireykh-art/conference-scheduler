@@ -1,5 +1,6 @@
 /**
  * trip-inbox.js — 해외 연자 여행·강의 제출함 (검토·승인)
+ *   + ASLS 이사회 앱(국내 연자) 강의 제출: source:'board', travel.status:'domestic' — 여행 일정 저장 없이 강의풀만 생성
  * 데이터: /tripSubmissions/<id> = { confId, speakerId, nameEn, nameKo, affiliationEn, nationality, email, phone,
  *           travel{...}, lectures[], note, lang, status, submittedAt }
  * 승인 시:
@@ -42,7 +43,9 @@ function gate() {
 document.addEventListener('admin-auth-change', gate);
 
 function fmtTs(ts) { if (!ts) return '-'; const d = new Date(ts), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
-function travelLine(t) {
+const isBoard = s => s && s.source === 'board';
+function travelLine(t, s) {
+    if (isBoard(s)) return '🏠 <b>국내 연자</b> · ASLS 이사회 앱에서 제출 (여행 일정 없음)';
     if (!t) return '-';
     if (t.status !== 'confirmed') return '✈️ <b>미정</b>' + (t.nights ? ` · ${t.nights}박 예정` : '') + (t.companions ? ` · 동반 ${t.companions}` : '');
     const seg = [];
@@ -93,7 +96,8 @@ function card(s) {
     return `<div class="card ti-card">
         <div class="ti-head"><div><b style="font-size:1rem">${name}</b> ${badge}<div class="dim" style="font-size:0.82rem">${aff}${contact ? ' · ' + contact : ''}</div></div>
             <div class="dim" style="font-size:0.78rem;text-align:right">${escapeHtml(CONF_TITLES[s.confId] || s.confId || '')}<br>${fmtTs(s.submittedAt)} · ${s.lang === 'ko' ? '국문' : 'EN'}</div></div>
-        <div class="ti-travel">${travelLine(s.travel)}</div>
+        <div class="ti-travel">${travelLine(s.travel, s)}</div>
+        ${(isBoard(s) && !s.speakerId) ? `<div class="dim" style="font-size:0.84rem;margin-top:4px">⚠ 연자 연결 없음 — 승인 시 연자 리스트에서 같은 이름(${escapeHtml(s.nameKo || '')})을 찾아 연결합니다.</div>` : ''}
         ${(s.travel && s.travel.requests) ? `<div class="dim" style="font-size:0.84rem;margin-top:4px">요청: ${escapeHtml(s.travel.requests)}</div>` : ''}
         ${docsLine}
         ${lecs}
@@ -110,20 +114,33 @@ window.rejectTrip = function (id) {
 window.approveTrip = async function (id) {
     if (!AdminAuth.requireEdit()) return;
     const s = SUBS.find(x => x.id === id); if (!s) return;
+    const board = isBoard(s);
+    // 이사회 앱 제출인데 연자 연결이 없으면 연자 리스트에서 같은 한글 이름 1명을 찾아 연결
+    if (board && !s.speakerId && s.nameKo) {
+        const all = (await database.ref('/adminSpeakers').once('value')).val() || {};
+        const hit = Object.entries(all).filter(([, v]) => v && (v.nameKo || '').trim() === s.nameKo.trim());
+        if (hit.length === 1) { s.speakerId = hit[0][0]; await TI_REF.child(id + '/speakerId').set(s.speakerId); }
+        else { Toast.error(hit.length ? `연자 리스트에 "${s.nameKo}"가 ${hit.length}명 있어 자동 연결할 수 없습니다.` : `연자 리스트에 "${s.nameKo}"가 없습니다. 연자 리스트에 먼저 등록해 주세요.`); return; }
+    }
     if (!s.confId || !s.speakerId) { Toast.error('행사/연자 정보가 없어 반영할 수 없습니다. (제출 링크 확인)'); return; }
     const lecList = (s.lectures || []).filter(l => l.title || l.type);
-    const ok = await confirmDialog(`"${s.nameEn || s.nameKo}" 제출을 승인·반영할까요?\n- 여행 일정·항공권·CV 저장\n- 강의 ${lecList.length}건 강의풀 생성\n- 이 행사 연자로 등록`, { okText: '승인·반영' });
+    const ok = await confirmDialog(`"${s.nameEn || s.nameKo}" 제출을 승인·반영할까요?\n${board ? '' : '- 여행 일정·항공권·CV 저장\n'}- 강의 ${lecList.length}건 강의풀 생성\n- 이 행사 연자로 등록`, { okText: '승인·반영' });
     if (!ok) return;
     const base = '/adminConferences/' + s.confId;
     const updates = {};
-    // 여행 일정(+ 항공권·CV 첨부 URL)
-    updates['speakerTrips/' + s.speakerId] = Object.assign({}, s.travel || {}, {
+    // 여행 일정(+ 항공권·CV 첨부 URL) — 이사회 앱(국내 연자) 제출은 여행 일정이 없으므로 건너뜀
+    if (!board) updates['speakerTrips/' + s.speakerId] = Object.assign({}, s.travel || {}, {
         nameEn: s.nameEn || '', nameKo: s.nameKo || '', email: s.email || '', phone: s.phone || '',
         cvFileUrl: s.cvFileUrl || '',
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     });
     // 연자 참여 등록
     updates['confSpeakers/' + s.speakerId] = { role: '연자', order: 0 };
+    if (board) {   // 이미 이 행사 연자면 기존 역할·순서 유지
+        const cur = (await database.ref(base + '/confSpeakers/' + s.speakerId).once('value')).val();
+        if (cur) delete updates['confSpeakers/' + s.speakerId];
+        else updates['confSpeakers/' + s.speakerId] = { role: '연자', order: 999 };
+    }
     // 강의풀 생성 (제목 없으면 종류를 제목 대신 사용, 종류→카테고리, 스폰서→파트너명, 초록 URL 보관)
     const spk = { id: s.speakerId, nameKo: s.nameKo || '', nameEn: s.nameEn || '', affiliationKo: '', affiliationEn: s.affiliationEn || '' };
     lecList.forEach((l, i) => {
@@ -140,7 +157,7 @@ window.approveTrip = async function (id) {
     try {
         await database.ref(base).update(updates);
         await TI_REF.child(id + '/status').set('approved');
-        logActivity('update', 'speaker', `해외 연자 "${s.nameEn || s.nameKo}" 일정·강의 제출 승인·반영`, { confId: s.confId, confTitle: CONF_TITLES[s.confId] || '', entityId: s.speakerId });
+        logActivity('update', 'speaker', board ? `이사회 앱 강의 제출 "${s.nameKo || s.nameEn}" 승인·반영` : `해외 연자 "${s.nameEn || s.nameKo}" 일정·강의 제출 승인·반영`, { confId: s.confId, confTitle: CONF_TITLES[s.confId] || '', entityId: s.speakerId });
         Toast.success('승인·반영 완료. 강의풀/연자/여행일정에 저장되었습니다.');
     } catch (e) { Toast.error('반영 실패: ' + (e.message || e)); }
 };
