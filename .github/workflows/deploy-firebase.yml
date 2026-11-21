@@ -34,10 +34,15 @@ jobs:
       - name: Deploy Realtime Database rules
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-        run: firebase deploy --only database --project conference-scheduler-a5656 --non-interactive --token "$FIREBASE_TOKEN"
+        run: |
+          if [ -z "$FIREBASE_TOKEN" ]; then echo "::error title=FIREBASE_TOKEN 없음::저장소 Secret FIREBASE_TOKEN 이 비어 있습니다"; exit 1; fi
+          set -o pipefail
+          firebase deploy --only database --project conference-scheduler-a5656 --non-interactive --token "$FIREBASE_TOKEN" 2>&1 | tee rules.log || { echo "::error title=DB 규칙 배포 실패::$(grep -iE 'error|denied|permission|invalid' rules.log | tail -6 | tr '\n' ' ' | cut -c1-900)"; exit 1; }
       - name: Install function deps
         run: cd functions && npm ci
       - name: Deploy functions (title edit)
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-        run: firebase deploy --only functions:editLectureTitle,functions:myLectures --project conference-scheduler-a5656 --non-interactive --force --token "$FIREBASE_TOKEN"
+        run: |
+          set -o pipefail
+          firebase deploy --only functions:editLectureTitle,functions:myLectures --project conference-scheduler-a5656 --non-interactive --force --token "$FIREBASE_TOKEN" 2>&1 | tee fn.log || { echo "::error title=함수 배포 실패::$(grep -iE 'error|denied|permission|billing|blaze|enable|invalid' fn.log | tail -8 | tr '\n' ' ' | cut -c1-900)"; exit 1; }
