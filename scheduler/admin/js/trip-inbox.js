@@ -43,6 +43,7 @@ function gate() {
 document.addEventListener('admin-auth-change', gate);
 
 function fmtTs(ts) { if (!ts) return '-'; const d = new Date(ts), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+const lecsOf = s => { const l = s && s.lectures; return Array.isArray(l) ? l.filter(Boolean) : (l && typeof l === 'object' ? Object.values(l).filter(Boolean) : []); };
 const isBoard = s => !!s && (s.source === 'board' || (s.travel && s.travel.status === 'domestic') || /^\[ASLS 이사회 앱\]/.test(s.note || ''));
 function travelLine(t, s) {
     if (isBoard(s)) return '🏠 <b>국내 연자</b> · ASLS 이사회 앱에서 제출 (여행 일정 없음)';
@@ -63,8 +64,9 @@ function render() {
     const done = SUBS.filter(s => s.status === 'approved' || s.status === 'rejected');
     let html = `<div class="ss-summary" style="margin-bottom:10px">검토 대기 <b>${pending.length}</b>건 · 처리됨 ${done.length}건</div>`;
     if (!pending.length) html += `<div class="card empty-state">검토할 제출이 없습니다.</div>`;
-    html += pending.map(card).join('');
-    if (done.length) html += `<details style="margin-top:16px"><summary style="cursor:pointer;color:var(--text-dim)">처리된 제출 ${done.length}건 보기</summary>${done.slice(0, 60).map(card).join('')}</details>`;
+    const safeCard = s => { try { return card(s); } catch (e) { console.error('trip-inbox card', s && s.id, e); return `<div class="card ti-card"><b>${escapeHtml((s && (s.nameKo || s.nameEn)) || s.id)}</b> — 표시 오류(${escapeHtml(e.message)}) <button class="btn btn-sm btn-danger-ghost" onclick="rejectTrip('${s.id}')">반려</button></div>`; } };
+    html += pending.map(safeCard).join('');
+    if (done.length) html += `<details style="margin-top:16px"><summary style="cursor:pointer;color:var(--text-dim)">처리된 제출 ${done.length}건 보기</summary>${done.slice(0, 60).map(safeCard).join('')}</details>`;
     host.innerHTML = html;
 }
 
@@ -82,8 +84,8 @@ function card(s) {
         const abs = l.abstractUrl ? ` <a href="${escapeHtml(l.abstractUrl)}" target="_blank" rel="noopener">📎 초록</a>` : '';
         return `<li>🎤 <b>${t}</b>${bits.length ? ' · ' + bits.join(' · ') : ''}${l.note ? ` <span class="dim">(${escapeHtml(l.note)})</span>` : ''}${abs}</li>`;
     };
-    const lecs = (s.lectures || []).length
-        ? `<ul class="ti-lecs">${s.lectures.map(lecLine).join('')}</ul>`
+    const lecs = lecsOf(s).length
+        ? `<ul class="ti-lecs">${lecsOf(s).map(lecLine).join('')}</ul>`
         : '<div class="dim" style="margin:6px 0">강의 없음</div>';
     const docs = [];
     if (s.travel && s.travel.ticketUrl) docs.push(`<a href="${escapeHtml(s.travel.ticketUrl)}" target="_blank" rel="noopener">✈️ 항공권</a>`);
@@ -123,7 +125,7 @@ window.approveTrip = async function (id) {
         else { Toast.error(hit.length ? `연자 리스트에 "${s.nameKo}"가 ${hit.length}명 있어 자동 연결할 수 없습니다.` : `연자 리스트에 "${s.nameKo}"가 없습니다. 연자 리스트에 먼저 등록해 주세요.`); return; }
     }
     if (!s.confId || !s.speakerId) { Toast.error('행사/연자 정보가 없어 반영할 수 없습니다. (제출 링크 확인)'); return; }
-    const lecList = (s.lectures || []).filter(l => l.title || l.type);
+    const lecList = lecsOf(s).filter(l => l.title || l.type);
     const ok = await confirmDialog(`"${s.nameEn || s.nameKo}" 제출을 승인·반영할까요?\n${board ? '' : '- 여행 일정·항공권·CV 저장\n'}- 강의 ${lecList.length}건 강의풀 생성\n- 이 행사 연자로 등록`, { okText: '승인·반영' });
     if (!ok) return;
     const base = '/adminConferences/' + s.confId;
