@@ -16,6 +16,8 @@ let CONF_PARTNERS = new Set(); // 선택한 행사에 참가하는 파트너사 
 let PRE_PARTNERS = new Set();  // 선택한 행사에 '신청전(참가 망설임)' 파트너사 id
 let CONF_PARTNER_MAP = {};     // { partnerId: { order, grade } } — 행사별 등급
 let CONF_CONTACTS = {};        // { partnerId: [{name,phone,email}] } — 행사별 담당자
+let LAST_PLACED_CONF = null;
+document.addEventListener('contacts-change', () => { if (!LAST_PLACED_CONF) return; CONF_CONTACTS = Contacts.partnerOf(PLACED_CONF_ID, LAST_PLACED_CONF); renderPartners(); });
 let PTN_SORT = 'nameAsc';
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('partners');
@@ -89,7 +91,8 @@ function subscribePlacedConf() {
         CONF_PARTNER_MAP = conf.confPartners || {};
         CONF_PARTNERS = new Set(Object.keys(CONF_PARTNER_MAP));
         PRE_PARTNERS = new Set(Object.keys(conf.prePartners || {}));
-        CONF_CONTACTS = conf.partnerContacts || {};   // 행사별 담당자 연락처
+        LAST_PLACED_CONF = conf;
+        CONF_CONTACTS = Contacts.partnerOf(PLACED_CONF_ID, conf);   // 행사별 담당자 연락처 (비공개 칸 우선)
         CONF_BOOTH = (conf.boothBenefits && Array.isArray(conf.boothBenefits.columns) && Array.isArray(conf.boothBenefits.grades)) ? conf.boothBenefits : null;
         applyBooth();
         populateGradeSelect();
@@ -275,7 +278,7 @@ window.saveContacts = function () {
         email: r.querySelector('.ct-email').value.trim()
     })).filter(c => c.name || c.phone || c.email);
     const p = PARTNERS.find(x => x.id === CONTACT_PID);
-    database.ref('/adminConferences/' + PLACED_CONF_ID + '/partnerContacts/' + CONTACT_PID).set(list.length ? list : null)
+    Contacts.savePartner(PLACED_CONF_ID, CONTACT_PID, list)
         .then(() => {
             logActivity('update', 'partner', `파트너사 "${p ? p.nameKo : ''}" 담당자 ${list.length}명 저장`, { confId: PLACED_CONF_ID, confTitle: PLACED_CONF_NAME, entityId: CONTACT_PID });
             Toast.success('담당자 정보를 저장했습니다.'); closeContactModal();
@@ -624,7 +627,8 @@ async function importPartners(rows) {
     if (!ok) return;
 
     const ptnUpdates = {};   // 마스터 신규 생성
-    const confUpdates = {};  // 선택 행사: 참가/신청전/담당자
+    const confUpdates = {};   // 선택 행사: 참가/신청전/담당자
+    const privUpdates = {};   // 담당자 연락처 → 비공개 칸
     let idx = PARTNERS.length;
     rows.forEach(r => {
         let p = byName.get(ptnNorm(r.nameKo));
@@ -637,7 +641,7 @@ async function importPartners(rows) {
             byName.set(ptnNorm(r.nameKo), { id: pid, ...rec });
         }
         const contacts = buildImportContacts(r);
-        if (contacts.length) confUpdates['partnerContacts/' + pid] = contacts;
+        if (contacts.length) { if (Contacts.ready) privUpdates[pid] = contacts; else confUpdates['partnerContacts/' + pid] = contacts; }
         const st = classifyStatus(r.participate);
         const meta = { booth: r.booth || '', status: r.participate || '', director: r.director || '', note: r.note || '' };
         if (st === 'join') confUpdates['confPartners/' + pid] = Object.assign({ order: 0, grade: '' }, meta);
@@ -647,6 +651,7 @@ async function importPartners(rows) {
     try {
         if (Object.keys(ptnUpdates).length) await PTN_ROOT.update(ptnUpdates);
         if (Object.keys(confUpdates).length) await database.ref('/adminConferences/' + PLACED_CONF_ID).update(confUpdates);
+        if (Object.keys(privUpdates).length) await database.ref('/adminPartnerContacts/' + PLACED_CONF_ID).update(privUpdates);
         logActivity('create', 'partner', `참여사 엑셀 가져오기 — ${rows.length}개사(신규 ${created}, 참가 ${joined})`, { confId: PLACED_CONF_ID, confTitle: PLACED_CONF_NAME });
         Toast.success(`가져오기 완료: ${rows.length}개사 (신규 ${created} · 참가 ${joined} · 신청전 ${pre})`);
     } catch (e) { Toast.error('가져오기 실패: ' + (e.message || e)); }

@@ -36,6 +36,7 @@
                     </div>
                     <div style="display:flex;gap:8px">
                         <button class="btn" onclick="exportSpeakersBackup()" title="연자 전체를 JSON으로 저장(안전용 백업)">💾 연자 백업</button>
+                        <button class="btn btn-danger-ghost" id="btnMigrateContacts" style="display:none" onclick="migrateContacts()">🔒 연락처 비공개 전환</button>
                         <!-- 사진 Storage 일괄 이전(일회성) — 완료되어 숨김. 백업 복원 등으로 base64가 다시 생기면
                              이 버튼을 되살려 migratePhotosToStorage()를 실행하면 됩니다.
                         <button class="btn" id="spkMigrateBtn" onclick="migratePhotosToStorage()" title="DB에 저장된 연자 사진(base64)을 Firebase Storage로 옮겨 다운로드 사용량을 줄입니다">🖼️ 사진 Storage 이전</button>
