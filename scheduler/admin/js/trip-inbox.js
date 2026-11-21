@@ -43,7 +43,7 @@ function gate() {
 document.addEventListener('admin-auth-change', gate);
 
 function fmtTs(ts) { if (!ts) return '-'; const d = new Date(ts), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
-const isBoard = s => s && s.source === 'board';
+const isBoard = s => !!s && (s.source === 'board' || (s.travel && s.travel.status === 'domestic') || /^\[ASLS 이사회 앱\]/.test(s.note || ''));
 function travelLine(t, s) {
     if (isBoard(s)) return '🏠 <b>국내 연자</b> · ASLS 이사회 앱에서 제출 (여행 일정 없음)';
     if (!t) return '-';
