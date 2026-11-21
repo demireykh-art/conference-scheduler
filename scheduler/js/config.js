@@ -115,6 +115,8 @@ window.KAKAO_JS_KEY = window.AppConfig.KAKAO_JS_KEY || '';
 firebase.initializeApp(window.AppConfig.firebase);
 window.auth = firebase.auth();
 window.database = firebase.database();
+// Storage — SDK(firebase-storage-compat)가 로드된 페이지에서만 초기화(없으면 null → base64 폴백)
+window.storage = (firebase && firebase.storage) ? firebase.storage() : null;
 
 // 로그인 세션 지속성 — 브라우저를 닫았다 열어도 유지 (자동 로그아웃 방지)
 if (window.auth && firebase.auth.Auth && firebase.auth.Auth.Persistence) {

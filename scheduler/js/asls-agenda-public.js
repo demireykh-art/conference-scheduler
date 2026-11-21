@@ -74,7 +74,7 @@
             // 국적(나라)은 룸 토글과 무관하게 항상 제공 — 연자 목록 페이지의 국가 표시용
             nationality: (m && m.nationalityKo) || s.nationalityKo || '',
             nationalityEn: (m && m.nationalityEn) || s.nationalityEn || '',
-            photo: (m && (m.photo || m.photoURL)) || '',  // 연자 사진(마스터의 photo, base64 data URL)
+            photo: (m && (m.photoURL || m.photo)) || '',  // 연자 사진(Storage URL 우선, 레거시 base64 폴백)
             cv: (m && m.cv) || s.cv || ''                  // 연자 CV/약력(마스터)
         };
     }

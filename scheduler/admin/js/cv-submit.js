@@ -51,7 +51,8 @@
             $('cvAffEn').value = spk.affiliationEn || '';
             $('cvEmail').value = spk.email || '';
             $('cvText').value = spk.cv || '';
-            if (spk.photo) { photoData = spk.photo; $('cvPhotoImg').src = spk.photo; $('cvPhotoImg').style.display = ''; $('cvPhotoEmpty').style.display = 'none'; }
+            const sp = spk.photoURL || spk.photo;
+            if (sp) { $('cvPhotoImg').src = sp; $('cvPhotoImg').style.display = ''; $('cvPhotoEmpty').style.display = 'none'; if (/^data:/.test(spk.photo || '')) photoData = spk.photo; }
             $('cvForm').style.display = '';
         });
     }

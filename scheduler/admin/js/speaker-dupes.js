@@ -88,7 +88,7 @@ function computeGroups() {
             // 사용 많은 → 사진 있는 → 먼저 등록된 순으로 대표 후보 정렬
             const records = recs.slice().sort((a, b) =>
                 usageCount(b.id) - usageCount(a.id) ||
-                (b.photo ? 1 : 0) - (a.photo ? 1 : 0) ||
+                ((b.photoURL || b.photo) ? 1 : 0) - ((a.photoURL || a.photo) ? 1 : 0) ||
                 (a.createdAt || 0) - (b.createdAt || 0));
             return { key, name: records[0].nameKo || records[0].nameEn || '(이름 없음)', records };
         });
@@ -153,7 +153,7 @@ function renderRecord(g, gi, r) {
                 <div class="dup-rec-top">
                     <b>${escapeHtml(r.nameKo || r.nameEn || '(이름 없음)')}</b>
                     ${r.nameEn && r.nameKo ? `<span class="dim">${escapeHtml(r.nameEn)}</span>` : ''}
-                    ${r.photo ? '<span class="dup-flag ok">사진</span>' : '<span class="dup-flag none">사진없음</span>'}
+                    ${(r.photoURL || r.photo) ? '<span class="dup-flag ok">사진</span>' : '<span class="dup-flag none">사진없음</span>'}
                     ${r.roleExec ? '<span class="dup-flag role">임원</span>' : ''}${r.roleAmb ? '<span class="dup-flag role">엠베서더</span>' : ''}
                 </div>
                 <div class="dup-rec-sub">${aff ? escapeHtml(aff) : '<span class="dim">소속 미입력</span>'} · <span class="dim">id ${escapeHtml(r.id.slice(0, 6))}…</span></div>
