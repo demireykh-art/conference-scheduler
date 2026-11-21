@@ -47,6 +47,8 @@ window.AdminAuth = {
 
 window.signInWithGoogle = function () {
     const provider = new firebase.auth.GoogleAuthProvider();
+    // 항상 계정 선택창을 띄워 다른 구글 계정으로 로그인할 수 있게 함(이전 계정 자동 로그인 방지)
+    provider.setCustomParameters({ prompt: 'select_account' });
     auth.signInWithPopup(provider)
         .then(res => {
             registerOrCheckUser(res.user);
