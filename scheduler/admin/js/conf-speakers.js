@@ -366,7 +366,8 @@ function render() {
             <div class="cv-group">
                 <button class="btn btn-sm" title="${m.email ? 'CV 등록 요청 메일(Gmail 작성창)' : '이메일이 없습니다 — 연자 정보에 이메일을 추가하세요'}" onclick="requestCV('${e.id}')">✉️ CV요청 메일보내기</button>
                 <button class="btn btn-sm" title="CV 등록 링크 복사(카톡·문자 등에 붙여넣기)" onclick="copyCVLink('${e.id}')">🔗 CV요청 링크복사</button>
-                <button class="btn btn-sm" title="해외 연자 여행·강의 제출 링크 복사 (영문 폼)" onclick="copyTripLink('${e.id}')">✈️ 일정요청 링크</button>
+                <button class="btn btn-sm" title="국내 연자용: 새 강의 제목 제출 + 등록된 강의 제목 수정 (여행 일정 없음)" onclick="copyTitleEditLink('${e.id}')">📝 강의 입력 링크 (국내)</button>
+                <button class="btn btn-sm" title="해외 연자 여행·강의 제출 링크 복사 (영문 폼)" onclick="copyTripLink('${e.id}')">✈️ 일정요청 링크 (해외)</button>
                 <button class="btn btn-sm btn-danger-ghost" onclick="removePerson('${e.id}')">제거</button>
             </div>
         </div>

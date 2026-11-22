@@ -31,7 +31,7 @@ function gate() {
     if (!tiSub) {
         tiSub = TI_REF.orderByChild('submittedAt').limitToLast(300);
         tiSub.on('value', snap => {
-            const arr = []; snap.forEach(ch => arr.push({ id: ch.key, ...ch.val() }));
+            const arr = []; snap.forEach(ch => arr.push({ ...ch.val(), id: ch.key }));   // 키가 항상 id (값 안의 id 필드에 덮이지 않게)
             arr.reverse(); SUBS = arr;
             [...new Set(arr.map(s => s.confId).filter(Boolean))].forEach(cid => {
                 if (CONF_TITLES[cid] == null) database.ref('/adminConferences/' + cid + '/title').once('value').then(s => { CONF_TITLES[cid] = s.val() || cid; render(); }).catch(() => { });
@@ -115,8 +115,14 @@ window.deleteTripSub = async function (id) {
     const s = SUBS.find(x => x.id === id); if (!s) return;
     const ok = await confirmDialog(`"${s.nameKo || s.nameEn || ''}" 제출 기록을 삭제할까요?\n(강의 관리에 들어간 강의는 지워지지 않습니다 — 필요하면 강의 관리에서 삭제)\n이사회 앱의 해당 제출 표시도 사라집니다.`, { okText: '기록 삭제' });
     if (!ok) return;
-    TI_REF.child(id).remove().then(() => { logActivity('delete', 'lecture', `제출 기록 삭제 "${s.nameKo || s.nameEn || ''}"`, { confId: s.confId || '' }); Toast.success('제출 기록을 삭제했습니다.'); })
-        .catch(e => Toast.error('삭제 실패: ' + e.message));
+    try {
+        await TI_REF.child(id).remove();
+        const still = (await TI_REF.child(id).once('value')).exists();   // 실제로 지워졌는지 서버에서 다시 확인
+        if (still) { Toast.error('삭제가 반영되지 않았습니다. 새로고침 후 다시 시도해 주세요.'); return; }
+        SUBS = SUBS.filter(x => x.id !== id); render();
+        logActivity('delete', 'lecture', `제출 기록 삭제 "${s.nameKo || s.nameEn || ''}"`, { confId: s.confId || '' });
+        Toast.success('제출 기록을 삭제했습니다.');
+    } catch (e) { Toast.error('삭제 실패: ' + e.message); }
 };
 
 window.rejectTrip = function (id) {
