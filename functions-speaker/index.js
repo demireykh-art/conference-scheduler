@@ -75,7 +75,17 @@ exports.myLectures = onCall({ region: 'asia-northeast3', timeoutSeconds: 30 }, a
     });
   }
   out.sort((a, b) => (b.startDate || '').localeCompare(a.startDate || '') || a.titleKo.localeCompare(b.titleKo));
-  return { speaker: { nameKo: spk.nameKo || '', nameEn: spk.nameEn || '' }, lectures: out };
+  // 이 링크로 제출하고 아직 사무국 확인 전인 강의
+  const subs = (await admin.database().ref('/tripSubmissions').orderByChild('submittedAt').limitToLast(300).once('value')).val() || {};
+  const pending = [];
+  Object.values(subs).forEach(v => {
+    if (!v || v.speakerId !== caller.speakerId || v.source !== 'link' || v.status === 'approved' || v.status === 'rejected') return;
+    if (caller.confId && v.confId !== caller.confId) return;
+    (Array.isArray(v.lectures) ? v.lectures : Object.values(v.lectures || {})).forEach(l => l && pending.push({ title: l.title || l.type || '', duration: l.duration || 0, sponsor: l.sponsor || '', at: v.submittedAt || 0 }));
+  });
+  let conf = null;
+  if (caller.confId) { const c = (await admin.database().ref('/adminConferences/' + caller.confId).once('value')).val() || {}; conf = { id: caller.confId, title: c.title || '', startDate: c.startDate || '' }; }
+  return { speaker: { nameKo: spk.nameKo || '', nameEn: spk.nameEn || '' }, lectures: out, pending, conf };
 });
 
 exports.editLectureTitle = onCall({ region: 'asia-northeast3', timeoutSeconds: 30 }, async (request) => {
@@ -149,7 +159,7 @@ exports.boardReview = onCall({ region: 'asia-northeast3', timeoutSeconds: 60 }, 
   if (d.action === 'list') {
     const subs = (await db.ref('/tripSubmissions').orderByChild('submittedAt').limitToLast(300).once('value')).val() || {};
     const pending = Object.entries(subs).filter(([, v]) => v && v.status !== 'approved' && v.status !== 'rejected')
-      .map(([id, v]) => ({ id, confId: v.confId || '', nameKo: v.nameKo || v.nameEn || '', board: isBoardSub(v), submittedAt: v.submittedAt || 0,
+      .map(([id, v]) => ({ id, confId: v.confId || '', nameKo: v.nameKo || v.nameEn || '', board: isBoardSub(v), via: v.source === 'link' ? 'link' : (isBoardSub(v) ? 'board' : 'overseas'), submittedAt: v.submittedAt || 0,
         lectures: (v.lectures || []).map(l => ({ title: l.title || '', type: l.type || '', sponsor: l.sponsor || '', duration: l.duration || 0, lang: l.lang || '' })), note: v.note || '' }));
     const confs = (await db.ref('/adminConferences').once('value')).val() || {};
     const edits = [];
@@ -250,4 +260,34 @@ exports.mySubmissions = onCall({ region: 'asia-northeast3', timeoutSeconds: 30 }
     out[k] = alive ? 'approved' : 'removed';
   }
   return { status: out };
+});
+
+
+/* ============================================================
+ * 연자 개인 링크로 새 강의 제출 — submitLecture (국내 연자용, 여행 일정 없음)
+ *   → /tripSubmissions 에 source:'link', travel.status:'domestic' 로 접수 → 사무국이 제출함·이사회 앱에서 승인
+ * ============================================================ */
+exports.submitLecture = onCall({ region: 'asia-northeast3', timeoutSeconds: 30 }, async (request) => {
+  const d = request.data || {};
+  const caller = await resolveCaller(d.auth);
+  if (caller.via !== 'link') throw new HttpsError('permission-denied', '이사회 앱에서는 앱의 [강의 제출]을 이용해 주세요.');
+  const confId = caller.confId || String(d.confId || '');
+  if (!/^[\w-]{4,80}$/.test(confId)) throw new HttpsError('invalid-argument', '행사 정보가 없습니다.');
+  const L = d.lecture || {};
+  const lec = { title: cleanTitle(L.title, 300), type: cleanTitle(L.type, 100), sponsor: cleanTitle(L.sponsor, 100),
+    lang: ['KO', 'EN', 'EN/KO'].includes(L.lang) ? L.lang : 'KO', duration: Math.max(0, Math.min(240, Number(L.duration) || 0)), note: cleanTitle(L.note, 500), abstractUrl: '' };
+  if (!lec.title && !lec.type) throw new HttpsError('invalid-argument', '강의 제목이나 주제를 입력해 주세요.');
+  const db = admin.database();
+  if (!(await db.ref('/adminConferences/' + confId + '/title').once('value')).exists()) throw new HttpsError('not-found', '행사를 찾을 수 없습니다.');
+  // 같은 링크 도배 방지: 1시간에 10건
+  const recent = (await db.ref('/tripSubmissions').orderByChild('submittedAt').startAt(Date.now() - 3600e3).once('value')).val() || {};
+  if (Object.values(recent).filter(v => v && v.source === 'link' && v.speakerId === caller.speakerId).length >= 10) throw new HttpsError('resource-exhausted', '잠시 후 다시 시도해 주세요.');
+  const spk = (await db.ref('/adminSpeakers/' + caller.speakerId).once('value')).val() || {};
+  const ref = await db.ref('/tripSubmissions').push({
+    confId, speakerId: caller.speakerId, nameKo: spk.nameKo || '', nameEn: spk.nameEn || '', affiliationEn: spk.affiliationKo || spk.affiliationEn || '',
+    nationality: 'Korea', email: '', phone: '', cvFileUrl: '', travel: { status: 'domestic' }, lectures: [lec],
+    note: '[연자 개인 링크] ' + (spk.nameKo || spk.nameEn || ''), lang: 'ko', status: 'pending', submittedAt: ServerValue.TIMESTAMP, source: 'link'
+  });
+  console.log('submitLecture', { confId, speakerId: caller.speakerId, key: ref.key });
+  return { ok: true, id: ref.key };
 });

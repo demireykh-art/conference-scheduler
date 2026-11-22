@@ -46,6 +46,7 @@ function fmtTs(ts) { if (!ts) return '-'; const d = new Date(ts), p = n => Strin
 const lecsOf = s => { const l = s && s.lectures; return Array.isArray(l) ? l.filter(Boolean) : (l && typeof l === 'object' ? Object.values(l).filter(Boolean) : []); };
 const isBoard = s => !!s && (s.source === 'board' || (s.travel && s.travel.status === 'domestic') || /^\[ASLS 이사회 앱\]/.test(s.note || ''));
 function travelLine(t, s) {
+    if (s && s.source === 'link') return '🏠 <b>국내 연자</b> · 연자 개인 링크로 제출 (여행 일정 없음)';
     if (isBoard(s)) return '🏠 <b>국내 연자</b> · ASLS 이사회 앱에서 제출 (여행 일정 없음)';
     if (!t) return '-';
     if (t.status !== 'confirmed') return '✈️ <b>미정</b>' + (t.nights ? ` · ${t.nights}박 예정` : '') + (t.companions ? ` · 동반 ${t.companions}` : '');

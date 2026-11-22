@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ASLS · 내 강의 제목 수정 / My Lecture Titles</title>
+<title>ASLS · 내 강의 입력 / My Lectures</title>
 <link rel="icon" type="image/png" href="scheduler/admin/assets/asls-logo.png">
-<meta property="og:title" content="ASLS · 내 강의 제목 수정">
-<meta property="og:description" content="연자 본인 강의 제목을 수정하면 학회 시간표에 바로 반영됩니다.">
+<meta property="og:title" content="ASLS · 내 강의 입력">
+<meta property="og:description" content="학술대회 강의 제목을 보내고, 등록된 강의 제목을 직접 고칠 수 있습니다.">
 <meta property="og:image" content="https://demireykh-art.github.io/conference-scheduler/scheduler/admin/assets/asls-logo.png">
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#6E2B7B">
@@ -27,14 +27,18 @@
   button { padding:10px 16px; border:none; border-radius:9px; background:var(--p); color:#fff; font-weight:700; font-size:.92rem; cursor:pointer; }
   button:disabled { opacity:.5; cursor:not-allowed; }
   .meta { font-size:.8rem; color:var(--dim); } .msg { font-size:.84rem; } .ok { color:var(--ok); } .err { color:var(--err); }
-  .lang { float:right; } .lang button { background:#fff; color:var(--p); border:1px solid var(--p); padding:5px 10px; font-size:.78rem; }
+  .lang { float:right; }
+  input, select { width:100%; padding:10px 12px; border:1px solid var(--b); border-radius:9px; font-size:.95rem; font-family:inherit; background:#fff; }
+  .h { font-size:.95rem; font-weight:800; margin:22px 0 8px; } .seg2 { display:flex; gap:6px; } .seg2 button { flex:1; background:#fff; color:var(--p); border:1px solid var(--p); padding:8px; } .seg2 button.on { background:var(--p); color:#fff; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:8px; } .pend { font-size:.9rem; padding:8px 0; border-top:1px solid var(--b); } .lang button { background:#fff; color:var(--p); border:1px solid var(--p); padding:5px 10px; font-size:.78rem; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="lang"><button onclick="setLang(LANG === 'ko' ? 'en' : 'ko')" id="langBtn">English</button></div>
-  <h1 id="ttl">내 강의 제목 수정</h1>
+  <h1 id="ttl">내 강의 입력</h1>
   <div class="sub" id="sub">불러오는 중…</div>
+  <div id="newBox"></div>
   <div id="list"></div>
 </div>
 <script>
@@ -51,8 +55,10 @@ const TOKEN = new URLSearchParams(location.search).get('t') || '';
 const AUTH = { type: 'token', token: TOKEN };
 let LANG = (navigator.language || 'ko').startsWith('ko') ? 'ko' : 'en', DATA = null;
 const T = {
-  ko: { ttl: '내 강의 제목 수정', sub: n => `<b>${n}</b> 선생님 강의입니다. 제목을 고치고 <b>저장</b>을 누르면 학회 시간표에 바로 반영되고, 사무국에 수정 사실이 표시됩니다.`, ko: '국문 제목', en: '영문 제목 (선택)', save: '저장', saved: '저장했어요 — 시간표에 반영됐습니다.', none: '등록된 강의가 없습니다.', bad: '링크가 올바르지 않습니다. 학회 사무국에 문의해 주세요.', saving: '저장 중…', same: '바뀐 내용이 없어요.', btn: 'English', min: '분' },
-  en: { ttl: 'My Lecture Titles', sub: n => `Lectures of <b>${n}</b>. Edit the title and press <b>Save</b> — it is applied to the program immediately and the committee is notified.`, ko: 'Title (Korean)', en: 'Title (English, optional)', save: 'Save', saved: 'Saved — the program is updated.', none: 'No lectures registered.', bad: 'Invalid link. Please contact the committee.', saving: 'Saving…', same: 'No changes.', btn: '한국어', min: 'min' }
+  ko: { ttl: '내 강의 입력', sub: n => `<b>${n}</b> 선생님, 아래에서 <b>새 강의</b>를 보내주시거나 <b>등록된 강의 제목</b>을 고치실 수 있습니다. 제목 수정은 학회 시간표에 바로 반영됩니다.`,
+        nh: '새 강의 보내기', nt: '강의 제목', ntp: '예: 피코레이저로 보는 색소 치료의 실제', ny: '주제 (제목 미정일 때)', nyp: '예: 레이저, 스킨부스터', ns: '스폰서 (있으면)', nd: '희망 시간(분)', nl: '발표 언어', nn: '메모 (선택)', nsend: '보내기', nok: '접수됐습니다 — 학회 사무국 확인 후 등록됩니다.', nneed: '강의 제목이나 주제를 입력해 주세요.', ph: '접수 — 사무국 확인 중', eh: '등록된 강의 (제목 수정)', ko: '국문 제목', en: '영문 제목 (선택)', save: '저장', saved: '저장했어요 — 시간표에 반영됐습니다.', none: '등록된 강의가 없습니다.', bad: '링크가 올바르지 않습니다. 학회 사무국에 문의해 주세요.', saving: '저장 중…', same: '바뀐 내용이 없어요.', btn: 'English', min: '분' },
+  en: { ttl: 'My Lectures', sub: n => `Dear <b>${n}</b>, send a <b>new lecture</b> below or edit the <b>titles of your registered lectures</b>. Title edits are applied to the program immediately.`,
+        nh: 'Send a new lecture', nt: 'Lecture title', ntp: 'e.g. Pico laser for pigmentation', ny: 'Topic (if title TBD)', nyp: 'e.g. Laser, Skin booster', ns: 'Sponsor (if any)', nd: 'Preferred length (min)', nl: 'Language', nn: 'Note (optional)', nsend: 'Send', nok: 'Received — it will be registered after the committee confirms.', nneed: 'Please enter a title or topic.', ph: 'Received — awaiting committee', eh: 'Registered lectures (edit title)', ko: 'Title (Korean)', en: 'Title (English, optional)', save: 'Save', saved: 'Saved — the program is updated.', none: 'No lectures registered.', bad: 'Invalid link. Please contact the committee.', saving: 'Saving…', same: 'No changes.', btn: '한국어', min: 'min' }
 };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function setLang(l) { LANG = l; render(); }
@@ -62,14 +68,37 @@ function render() {
   if (!DATA) return;
   const s = DATA.speaker || {};
   document.getElementById('sub').innerHTML = t.sub(esc(LANG === 'en' ? (s.nameEn || s.nameKo) : (s.nameKo || s.nameEn)));
+  const P = DATA.pending || [];
+  document.getElementById('newBox').innerHTML = `<div class="h">${t.nh}${DATA.conf ? ' · ' + esc(DATA.conf.title) : ''}</div><div class="card">
+      <label>${t.nt}</label><textarea id="n_t" rows="2" placeholder="${t.ntp}"></textarea>
+      <label>${t.ny}</label><input id="n_y" placeholder="${t.nyp}">
+      <div class="two"><div><label>${t.ns}</label><input id="n_s"></div><div><label>${t.nd}</label><input id="n_d" type="number" min="5" step="5" inputmode="numeric" placeholder="20"></div></div>
+      <label>${t.nl}</label><div class="seg2" id="n_l">${['KO', 'EN', 'EN/KO'].map(v => `<button type="button" class="${NLANG === v ? 'on' : ''}" onclick="NLANG='${v}';document.querySelectorAll('#n_l button').forEach(x=>x.classList.toggle('on',x===this))">${v === 'KO' ? '한국어' : v === 'EN' ? 'English' : '혼용 / Both'}</button>`).join('')}</div>
+      <label>${t.nn}</label><input id="n_n">
+      <div class="row"><button id="n_b" onclick="sendNew()">${t.nsend}</button><span class="msg" id="n_m"></span></div>
+      ${P.length ? `<div style="margin-top:12px">${P.map(x => `<div class="pend">📨 ${esc(x.title)}${x.duration ? ' · ' + x.duration + t.min : ''}${x.sponsor ? ' · ' + esc(x.sponsor) : ''}<div class="meta">${t.ph}</div></div>`).join('')}</div>` : ''}
+    </div>`;
   const L = DATA.lectures || [];
-  document.getElementById('list').innerHTML = L.length ? L.map((l, i) => `<div class="card">
+  document.getElementById('list').innerHTML = `<div class="h">${t.eh}</div>` + (L.length ? L.map((l, i) => `<div class="card">
       <div class="conf">${esc(l.confTitle)}${l.startDate ? ' · ' + esc(l.startDate) : ''}</div>
       <div class="meta">${l.duration ? l.duration + t.min : ''}${l.partner ? ' · ' + esc(l.partner) : ''}</div>
       <label>${t.ko}</label><textarea id="ko${i}" rows="2">${esc(l.titleKo)}</textarea>
       <label>${t.en}</label><textarea id="en${i}" rows="2">${esc(l.titleEn)}</textarea>
       <div class="row"><button id="b${i}" onclick="save(${i})">${t.save}</button><span class="msg" id="m${i}"></span></div></div>`).join('')
-    : `<div class="card">${t.none}</div>`;
+    : `<div class="card">${t.none}</div>`);
+}
+let NLANG = 'KO';
+async function sendNew() {
+  const t = T[LANG], b = document.getElementById('n_b'), m = document.getElementById('n_m');
+  const v = id => document.getElementById(id).value.trim();
+  const lecture = { title: v('n_t'), type: v('n_y'), sponsor: v('n_s'), duration: Number(v('n_d')) || 0, lang: NLANG, note: v('n_n') };
+  if (!lecture.title && !lecture.type) { m.className = 'msg err'; m.textContent = t.nneed; return; }
+  b.disabled = true; m.className = 'msg'; m.textContent = '…';
+  try {
+    await fn.httpsCallable('submitLecture')({ auth: AUTH, lecture });
+    DATA = (await fn.httpsCallable('myLectures')({ auth: AUTH })).data; render();
+    const m2 = document.getElementById('n_m'); m2.className = 'msg ok'; m2.textContent = t.nok;
+  } catch (e) { b.disabled = false; m.className = 'msg err'; m.textContent = e.message || String(e); }
 }
 async function save(i) {
   const t = T[LANG], l = DATA.lectures[i], b = document.getElementById('b' + i), m = document.getElementById('m' + i);
