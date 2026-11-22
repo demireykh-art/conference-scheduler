@@ -213,9 +213,41 @@ exports.boardReview = onCall({ region: 'asia-northeast3', timeoutSeconds: 60 }, 
       if (c.email || c.phone) await db.ref('/adminSpeakerContacts/' + sid).set(c);
     }
     await base.update(up);
-    await db.ref('/tripSubmissions/' + id).update({ status: 'approved', speakerId: sid });
+    await db.ref('/tripSubmissions/' + id).update({ status: 'approved', speakerId: sid, lectureIds: Object.keys(up).filter(k => k.startsWith('lecturePool/')).map(k => k.slice(12)) });
     await log(`${boardSub ? '이사회 앱 강의 제출' : '해외 연자 일정·강의 제출'} "${s.nameKo || s.nameEn || ''}" 승인·반영 (이사회 앱)`, { confId: s.confId, confTitle: await titleOf(s.confId), entityId: sid });
     return { ok: true };
   }
   throw new HttpsError('invalid-argument', '알 수 없는 요청');
+});
+
+
+/* ============================================================
+ * 이사회 앱 '내 제출' 상태 동기화 — mySubmissions
+ *   이사회 앱이 기억하는 내 제출 키들의 현재 상태를 알려준다 (본인 이메일로 제출한 것만)
+ *   pending · approved(강의풀에 있음) · removed(승인됐지만 강의가 지워짐) · rejected · gone(제출 기록 삭제)
+ * ============================================================ */
+exports.mySubmissions = onCall({ region: 'asia-northeast3', timeoutSeconds: 30 }, async (request) => {
+  const d = request.data || {};
+  const u = await boardUser(d.idToken);
+  if (u.status !== 'active') throw new HttpsError('permission-denied', '승인된 이사만 볼 수 있어요.');
+  const keys = (Array.isArray(d.keys) ? d.keys : []).map(String).filter(k => /^[\w-]{4,80}$/.test(k)).slice(0, 100);
+  const db = admin.database(), out = {}, pools = {};
+  const poolOf = async cid => pools[cid] || (pools[cid] = (await db.ref(`/adminConferences/${cid}/lecturePool`).once('value')).val() || {});
+  for (const k of keys) {
+    const s = (await db.ref('/tripSubmissions/' + k).once('value')).val();
+    if (!s) { out[k] = 'gone'; continue; }
+    if ((s.email || '').toLowerCase() !== (u.email || '').toLowerCase()) continue;   // 남의 제출은 알려주지 않음
+    if (s.status === 'rejected') { out[k] = 'rejected'; continue; }
+    if (s.status !== 'approved') { out[k] = 'pending'; continue; }
+    const pool = s.confId ? await poolOf(s.confId) : {};
+    let alive;
+    if (Array.isArray(s.lectureIds) && s.lectureIds.length) alive = s.lectureIds.some(id => pool[id]);
+    else {   // 예전 승인분: 같은 연자 + 같은 제목(또는 수정 전 제목) 강의가 남아 있는지
+      const titles = (Array.isArray(s.lectures) ? s.lectures : Object.values(s.lectures || {})).map(l => ((l && (l.title || l.type)) || '').trim()).filter(Boolean);
+      alive = Object.values(pool).some(l => l && Array.isArray(l.speakers) && l.speakers.some(x => x && x.id === s.speakerId)
+        && (titles.includes((l.titleKo || '').trim()) || (l.titleEdit && titles.includes((l.titleEdit.prevKo || '').trim()))));
+    }
+    out[k] = alive ? 'approved' : 'removed';
+  }
+  return { status: out };
 });

@@ -92,7 +92,8 @@ function card(s) {
     if (s.cvFileUrl) docs.push(`<a href="${escapeHtml(s.cvFileUrl)}" target="_blank" rel="noopener">📄 CV</a>`);
     const docsLine = docs.length ? `<div class="ti-docs" style="font-size:0.84rem;margin-top:4px">첨부: ${docs.join(' · ')}</div>` : '';
     const badge = s.status === 'approved' ? '<span class="badge badge-ongoing">반영됨</span>' : (s.status === 'rejected' ? '<span class="badge badge-ended">반려</span>' : '');
-    const actions = (s.status === 'approved' || s.status === 'rejected') ? ''
+    const actions = (s.status === 'approved' || s.status === 'rejected')
+        ? `<div class="ti-actions"><button class="btn btn-sm btn-danger-ghost" title="제출 기록만 지웁니다 (강의 관리에 들어간 강의는 그대로 — 강의는 강의 관리에서 삭제)" onclick="deleteTripSub('${s.id}')">🗑 기록 삭제</button></div>`
         : `<div class="ti-actions"><button class="btn btn-sm btn-success" onclick="approveTrip('${s.id}')">✔ 승인·반영</button>
            <button class="btn btn-sm btn-danger-ghost" onclick="rejectTrip('${s.id}')">반려</button></div>`;
     return `<div class="card ti-card">
@@ -107,6 +108,15 @@ function card(s) {
         ${actions}
     </div>`;
 }
+
+window.deleteTripSub = async function (id) {
+    if (!AdminAuth.requireEdit()) return;
+    const s = SUBS.find(x => x.id === id); if (!s) return;
+    const ok = await confirmDialog(`"${s.nameKo || s.nameEn || ''}" 제출 기록을 삭제할까요?\n(강의 관리에 들어간 강의는 지워지지 않습니다 — 필요하면 강의 관리에서 삭제)\n이사회 앱의 해당 제출 표시도 사라집니다.`, { okText: '기록 삭제' });
+    if (!ok) return;
+    TI_REF.child(id).remove().then(() => { logActivity('delete', 'lecture', `제출 기록 삭제 "${s.nameKo || s.nameEn || ''}"`, { confId: s.confId || '' }); Toast.success('제출 기록을 삭제했습니다.'); })
+        .catch(e => Toast.error('삭제 실패: ' + e.message));
+};
 
 window.rejectTrip = function (id) {
     if (!AdminAuth.requireEdit()) return;
