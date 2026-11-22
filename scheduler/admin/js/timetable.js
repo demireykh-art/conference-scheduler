@@ -32,15 +32,32 @@ Masters.init();   // 연자 이름·사진 표시(중복 알림)용
 document.addEventListener('masters-change', () => { if (CONF) renderAll(); });
 
 // 행사 목록 로드 → 좌우 전환기 (id 없으면 첫 행사로 이동)
-database.ref('/adminConferences').once('value').then(snap => {
-    CONFS = toOrderedArray(snap.val());
-    if (!CONF_ID && CONFS.length) {
-        let last = ''; try { last = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { }  // 마지막 보던 행사
-        const target = CONFS.find(c => c.id === last) ? last : CONFS[0].id;
-        location.replace('timetable.html?id=' + target); return;
-    }
-    renderConfSwitcher();
-});
+// 행사 목록(전환기용): 제목·기간만 가볍게 조회. 현재 행사 데이터는 CONF_ID로 따로 로드. shallow 실패 시 폴백.
+(function loadTtConfs() {
+    const DB = (window.AppConfig && AppConfig.firebase && AppConfig.firebase.databaseURL) || '';
+    const apply = () => {
+        if (!CONF_ID && CONFS.length) {
+            let last = ''; try { last = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { }  // 마지막 보던 행사
+            const target = CONFS.find(c => c.id === last) ? last : CONFS[0].id;
+            location.replace('timetable.html?id=' + target); return;
+        }
+        renderConfSwitcher();
+    };
+    fetch(DB + '/adminConferences.json?shallow=true&_=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(keymap => {
+            if (!keymap) throw new Error('shallow unavailable');
+            const ids = Object.keys(keymap);
+            return Promise.all(ids.map(id => Promise.all([
+                database.ref('/adminConferences/' + id + '/title').once('value').then(s => s.val()).catch(() => ''),
+                database.ref('/adminConferences/' + id + '/order').once('value').then(s => s.val()).catch(() => null),
+                database.ref('/adminConferences/' + id + '/startDate').once('value').then(s => s.val()).catch(() => ''),
+                database.ref('/adminConferences/' + id + '/endDate').once('value').then(s => s.val()).catch(() => '')
+            ]).then(([title, order, startDate, endDate]) => ({ id, title: title || '', order: order == null ? 9999 : order, startDate: startDate || '', endDate: endDate || '' }))));
+        })
+        .then(arr => { CONFS = arr.sort((a, b) => a.order - b.order || (a.title || '').localeCompare(b.title || '', 'ko')); apply(); })
+        .catch(() => { database.ref('/adminConferences').once('value').then(s => { CONFS = toOrderedArray(s.val() || {}); apply(); }).catch(() => { }); });
+})();
 
 function renderConfSwitcher() {
     const el = document.getElementById('confSwitcher');

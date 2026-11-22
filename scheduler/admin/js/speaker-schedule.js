@@ -33,18 +33,35 @@ Masters.init();
 
 /* ---------- 행사 선택 ---------- */
 if (!CONF_ID) { try { CONF_ID = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { } }
-database.ref('/adminConferences').on('value', snap => {
-    const v = snap.val() || {};
-    CONF_LIST = Object.entries(v).map(([id, c]) => ({ id, title: c.title || '(제목 없음)', startDate: c.startDate || '', endDate: c.endDate || '' }))
-        .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
-    if (!CONF_ID || !CONF_LIST.find(c => c.id === CONF_ID)) CONF_ID = CONF_LIST.length ? CONF_LIST[0].id : '';
-    const sel = document.getElementById('ssConfSelect');
-    if (sel) {
-        sel.innerHTML = CONF_LIST.map(c => `<option value="${c.id}">${escapeHtml(c.title)}</option>`).join('');
-        sel.value = CONF_ID;
-    }
-    subscribeConf();
-});
+// 행사 목록: 제목·기간만 가볍게 조회(각 행사 대용량 제외). 선택 행사만 subscribeConf()에서 구독. 폴백 포함.
+(function loadSSConfs() {
+    const DB = (window.AppConfig && AppConfig.firebase && AppConfig.firebase.databaseURL) || '';
+    const apply = () => {
+        if (!CONF_ID || !CONF_LIST.find(c => c.id === CONF_ID)) CONF_ID = CONF_LIST.length ? CONF_LIST[0].id : '';
+        const sel = document.getElementById('ssConfSelect');
+        if (sel) { sel.innerHTML = CONF_LIST.map(c => `<option value="${c.id}">${escapeHtml(c.title)}</option>`).join(''); sel.value = CONF_ID; }
+        subscribeConf();
+    };
+    fetch(DB + '/adminConferences.json?shallow=true&_=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(keymap => {
+            if (!keymap) throw new Error('shallow unavailable');
+            const ids = Object.keys(keymap);
+            return Promise.all(ids.map(id => Promise.all([
+                database.ref('/adminConferences/' + id + '/title').once('value').then(s => s.val()).catch(() => ''),
+                database.ref('/adminConferences/' + id + '/startDate').once('value').then(s => s.val()).catch(() => ''),
+                database.ref('/adminConferences/' + id + '/endDate').once('value').then(s => s.val()).catch(() => '')
+            ]).then(([title, startDate, endDate]) => ({ id, title: title || '(제목 없음)', startDate: startDate || '', endDate: endDate || '' }))));
+        })
+        .then(arr => { CONF_LIST = arr.sort((a, b) => (b.startDate || '').localeCompare(a.startDate || '')); apply(); })
+        .catch(() => {
+            database.ref('/adminConferences').once('value').then(s => {
+                const v = s.val() || {};
+                CONF_LIST = Object.entries(v).map(([id, c]) => ({ id, title: c.title || '(제목 없음)', startDate: c.startDate || '', endDate: c.endDate || '' })).sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
+                apply();
+            }).catch(() => { });
+        });
+})();
 
 window.changeConf = function (id) {
     CONF_ID = id;
