@@ -23,12 +23,28 @@ document.querySelectorAll('#confTabs .tab').forEach(tab => {
     });
 });
 
-/* ---------- 데이터 구독 ---------- */
-CONF_ROOT.on('value', snap => {
-    const val = snap.val() || {};
-    CONFS = toOrderedArray(val);
-    renderList();
-});
+/* ---------- 데이터 로드 ----------
+   목록에 필요한 가벼운 필드만 조회(행사별 lecturePool·rooms·지도·연자/파트너 등 대용량 제외) →
+   행사가 많아도 목록이 빨리 뜬다. 편집 모달은 열 때 그 행사만 전체를 다시 읽고,
+   저장·삭제·순서변경 후 reloadConferences()로 갱신한다. shallow 조회 실패 시 기존 전체 로드로 폴백. */
+function reloadConferences() {
+    const DB = (window.AppConfig && AppConfig.firebase && AppConfig.firebase.databaseURL) || '';
+    const LIGHT = ['order', 'title', 'titleEn', 'startDate', 'endDate', 'location', 'visibility', 'posterUrl'];
+    fetch(DB + '/adminConferences.json?shallow=true&_=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(keymap => {
+            if (!keymap) throw new Error('shallow unavailable');
+            const ids = Object.keys(keymap);
+            return Promise.all(ids.map(id =>
+                Promise.all(LIGHT.map(f => CONF_ROOT.child(id + '/' + f).once('value').then(s => s.val()).catch(() => null)))
+                    .then(vals => { const o = { id }; LIGHT.forEach((f, i) => o[f] = vals[i]); return o; })
+            ));
+        })
+        .then(arr => { CONFS = arr.sort((a, b) => (a.order == null ? 9999 : a.order) - (b.order == null ? 9999 : b.order)); renderList(); })
+        .catch(() => { CONF_ROOT.once('value').then(s => { CONFS = toOrderedArray(s.val() || {}); renderList(); }).catch(() => { }); });
+}
+window.reloadConferences = reloadConferences;
+reloadConferences();
 
 /* ---------- 목록 렌더 ---------- */
 function renderList() {
@@ -97,7 +113,9 @@ function currentFilteredList() {
 // 새 순서대로 order 값을 0,1,2… 로 재기록
 function persistOrder(arr) {
     const updates = {};
-    arr.forEach((c, idx) => { updates[c.id + '/order'] = idx; });
+    arr.forEach((c, idx) => { updates[c.id + '/order'] = idx; c.order = idx; });   // 로컬도 즉시 갱신
+    CONFS.sort((a, b) => (a.order == null ? 9999 : a.order) - (b.order == null ? 9999 : b.order));
+    renderList();
     CONF_ROOT.update(updates).catch(e => Toast.error('순서 저장 실패: ' + e.message));
 }
 
@@ -172,10 +190,12 @@ window.openConferenceModal = function () {
     document.getElementById('confModal').classList.add('open');
 };
 
-window.editConference = function (id) {
+window.editConference = async function (id) {
     if (!AdminAuth.requireEdit()) return;
-    const c = CONFS.find(x => x.id === id);
+    let c = CONFS.find(x => x.id === id);
     if (!c) return;
+    // 목록은 가벼운 필드만 갖고 있으므로, 편집에 필요한 전체(venueMap·submitConfig 등)를 이 행사만 다시 읽음
+    try { const full = (await CONF_ROOT.child(id).once('value')).val(); if (full) c = Object.assign({ id }, full); } catch (e) { }
     EDIT_ID = id;
     document.getElementById('confModalTitle').textContent = '행사 설정';
     document.getElementById('cfTitle').value = c.title || '';
@@ -242,7 +262,7 @@ window.saveConference = function () {
         CONF_ROOT.child(EDIT_ID).update(data)
             .then(() => {
                 logActivity('update', 'conference', `행사 "${title}" 수정`, { confId: EDIT_ID, confTitle: title, entityId: EDIT_ID });
-                Toast.success('저장되었습니다.'); closeConferenceModal();
+                Toast.success('저장되었습니다.'); closeConferenceModal(); reloadConferences();
             })
             .catch(e => Toast.error('저장 실패: ' + e.message));
     } else {
@@ -252,7 +272,7 @@ window.saveConference = function () {
         CONF_ROOT.child(id).set(data)
             .then(() => {
                 logActivity('create', 'conference', `행사 "${title}" 등록`, { confId: id, confTitle: title, entityId: id });
-                Toast.success('행사가 등록되었습니다.'); closeConferenceModal();
+                Toast.success('행사가 등록되었습니다.'); closeConferenceModal(); reloadConferences();
             })
             .catch(e => Toast.error('등록 실패: ' + e.message));
     }
@@ -266,7 +286,7 @@ window.deleteConference = async function (id) {
     CONF_ROOT.child(id).remove()
         .then(() => {
             logActivity('delete', 'conference', `행사 "${c ? c.title : ''}" 삭제`, { confId: id, confTitle: c ? c.title : '', entityId: id });
-            Toast.success('삭제되었습니다.');
+            Toast.success('삭제되었습니다.'); reloadConferences();
         })
         .catch(e => Toast.error('삭제 실패: ' + e.message));
 };
