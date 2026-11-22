@@ -154,13 +154,9 @@ window.approveTrip = async function (id) {
         cvFileUrl: s.cvFileUrl || '',
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     });
-    // 연자 참여 등록
-    updates['confSpeakers/' + s.speakerId] = { role: '연자', order: 0 };
-    if (board) {   // 이미 이 행사 연자면 기존 역할·순서 유지
-        const cur = (await database.ref(base + '/confSpeakers/' + s.speakerId).once('value')).val();
-        if (cur) delete updates['confSpeakers/' + s.speakerId];
-        else updates['confSpeakers/' + s.speakerId] = { role: '연자', order: 999 };
-    }
+    // 연자 참여 등록 — 이미 이 행사 연자면 기존 역할·순서 유지, 아니면 맨 뒤에 추가(해외·국내 공통)
+    const curCS = (await database.ref(base + '/confSpeakers/' + s.speakerId).once('value')).val();
+    if (!curCS) updates['confSpeakers/' + s.speakerId] = { role: '연자', order: 999 };
     // 강의풀 생성 (제목 없으면 종류를 제목 대신 사용, 종류→카테고리, 스폰서→파트너명, 초록 URL 보관)
     const spk = { id: s.speakerId, nameKo: s.nameKo || '', nameEn: s.nameEn || '', affiliationKo: '', affiliationEn: s.affiliationEn || '' };
     lecList.forEach((l, i) => {
