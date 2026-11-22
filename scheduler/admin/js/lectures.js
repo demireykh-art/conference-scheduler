@@ -80,19 +80,35 @@ database.ref('/adminBoothBenefits').once('value').then(s => {
 renderTypeChecks();
 
 // 행사 목록 로드 → 셀렉트 (1회 로드; 풀은 별도 구독)
-database.ref('/adminConferences').once('value').then(snap => {
-    CONFS = toOrderedArray(snap.val());
+// 행사 선택 목록: 제목/정렬값만 가볍게 조회(각 행사 포스터·시간표·강의풀 등 대용량 제외).
+// 선택한 행사의 강의풀/룸/부스는 subscribeConf()에서 그 행사만 구독. shallow 실패 시 전체 로드로 폴백.
+(function loadLectureConfs() {
+    const DB = (window.AppConfig && AppConfig.firebase && AppConfig.firebase.databaseURL) || '';
     const sel = document.getElementById('confSelect');
-    if (!CONFS.length) {
-        sel.innerHTML = '<option value="">등록된 행사가 없습니다</option>';
-        document.getElementById('poolArea').style.display = 'none';
-        return;
-    }
-    if (!CONF_ID) { try { CONF_ID = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { } }  // 마지막 보던 행사
-    if (!CONF_ID || !CONFS.find(c => c.id === CONF_ID)) CONF_ID = CONFS[0].id;
-    sel.innerHTML = CONFS.map(c => `<option value="${c.id}" ${c.id === CONF_ID ? 'selected' : ''}>${escapeHtml(c.title || '(제목 없음)')}</option>`).join('');
-    subscribeConf();
-});
+    const done = () => {
+        if (!CONFS.length) {
+            sel.innerHTML = '<option value="">등록된 행사가 없습니다</option>';
+            document.getElementById('poolArea').style.display = 'none';
+            return;
+        }
+        if (!CONF_ID) { try { CONF_ID = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { } }  // 마지막 보던 행사
+        if (!CONF_ID || !CONFS.find(c => c.id === CONF_ID)) CONF_ID = CONFS[0].id;
+        sel.innerHTML = CONFS.map(c => `<option value="${c.id}" ${c.id === CONF_ID ? 'selected' : ''}>${escapeHtml(c.title || '(제목 없음)')}</option>`).join('');
+        subscribeConf();
+    };
+    fetch(DB + '/adminConferences.json?shallow=true&_=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(keymap => {
+            if (!keymap) throw new Error('shallow unavailable');
+            const ids = Object.keys(keymap);
+            return Promise.all(ids.map(id => Promise.all([
+                database.ref('/adminConferences/' + id + '/title').once('value').then(s => s.val()).catch(() => ''),
+                database.ref('/adminConferences/' + id + '/order').once('value').then(s => s.val()).catch(() => null)
+            ]).then(([title, order]) => ({ id, title: title || '', order: order == null ? 9999 : order }))));
+        })
+        .then(arr => { CONFS = arr.sort((a, b) => a.order - b.order || (a.title || '').localeCompare(b.title || '', 'ko')); done(); })
+        .catch(() => { database.ref('/adminConferences').once('value').then(s => { CONFS = toOrderedArray(s.val() || {}); done(); }).catch(() => { }); });
+})();
 
 // 승인 대기 제출 안내: 제출함(이사회 앱·해외 연자)에 들어온 강의는 승인해야 이 목록에 들어온다
 let SUB_PENDING = {};   // confId → 건수

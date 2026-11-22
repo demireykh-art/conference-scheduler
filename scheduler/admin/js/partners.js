@@ -60,15 +60,28 @@ let PLACED_CONF_ID = '';
 try { PLACED_CONF_ID = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { }
 let placedRef = null;
 
-// 행사 목록 구독 → 드롭다운 채우기
-database.ref('/adminConferences').on('value', snap => {
-    CONF_LIST = toOrderedArray(snap.val());
-    if (!PLACED_CONF_ID || !CONF_LIST.find(c => c.id === PLACED_CONF_ID)) {
-        PLACED_CONF_ID = CONF_LIST.length ? CONF_LIST[0].id : '';
-    }
-    populateConfSelect();
-    subscribePlacedConf();
-});
+// 행사 목록: 제목/정렬값만 가볍게 조회(각 행사 포스터·시간표·강의풀 등 대용량 제외).
+// 선택한 행사만 subscribePlacedConf()에서 구독. shallow 실패 시 전체 로드로 폴백.
+(function loadPtnConfs() {
+    const DB = (window.AppConfig && AppConfig.firebase && AppConfig.firebase.databaseURL) || '';
+    const apply = () => {
+        if (!PLACED_CONF_ID || !CONF_LIST.find(c => c.id === PLACED_CONF_ID)) PLACED_CONF_ID = CONF_LIST.length ? CONF_LIST[0].id : '';
+        populateConfSelect();
+        subscribePlacedConf();
+    };
+    fetch(DB + '/adminConferences.json?shallow=true&_=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(keymap => {
+            if (!keymap) throw new Error('shallow unavailable');
+            const ids = Object.keys(keymap);
+            return Promise.all(ids.map(id => Promise.all([
+                database.ref('/adminConferences/' + id + '/title').once('value').then(s => s.val()).catch(() => ''),
+                database.ref('/adminConferences/' + id + '/order').once('value').then(s => s.val()).catch(() => null)
+            ]).then(([title, order]) => ({ id, title: title || '', order: order == null ? 9999 : order }))));
+        })
+        .then(arr => { CONF_LIST = arr.sort((a, b) => a.order - b.order || (a.title || '').localeCompare(b.title || '', 'ko')); apply(); })
+        .catch(() => { database.ref('/adminConferences').once('value').then(s => { CONF_LIST = toOrderedArray(s.val() || {}); apply(); }).catch(() => { }); });
+})();
 
 function populateConfSelect() {
     const sel = document.getElementById('placedConfSelect');
