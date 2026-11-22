@@ -59,7 +59,8 @@ function partnerName(pid) {
     const m = Masters.partner(pid);
     return (m && (m.nameKo || m.nameEn)) || '(삭제된 파트너사)';
 }
-function contactsOf(pid) { const c = (CONF.partnerContacts || {})[pid]; return Array.isArray(c) ? c : []; }
+function contactsOf(pid) { const c = Contacts.partnerOf(CONF_ID, CONF)[pid]; return Array.isArray(c) ? c : []; }
+document.addEventListener('contacts-change', () => { if (typeof renderRoster === 'function') renderRoster(); });
 function contactText(pid) {
     return contactsOf(pid).map(c => [c.name, c.phone, c.email].filter(Boolean).join(' · ')).join(' / ');
 }

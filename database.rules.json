@@ -1,0 +1,183 @@
+{
+  "rules": {
+    "adminSpeakerContacts": {
+      ".read": "auth != null && (root.child('users/' + auth.uid + '/role').val() === 'admin' || root.child('users/' + auth.uid + '/role').val() === 'editor')",
+      ".write": "auth != null && (root.child('users/' + auth.uid + '/role').val() === 'admin' || root.child('users/' + auth.uid + '/role').val() === 'editor')"
+    },
+    "adminPartnerContacts": {
+      ".read": "auth != null && (root.child('users/' + auth.uid + '/role').val() === 'admin' || root.child('users/' + auth.uid + '/role').val() === 'editor')",
+      ".write": "auth != null && (root.child('users/' + auth.uid + '/role').val() === 'admin' || root.child('users/' + auth.uid + '/role').val() === 'editor')"
+    },
+    "adminSpeakerTrips": {
+      ".read": "auth != null && (root.child('users/' + auth.uid + '/role').val() === 'admin' || root.child('users/' + auth.uid + '/role').val() === 'editor')",
+      ".write": "auth != null && (root.child('users/' + auth.uid + '/role').val() === 'admin' || root.child('users/' + auth.uid + '/role').val() === 'editor')"
+    },
+    "lectureEditTokens": {
+      ".read": "auth != null && (root.child('users/' + auth.uid + '/role').val() === 'admin' || root.child('users/' + auth.uid + '/role').val() === 'editor')",
+      ".write": "auth != null && (root.child('users/' + auth.uid + '/role').val() === 'admin' || root.child('users/' + auth.uid + '/role').val() === 'editor')"
+    },
+    "adminConferences": {
+      ".read": true,
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor')"
+    },
+    "adminSpeakers": {
+      ".read": true,
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor')"
+    },
+    "adminPartners": {
+      ".read": true,
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor')"
+    },
+    "adminBoothBenefits": {
+      ".read": true,
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor')"
+    },
+    "adminActivityLog": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor')",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      ".indexOn": [
+        "ts"
+      ],
+      "$entry": {
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor') && !data.exists()"
+      }
+    },
+    "cvSubmissions": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor')",
+      "$sub": {
+        ".write": "(!data.exists() && newData.exists()) || (auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor'))",
+        ".validate": "newData.hasChildren(['speakerId','submittedAt'])",
+        "photo": {
+          ".validate": "newData.isString() && newData.val().length <= 600000"
+        },
+        "cv": {
+          ".validate": "newData.isString() && newData.val().length <= 20000"
+        },
+        "nameKo": {
+          ".validate": "newData.isString() && newData.val().length <= 100"
+        },
+        "nameEn": {
+          ".validate": "newData.isString() && newData.val().length <= 100"
+        },
+        "affiliationKo": {
+          ".validate": "newData.isString() && newData.val().length <= 200"
+        },
+        "affiliationEn": {
+          ".validate": "newData.isString() && newData.val().length <= 200"
+        },
+        "email": {
+          ".validate": "newData.isString() && newData.val().length <= 200"
+        },
+        "confId": {
+          ".validate": "newData.isString() && newData.val().length <= 200"
+        },
+        "speakerId": {
+          ".validate": "newData.isString() && newData.val().length <= 200"
+        },
+        "status": {
+          ".validate": "newData.isString() && newData.val().length <= 30"
+        },
+        "submittedAt": {
+          ".validate": true
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "tripSubmissions": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor')",
+      ".indexOn": [
+        "submittedAt"
+      ],
+      "$sub": {
+        ".write": "(!data.exists() && newData.exists()) || (auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor'))",
+        ".validate": "newData.hasChildren(['speakerId','submittedAt'])",
+        "speakerId": {
+          ".validate": "newData.isString() && newData.val().length <= 200"
+        },
+        "confId": {
+          ".validate": "newData.isString() && newData.val().length <= 200"
+        },
+        "nameKo": {
+          ".validate": "newData.isString() && newData.val().length <= 100"
+        },
+        "nameEn": {
+          ".validate": "newData.isString() && newData.val().length <= 100"
+        },
+        "affiliationEn": {
+          ".validate": "newData.isString() && newData.val().length <= 200"
+        },
+        "nationality": {
+          ".validate": "newData.isString() && newData.val().length <= 100"
+        },
+        "email": {
+          ".validate": "newData.isString() && newData.val().length <= 200"
+        },
+        "phone": {
+          ".validate": "newData.isString() && newData.val().length <= 100"
+        },
+        "cvFileUrl": {
+          ".validate": "newData.isString() && newData.val().length <= 2000"
+        },
+        "note": {
+          ".validate": "newData.isString() && newData.val().length <= 2000"
+        },
+        "lang": {
+          ".validate": "newData.isString() && newData.val().length <= 10"
+        },
+        "status": {
+          ".validate": "newData.isString() && newData.val().length <= 30"
+        },
+        "submittedAt": {
+          ".validate": true
+        },
+        "travel": {
+          "$f": {
+            ".validate": "(newData.isString() && newData.val().length <= 2000) || newData.isNumber() || newData.isBoolean()"
+          }
+        },
+        "lectures": {
+          "$i": {
+            "$f": {
+              ".validate": "(newData.isString() && newData.val().length <= 2000) || newData.isNumber() || newData.isBoolean()"
+            }
+          }
+        },
+        "$other": {
+          ".validate": false
+        },
+        "source": {
+          ".validate": "newData.isString() && newData.val().length <= 30"
+        }
+      }
+    },
+    "preApproved": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      "$emailKey": {
+        ".read": "auth != null && data.child('email').val() === auth.token.email",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || (data.child('email').val() === auth.token.email && !newData.exists()))"
+      }
+    },
+    "data": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor')"
+    },
+    "settings": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor')",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "backups": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor')",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "users": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || (auth.uid === $uid && data.exists() && newData.child('role').val() === data.child('role').val() && newData.child('canPublish').val() === data.child('canPublish').val()) || (auth.uid === $uid && !data.exists() && !newData.child('canPublish').exists() && (newData.child('role').val() === 'pending' || (newData.child('role').val() === 'admin' && auth.token.email === 'demire.ykh@gmail.com' && auth.token.email_verified === true) || ((newData.child('role').val() === 'admin' || newData.child('role').val() === 'editor') && newData.child('role').val() === root.child('preApproved').child(auth.token.email.toLowerCase().replace('.', ',')).child('role').val()))))"
+      }
+    }
+  }
+}

@@ -176,4 +176,72 @@ auth.onAuthStateChanged(user => {
     AdminAuth._cbs = [];
 });
 
+/* ---------- 연락처 비공개 저장소 (2026-11) ----------
+ * 연자 이메일·전화 → /adminSpeakerContacts/<speakerId> = { email, phone }
+ * 참여사 담당자     → /adminPartnerContacts/<confId>/<partnerId> = [{ name, phone, email }]
+ * 두 경로는 DB 규칙에서 관리자·편집자만 읽고 쓴다. (/adminSpeakers, /adminConferences 는 홈페이지용 공개 읽기)
+ * 규칙이 아직 없으면(읽기 거부) ready=false → 예전 위치(공개 레코드)에 그대로 저장해 기능이 끊기지 않게 한다.
+ */
+window.Contacts = {
+    ready: false, spk: {}, partner: {}, _on: false,
+    watch() {
+        const ok = !!(AdminAuth.user && (AdminAuth.role === 'admin' || AdminAuth.role === 'editor'));
+        if (ok && !this._on) {
+            this._on = true;
+            database.ref('/adminSpeakerContacts').on('value', s => { this.spk = s.val() || {}; this.ready = true; this._emit(); },
+                () => { this.ready = false; this._on = false; this._emit(); });
+            database.ref('/adminPartnerContacts').on('value', s => { this.partner = s.val() || {}; this._emit(); }, () => { });
+        } else if (!ok && this._on) {
+            database.ref('/adminSpeakerContacts').off(); database.ref('/adminPartnerContacts').off();
+            this._on = false; this.ready = false; this.spk = {}; this.partner = {}; this._emit();
+        }
+    },
+    _emit() { document.dispatchEvent(new CustomEvent('contacts-change')); },
+    of(s) { const c = (s && this.spk[s.id]) || {}; return { email: c.email || (s && s.email) || '', phone: c.phone || (s && s.phone) || '' }; },
+    merge(arr) { (arr || []).forEach(s => { const c = this.of(s); s.email = c.email; s.phone = c.phone; }); return arr; },
+    // 연자 저장 직전: 비공개 칸이 열려 있으면 연락처를 거기 쓰고, 공개 레코드에서는 지운 data 를 돌려준다
+    async splitSpeaker(id, data) {
+        if (!this.ready || !data || !('email' in data || 'phone' in data)) return data;
+        const cur = this.spk[id] || {};
+        const c = { email: 'email' in data ? (data.email || '') : (cur.email || ''), phone: 'phone' in data ? (data.phone || '') : (cur.phone || '') };
+        await database.ref('/adminSpeakerContacts/' + id).set((c.email || c.phone) ? c : null);
+        return Object.assign({}, data, { email: null, phone: null });
+    },
+    partnerOf(cid, conf) { return Object.assign({}, (conf && conf.partnerContacts) || {}, (cid && this.partner[cid]) || {}); },
+    async savePartner(cid, pid, list) {
+        const v = (list && list.length) ? list : null;
+        if (this.ready) {
+            await database.ref(`/adminPartnerContacts/${cid}/${pid}`).set(v);
+            await database.ref(`/adminConferences/${cid}/partnerContacts/${pid}`).remove();
+        } else await database.ref(`/adminConferences/${cid}/partnerContacts/${pid}`).set(v);
+    },
+    // 1회 이전: 공개 레코드에 남은 연락처를 비공개 칸으로 옮기고 원본에서 삭제 (관리자)
+    async migrate() {
+        if (!AdminAuth.isAdmin()) { Toast.error('관리자만 실행할 수 있습니다.'); return; }
+        if (!this.ready) { Toast.error('DB 규칙에 adminSpeakerContacts·adminPartnerContacts 가 아직 없습니다. 규칙을 먼저 추가해 주세요.'); return; }
+        const spk = (await database.ref('/adminSpeakers').once('value')).val() || {};
+        const confs = (await database.ref('/adminConferences').once('value')).val() || {};
+        const up = {}; let ns = 0, np = 0;
+        Object.entries(spk).forEach(([id, s]) => {
+            if (!s || (s.email == null && s.phone == null)) return;
+            const cur = this.spk[id] || {}, c = { email: cur.email || s.email || '', phone: cur.phone || s.phone || '' };
+            if (c.email || c.phone) up['adminSpeakerContacts/' + id] = c;
+            up['adminSpeakers/' + id + '/email'] = null; up['adminSpeakers/' + id + '/phone'] = null; ns++;
+        });
+        Object.entries(confs).forEach(([cid, c]) => {
+            const pc = c && c.partnerContacts; if (!pc) return;
+            Object.entries(pc).forEach(([pid, list]) => { if (!(this.partner[cid] || {})[pid]) up[`adminPartnerContacts/${cid}/${pid}`] = list; np++; });
+            up[`adminConferences/${cid}/partnerContacts`] = null;
+        });
+        if (!Object.keys(up).length) { Toast.info('옮길 연락처가 없습니다. 이미 비공개입니다.'); return; }
+        const ok = await confirmDialog(`공개 레코드에 남은 연락처를 비공개 칸으로 옮깁니다.\n- 연자 ${ns}명 이메일·전화\n- 참여사 담당자 ${np}건\n(먼저 💾 연자 백업을 받아두세요)`, { okText: '이전 실행' });
+        if (!ok) return;
+        await database.ref().update(up);
+        if (window.logActivity) logActivity('update', 'speaker', `연락처 비공개 이전 — 연자 ${ns}명, 참여사 담당자 ${np}건`, {});
+        Toast.success(`연락처를 비공개로 옮겼습니다. (연자 ${ns}명 · 참여사 ${np}건)`);
+    }
+};
+document.addEventListener('admin-auth-change', () => Contacts.watch());
+window.migrateContacts = () => Contacts.migrate().catch(e => Toast.error('이전 실패: ' + (e.message || e)));
+
 console.log('✅ admin-auth.js 로드 완료');

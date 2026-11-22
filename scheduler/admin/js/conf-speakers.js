@@ -168,6 +168,7 @@ function scheduleHtml(id) {
             <button class="btn btn-sm btn-primary" title="${m.email ? '이 일정을 메일로 보내기(Gmail 작성창)' : '이메일이 없습니다 — Gmail 작성창에서 수신인 직접 입력'}" onclick="mailSchedule('${id}')">📧 일정 메일 보내기</button>
             <button class="btn btn-sm" title="이 일정 내용을 복사(카톡·문자에 붙여넣기)" onclick="copySchedule('${id}')">📋 일정 복사(카톡)</button>
             <button class="btn btn-sm" title="카카오톡으로 이 연자에게 일정 카드 보내기 — 카톡 대화상대 선택 후 전송" onclick="kakaoSchedule('${id}')">💬 카톡 보내기</button>
+            <button class="btn btn-sm" title="국내 연자용 개인 링크 복사 — 새 강의 제목 제출(사무국 승인 후 등록) + 기존 강의 제목 수정(즉시 반영·'연자 수정' 표시·변경이력). 여행 일정 입력 없음" onclick="copyTitleEditLink('${id}')">📝 강의 입력 링크</button>
             ${shareBtn}
         </div>
         <div class="sch-grid">
@@ -235,6 +236,18 @@ ${ORG_NAME} 사무국 드림`;
         + '&body=' + encodeURIComponent(body);
     window.open(gmail, '_blank');
     if (!m.email) Toast.info('이 연자의 이메일이 없습니다. Gmail 작성창에서 수신인을 직접 입력하세요.');
+};
+window.copyTitleEditLink = async function (id) {
+    if (!AdminAuth.requireEdit()) return;
+    try {
+        const url = await lectureEditLink(id, CONF_ID);
+        const m = Masters.speaker(id) || {};
+        const ct = (await database.ref('/adminConferences/' + CONF_ID + '/title').once('value')).val() || '학술대회';
+        const text = `[ASLS] ${m.nameKo || m.nameEn || ''} 선생님, ${ct} 강의 입력 링크입니다.\n아래 링크에서 강의 제목(주제·스폰서·희망 시간)을 보내주시고, 이미 등록된 강의 제목도 직접 고치실 수 있습니다.\n(개인 링크이니 다른 분께 공유하지 마세요)\n${url}`;
+        const done = () => Toast.success('강의 입력 링크를 복사했습니다. 카톡·문자로 보내세요.');
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+        else fallbackCopy(text, done);
+    } catch (e) { Toast.error('링크 생성 실패 — DB 규칙에 lectureEditTokens 가 있는지 확인해 주세요. (' + (e.message || e) + ')'); }
 };
 window.copySchedule = function (id) {
     const done = () => Toast.success('일정을 복사했습니다. 카톡·문자에 붙여넣으세요.');
@@ -353,7 +366,8 @@ function render() {
             <div class="cv-group">
                 <button class="btn btn-sm" title="${m.email ? 'CV 등록 요청 메일(Gmail 작성창)' : '이메일이 없습니다 — 연자 정보에 이메일을 추가하세요'}" onclick="requestCV('${e.id}')">✉️ CV요청 메일보내기</button>
                 <button class="btn btn-sm" title="CV 등록 링크 복사(카톡·문자 등에 붙여넣기)" onclick="copyCVLink('${e.id}')">🔗 CV요청 링크복사</button>
-                <button class="btn btn-sm" title="해외 연자 여행·강의 제출 링크 복사 (영문 폼)" onclick="copyTripLink('${e.id}')">✈️ 일정요청 링크</button>
+                <button class="btn btn-sm" title="국내 연자용: 새 강의 제목 제출 + 등록된 강의 제목 수정 (여행 일정 없음)" onclick="copyTitleEditLink('${e.id}')">📝 강의 입력 링크 (국내)</button>
+                <button class="btn btn-sm" title="해외 연자 여행·강의 제출 링크 복사 (영문 폼)" onclick="copyTripLink('${e.id}')">✈️ 일정요청 링크 (해외)</button>
                 <button class="btn btn-sm btn-danger-ghost" onclick="removePerson('${e.id}')">제거</button>
             </div>
         </div>
@@ -559,7 +573,7 @@ window.saveNewSpeaker = function () {
         createdAt: firebase.database.ServerValue.TIMESTAMP,
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     };
-    database.ref('/adminSpeakers/' + id).set(data)
+    Contacts.splitSpeaker(id, data).then(d => database.ref('/adminSpeakers/' + id).set(d))
         .then(() => {
             logActivity('create', 'speaker', `연자 "${nameKo}" 등록`, { entityId: id });
             closeSpeakerModal();

@@ -1,0 +1,48 @@
+name: Deploy Firebase (DB rules + functions)
+
+# main 에 push 되면 자동 배포
+#  - database.rules.json 변경 → Realtime Database 보안 규칙
+#  - functions-speaker/** 변경 → 연자 제목 수정 함수(codebase speaker: editLectureTitle, myLectures)
+#    (functions/ 의 aiExtractLectures 는 Claude API 키 Secret 이 필요해서 여기서 배포하지 않음)
+# 필요: 저장소 Settings → Secrets → FIREBASE_TOKEN (firebase login:ci 로 발급, 스케줄러 프로젝트 권한 계정)
+# 함수 배포에는 Firebase 요금제 Blaze 필요. 수동 재실행: Actions 탭 → 이 워크플로 → Run workflow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'database.rules.json'
+      - 'functions-speaker/**'
+      - 'firebase.json'
+      - '.github/workflows/deploy-firebase.yml'
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-firebase
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@latest
+      - name: Deploy Realtime Database rules
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          if [ -z "$FIREBASE_TOKEN" ]; then echo "::error title=FIREBASE_TOKEN 없음::저장소 Secret FIREBASE_TOKEN 이 비어 있습니다"; exit 1; fi
+          set -o pipefail
+          firebase deploy --only database --project conference-scheduler-a5656 --non-interactive --token "$FIREBASE_TOKEN" 2>&1 | tee rules.log || { echo "::error title=DB 규칙 배포 실패::$(grep -iE 'error|denied|permission|invalid' rules.log | tail -6 | tr '\n' ' ' | cut -c1-900)"; exit 1; }
+      - name: Install function deps
+        run: cd functions-speaker && npm ci
+      - name: Deploy functions (title edit)
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          set -o pipefail
+          firebase deploy --only functions:speaker --project conference-scheduler-a5656 --non-interactive --force --token "$FIREBASE_TOKEN" 2>&1 | tee fn.log || { echo "::error title=함수 배포 실패::$(grep -iE 'error|denied|permission|billing|blaze|enable|invalid' fn.log | tail -8 | tr '\n' ' ' | cut -c1-900)"; exit 1; }

@@ -32,3 +32,26 @@
 ## 주의
 - AI는 원문에 없는 내용을 지어낼 수 있음 → 원문에 없으면 빈칸으로 두도록 지시했지만, 미리보기의 ⚠️·"신규 연자?" 표시는 반드시 확인
 - 시간 칸 "(기본값)"은 원문에 강의 시간이 없어 15분으로 넣은 것
+
+
+---
+
+# 연자 본인 강의 제목 수정 (editLectureTitle · myLectures) — 소스: functions-speaker/
+
+- 이사회 앱(asls-board) 이사: 이사회 앱 로그인 토큰 + 이사회 앱에서 연결한 연자 ID로 본인 확인
+- 외부 연자: 행사별 연자 화면의 [✏️ 제목 수정 링크] → `mylectures.html?t=<비밀토큰>` (`/lectureEditTokens`)
+- 본인 강의만 제목(국문·영문)만 수정 → 강의풀 + 시간표 배치본 동시 반영, `titleEdit`(강의관리·시간표 「✏️ 연자 수정」 배지), 변경이력 기록
+- 배지를 누르면 확인 처리(표시 해제)
+- Claude API 키 불필요 → AI 함수와 따로 배포 가능
+
+## 배포 (원장님 맥, 1회)
+1. Firebase 콘솔 → `conference-scheduler-a5656` → 요금제 **Blaze** (이 사용량이면 비용 거의 0원)
+2. 터미널:
+   ```bash
+   npm install -g firebase-tools
+   firebase login                     # 스케줄러 프로젝트 소유 계정
+   git clone https://github.com/demireykh-art/conference-scheduler && cd conference-scheduler
+   cd functions && npm install && cd ..
+   firebase deploy --only functions:speaker --project conference-scheduler-a5656   # GitHub Actions 가 자동 배포
+   ```
+3. DB 규칙에 `lectureEditTokens` (관리자·편집자 전용) 포함된 완성본 게시

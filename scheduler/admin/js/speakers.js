@@ -12,12 +12,23 @@ let spkPhotoData = '';   // 업로드한 사진 data URL
 
 document.getElementById('sidebarMount').innerHTML = renderSidebar('speakers');
 
-let SPK_LOADED = false, SPK_SYNCED = false;
+let SPK_LOADED = false, SPK_SYNCED = false, LEGACY_CONTACTS = false;
+// 공개 레코드에 연락처가 남아 있고 관리자일 때만 [🔒 연락처 비공개 전환] 버튼 표시
+function updateContactsBtn() {
+    const b = document.getElementById('btnMigrateContacts'); if (!b) return;
+    b.style.display = (LEGACY_CONTACTS && window.AdminAuth && AdminAuth.isAdmin()) ? '' : 'none';
+    b.title = Contacts.ready ? '공개 레코드의 이메일·전화를 관리자 전용 칸으로 옮김' : 'DB 규칙 추가가 먼저 필요합니다';
+}
+document.addEventListener('contacts-change', () => { Contacts.merge(SPEAKERS); updateContactsBtn(); if (SPK_LOADED) renderSpeakers(); });
+document.addEventListener('admin-auth-change', updateContactsBtn);
 
 SPK_ROOT.on('value', snap => {
-    SPEAKERS = toOrderedArray(snap.val())
-        .sort((a, b) => (a.nameKo || '').localeCompare(b.nameKo || '', 'ko'));
+    const raw = snap.val() || {};
+    LEGACY_CONTACTS = Object.values(raw).some(s => s && (s.email || s.phone));
+    SPEAKERS = Contacts.merge(toOrderedArray(raw)
+        .sort((a, b) => (a.nameKo || '').localeCompare(b.nameKo || '', 'ko')));
     SPK_LOADED = true;
+    updateContactsBtn();
     renderSpeakers();
     maybeSyncFromLectures();
 });
@@ -211,7 +222,7 @@ async function doSaveSpeaker(closeAfter) {
         }
     }
 
-    const data = {
+    let data = {
         nameKo,
         nameEn: document.getElementById('spkNameEn').value.trim(),
         affiliationKo: affKo,
@@ -230,6 +241,8 @@ async function doSaveSpeaker(closeAfter) {
         updatedAt: firebase.database.ServerValue.TIMESTAMP
     };
 
+    try { data = await Contacts.splitSpeaker(sid, data); }
+    catch (e) { Toast.error('연락처 저장 실패: ' + e.message); throw e; }
     if (SPK_EDIT_ID) {
         return SPK_ROOT.child(sid).update(data)
             .then(() => {
