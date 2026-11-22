@@ -3,16 +3,24 @@
  * 강제 새로고침(Ctrl+Shift+R) 없이 최신 버전을 자동 반영한다.
  * 배포할 때마다 APP_VERSION 값을 갱신한다. (배포 스크립트에서 자동 증가)
  */
-window.APP_VERSION = '2026.11.22-10';
+window.APP_VERSION = '2026.11.22-11';
 
 (function () {
     const LOADED = window.APP_VERSION;
     const VER_URL = '/conference-scheduler/scheduler/admin/js/version.js';
     let reloading = false;
 
-    function doReload(msg) {
-        if (reloading) return; reloading = true;
-        try { if (window.Toast) Toast.info(msg || '새 버전이 있어 자동 업데이트합니다…'); } catch (e) { }
+    function doReload(newVer) {
+        if (reloading) return;
+        // 같은 버전으로 이미 한 번 리로드했으면 또 하지 않음 — CDN 전파 지연으로 생기는 리로드 루프(=탭 이동 불가) 방지
+        try {
+            if (newVer) {
+                if (sessionStorage.getItem('asls_vreload') === newVer) return;
+                sessionStorage.setItem('asls_vreload', newVer);
+            }
+        } catch (e) { }
+        reloading = true;
+        try { if (window.Toast) Toast.info('새 버전이 있어 자동 업데이트합니다…'); } catch (e) { }
         setTimeout(function () { location.reload(); }, 700);
     }
 
@@ -38,7 +46,7 @@ window.APP_VERSION = '2026.11.22-10';
             .then(function (txt) {
                 if (!txt) return;
                 const m = txt.match(/APP_VERSION\s*=\s*'([^']+)'/);
-                if (m && m[1] && m[1] !== LOADED) doReload();
+                if (m && m[1] && m[1] !== LOADED) doReload(m[1]);
             })
             .catch(function () { });
     }
