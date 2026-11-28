@@ -129,6 +129,61 @@ window.changePlacedConf = function (id) {
     subscribePlacedConf();
 };
 
+/* ---------- 지난 행사에서 복사 (참여사·등급 + 부스 혜택표) ---------- */
+window.openCopyFromConf = function () {
+    if (!AdminAuth.requireEdit()) return;
+    if (!PLACED_CONF_ID) { Toast.warning('먼저 위에서 이 행사를 선택하세요.'); return; }
+    const others = CONF_LIST.filter(c => c.id !== PLACED_CONF_ID);
+    if (!others.length) { Toast.info('복사해올 다른 행사가 없습니다.'); return; }
+    const ov = document.createElement('div');
+    ov.className = 'modal-overlay open';
+    ov.innerHTML = `
+        <div class="modal" style="max-width:420px">
+            <h3>지난 행사에서 복사</h3>
+            <p style="margin:0 0 12px;color:var(--text-dim);font-size:0.88rem;line-height:1.55">
+                고른 행사의 <b>참여사·등급 지정</b>, <b>신청전 목록</b>, <b>부스 등급별 혜택표</b>, 담당자 연락처를
+                <b>${escapeHtml(PLACED_CONF_NAME || '이 행사')}</b>(으)로 복사합니다.<br>
+                <span style="color:var(--danger)">※ 이 행사의 기존 참여사·혜택표는 복사본으로 대체됩니다.</span>
+            </p>
+            <div class="modal-field">
+                <label>복사해올 행사</label>
+                <select id="copySrcSel">${others.map(c => `<option value="${c.id}">${escapeHtml(c.title || '(제목 없음)')}</option>`).join('')}</select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" data-no>취소</button>
+                <button class="btn btn-primary" data-yes>복사</button>
+            </div>
+        </div>`;
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.querySelector('[data-no]').onclick = close;
+    ov.onclick = e => { if (e.target === ov) close(); };
+    ov.querySelector('[data-yes]').onclick = () => { const id = ov.querySelector('#copySrcSel').value; close(); doCopyFromConf(id); };
+};
+
+async function doCopyFromConf(sourceId) {
+    if (!sourceId || sourceId === PLACED_CONF_ID) return;
+    const srcTitle = (CONF_LIST.find(c => c.id === sourceId) || {}).title || '선택 행사';
+    const ok = await confirmDialog(`"${srcTitle}"의 참여사·등급·혜택표를 "${PLACED_CONF_NAME || '이 행사'}"(으)로 복사할까요?\n이 행사의 기존 참여사·혜택표는 대체됩니다.`, { danger: true, okText: '복사' });
+    if (!ok) return;
+    try {
+        const src = '/adminConferences/' + sourceId;
+        const [bb, cp, pp, pc] = await Promise.all([
+            database.ref(src + '/boothBenefits').once('value').then(s => s.val()).catch(() => null),
+            database.ref(src + '/confPartners').once('value').then(s => s.val()).catch(() => null),
+            database.ref(src + '/prePartners').once('value').then(s => s.val()).catch(() => null),
+            database.ref('/adminPartnerContacts/' + sourceId).once('value').then(s => s.val()).catch(() => null)
+        ]);
+        const updates = { confPartners: cp || null, prePartners: pp || null };
+        if (bb && Array.isArray(bb.columns) && Array.isArray(bb.grades)) updates.boothBenefits = bb;
+        await database.ref('/adminConferences/' + PLACED_CONF_ID).update(updates);
+        if (pc) await database.ref('/adminPartnerContacts/' + PLACED_CONF_ID).set(pc).catch(() => { });
+        const nP = cp ? Object.keys(cp).length : 0, nPre = pp ? Object.keys(pp).length : 0;
+        logActivity('create', 'partner', `"${srcTitle}" → 참여사·등급·혜택표 복사 (참여 ${nP}, 신청전 ${nPre})`, { confId: PLACED_CONF_ID, confTitle: PLACED_CONF_NAME });
+        Toast.success(`복사 완료: 참여 ${nP}개사 · 신청전 ${nPre}개사 · 혜택표${updates.boothBenefits ? ' 포함' : ' 없음'}`);
+    } catch (e) { Toast.error('복사 실패: ' + (e.message || e)); }
+}
+
 function populateGradeSelect() {
     const sel = document.getElementById('ptnGrade');
     if (!sel) return;
