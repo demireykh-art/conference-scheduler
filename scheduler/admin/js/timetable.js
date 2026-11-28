@@ -355,7 +355,8 @@ function renderRoomTabs(rooms) {
     const trashCount = (CONF && CONF.roomTrash) ? Object.keys(CONF.roomTrash).length : 0;
     const trashBtn = trashCount ? `<button class="room-tab trash-tab" onclick="openTrashModal()" title="삭제된 룸 복원">🗑 휴지통 ${trashCount}</button>` : '';
     const importBtn = `<button class="room-tab import-tab" onclick="openImportModal()" title="전체강의 엑셀 파일로 룸 가져오기/복원">📥 엑셀 가져오기</button>`;
-    box.innerHTML = rowsHtml + `<div class="room-tab-row addrow"><button class="room-tab add-tab" onclick="openRoomModal()">+ 룸 추가</button>${importBtn}${trashBtn}</div>`;
+    const restoreBtns = `<button class="room-tab" onclick="saveRestorePoint()" title="지금 시간표 배치를 되돌리기 지점으로 저장(테스트 전에 눌러두세요)">📌 되돌리기 지점</button><button class="room-tab" onclick="restoreTimetable()" title="저장해둔 되돌리기 지점으로 시간표 복원">♻️ 되돌리기</button>`;
+    box.innerHTML = rowsHtml + `<div class="room-tab-row addrow"><button class="room-tab add-tab" onclick="openRoomModal()">+ 룸 추가</button>${importBtn}${trashBtn}${restoreBtns}</div>`;
 
     // 재렌더 전 가로 스크롤 위치 복원 (선택/데이터 갱신 시 좌측으로 튀지 않게)
     box.querySelectorAll('.room-tab-row[data-date]').forEach(row => {
@@ -957,6 +958,33 @@ window.purgeRoom = async function (id) {
         Toast.success('완전히 삭제되었습니다.');
         renderTrashList();
     }).catch(e => Toast.error('삭제 실패: ' + e.message));
+};
+
+/* ============================================================
+   시간표 되돌리기 지점 (베타테스트 등 — 지금 배치를 저장해두고 한 번에 복원)
+   저장 위치: /timetableRestore/<confId> = { rooms, at }  (행사 노드와 분리 → 시간표 로딩 안 무겁게)
+   ============================================================ */
+const restoreRef = () => database.ref('/timetableRestore/' + CONF_ID);
+window.saveRestorePoint = async function () {
+    if (!AdminAuth.requireEdit()) return;
+    if (!CONF_ID) return;
+    const ok = await confirmDialog('지금 시간표 배치를 "되돌리기 지점"으로 저장할까요?\n나중에 이 상태로 한 번에 되돌릴 수 있습니다.\n(이 행사의 기존 되돌리기 지점은 덮어씁니다)', { okText: '지점 저장' });
+    if (!ok) return;
+    restoreRef().set({ rooms: (CONF && CONF.rooms) || null, at: firebase.database.ServerValue.TIMESTAMP })
+        .then(() => { logActivity('update', 'room', '시간표 되돌리기 지점 저장', { confId: CONF_ID, confTitle: ctitle() }); Toast.success('되돌리기 지점을 저장했습니다. 테스트 후 ♻️ 되돌리기로 원복할 수 있어요.'); })
+        .catch(e => Toast.error('저장 실패 — DB 규칙에 timetableRestore 가 있는지 확인해 주세요. (' + (e.message || e) + ')'));
+};
+window.restoreTimetable = async function () {
+    if (!AdminAuth.requireEdit()) return;
+    if (!CONF_ID) return;
+    const rp = (await restoreRef().once('value').catch(() => null))?.val();
+    if (!rp) { Toast.info('저장된 되돌리기 지점이 없습니다. 먼저 📌 되돌리기 지점을 저장하세요.'); return; }
+    const when = rp.at ? new Date(rp.at).toLocaleString('ko-KR') : '';
+    const ok = await confirmDialog(`시간표를 저장된 지점${when ? `(${when})` : ''}으로 되돌릴까요?\n지금의 시간표 배치는 사라지고 그때 상태로 바뀝니다.`, { danger: true, okText: '되돌리기' });
+    if (!ok) return;
+    confRef().child('rooms').set(rp.rooms || null)
+        .then(() => { logActivity('update', 'room', '시간표를 되돌리기 지점으로 복원', { confId: CONF_ID, confTitle: ctitle() }); Toast.success('되돌렸습니다.'); })
+        .catch(e => Toast.error('되돌리기 실패: ' + (e.message || e)));
 };
 
 /* ============================================================
