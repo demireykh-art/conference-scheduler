@@ -1023,6 +1023,20 @@ tr.row-pre { background: #fffaf0; }
     margin-top: -2px;
 }
 
+/* 룸 설정 컴팩트 (핵심 1줄 + ⚙️ 상세 접기) */
+#roomSettings.rs { display: block; }
+#roomSettings.rs .rs-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 10px; }
+#roomSettings.rs .rs-row.rs-detail { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+#roomSettings.rs .field { margin: 0; }
+#roomSettings.rs .field > label { font-size: 0.72rem; margin-bottom: 3px; font-weight: 600; color: var(--text-dim); }
+#roomSettings.rs .field input { padding: 6px 9px; font-size: 0.85rem; }
+#roomSettings.rs .settings-hint { font-size: 0.74rem; margin-top: 4px; line-height: 1.5; }
+#roomSettings.rs .rs-actions { display: flex; gap: 6px; align-items: flex-end; margin-left: auto; }
+@media (max-width: 640px) {
+    #roomSettings.rs .field, #roomSettings.rs .field.grow { flex-basis: calc(50% - 5px); min-width: calc(50% - 5px) !important; }
+    #roomSettings.rs .rs-actions { margin-left: 0; width: 100%; }
+}
+
 .timetable-toolbar {
     display: flex;
     justify-content: flex-end;
