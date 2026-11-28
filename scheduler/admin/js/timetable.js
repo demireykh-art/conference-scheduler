@@ -557,83 +557,85 @@ function agendaOwnerOptions() {
     }).join('');
 }
 
-/* ---------- 룸 설정 ---------- */
+/* ---------- 룸 설정 (컴팩트: 핵심 1줄 + ⚙️ 상세 접기) ---------- */
+let ROOM_DETAIL_OPEN = false;
+window.toggleRoomDetail = function () { ROOM_DETAIL_OPEN = !ROOM_DETAIL_OPEN; renderRoomSettings(); };
 function renderRoomSettings() {
     const el = document.getElementById('roomSettings');
     const addRow = document.getElementById('addSessionRow');
     const room = getRoom(CURRENT_ROOM);
     if (!room) { el.style.display = 'none'; addRow.style.display = 'none'; return; }
-    el.style.display = 'flex';
+    el.style.display = 'block';
+    el.classList.add('rs');
     addRow.style.display = room.sessionless ? 'none' : 'flex';   // 오픈렉처는 세션 추가 불가
+    const open = ROOM_DETAIL_OPEN;
+
+    const pub = (AdminAuth.canPublish && AdminAuth.canPublish())
+        ? `<button type="button" class="pub-toggle ${room.publicOpen ? 'on' : ''}" onclick="updateRoom('publicOpen', ${room.publicOpen ? 'false' : 'true'})" title="켜면 홈페이지(공개 시간표)에 이 룸이 표시됩니다">${room.publicOpen ? '🌐 공개 중' : '⛔ 비공개'}</button>`
+        : `<button type="button" class="pub-toggle locked ${room.publicOpen ? 'on' : ''}" disabled title="홈페이지 공개 권한이 있는 계정만 변경할 수 있습니다">${room.publicOpen ? '🌐 공개 중' : '⛔ 비공개'} 🔒</button>`;
 
     el.innerHTML = `
-        <div class="field grow">
-            <label>룸 이름 <span class="hint-i" title="홈페이지에 이 이름이 룸 제목(헤더)으로 표시됩니다. 예: A Room">ⓘ</span></label>
-            <input type="text" value="${escapeHtml(room.name || '')}" onchange="updateRoom('name', this.value)" placeholder="예: A Room">
-        </div>
-        <div class="field grow">
-            <label>룸 이름(영문) <span class="hint-i" title="영어 버튼일 때 표시됩니다. 비우면 국문 이름이 그대로 표시됩니다.">ⓘ</span></label>
-            <input type="text" value="${escapeHtml(room.nameEn || '')}" onchange="updateRoom('nameEn', this.value)" placeholder="비우면 국문 그대로">
-        </div>
-        <div class="field grow">
-            <label>주제 <span class="hint-i" title="홈페이지에서 룸 이름 아래에 부제(카테고리)로 표시됩니다. 예: K-trend. 비워두면 표시되지 않습니다.">ⓘ</span></label>
-            <input type="text" value="${escapeHtml(room.topic || '')}" onchange="updateRoom('topic', this.value)" placeholder="예: K-trend (홈페이지 룸 아래 부제)">
-        </div>
-        <div class="field grow">
-            <label>주제(영문) <span class="hint-i" title="영어 버튼일 때 표시됩니다. 비우면 국문 주제가 그대로 표시됩니다.">ⓘ</span></label>
-            <input type="text" value="${escapeHtml(room.topicEn || '')}" onchange="updateRoom('topicEn', this.value)" placeholder="비우면 국문 그대로">
-        </div>
-        <div class="field" style="min-width:200px">
-            <label>날짜 (연자 중복 체크 기준)</label>
-            <div class="day-btns">${renderDayButtons(room)}</div>
-        </div>
-        <div class="field">
-            <label>시작시간</label>
-            <input type="time" value="${escapeHtml(room.startTime || '09:00')}" onchange="updateRoom('startTime', this.value)">
-        </div>
-        <div class="field" style="min-width:170px">
-            <label>표시 언어 (이 룸 전체)</label>
-            <div class="lang-btns">
-                <button type="button" class="lang-btn ${roomLang(room) === 'ko' ? 'active' : ''}" onclick="updateRoom('lang','ko')">한글</button>
-                <button type="button" class="lang-btn ${roomLang(room) === 'en' ? 'active' : ''}" onclick="updateRoom('lang','en')">영어(EN)</button>
+        <div class="rs-row">
+            <div class="field grow" style="min-width:160px">
+                <label>룸 이름 <span class="hint-i" title="홈페이지에 이 이름이 룸 제목(헤더)으로 표시됩니다. 예: A Room">ⓘ</span></label>
+                <input type="text" value="${escapeHtml(room.name || '')}" onchange="updateRoom('name', this.value)" placeholder="예: A Room">
+            </div>
+            <div class="field" style="min-width:190px">
+                <label>날짜 <span class="hint-i" title="연자 중복 체크 기준 날짜">ⓘ</span></label>
+                <div class="day-btns">${renderDayButtons(room)}</div>
+            </div>
+            <div class="field" style="min-width:110px">
+                <label>시작시간</label>
+                <input type="time" value="${escapeHtml(room.startTime || '09:00')}" onchange="updateRoom('startTime', this.value)">
+            </div>
+            <div class="field" style="min-width:120px">
+                <label>홈페이지 공개</label>${pub}
+            </div>
+            <label class="check-inline" style="align-self:flex-end;height:36px"><input type="checkbox" ${room.kmaSubmit ? 'checked' : ''} onchange="updateRoom('kmaSubmit', this.checked)"> 의협제출</label>
+            <div class="rs-actions">
+                <button class="btn btn-sm ${open ? 'btn-primary' : ''}" onclick="toggleRoomDetail()" title="영문·주제·표시언어·연자소속·아젠다담당·메모 등 상세 설정">⚙️ 상세 ${open ? '▴' : '▾'}</button>
+                <button class="btn btn-sm" onclick="duplicateRoom()" title="이 룸을 다른 날짜로 복제">📑 복제</button>
+                <button class="btn btn-danger-ghost btn-sm" onclick="deleteRoom('${room.id}')">🗑 삭제</button>
             </div>
         </div>
-        <div class="field" style="min-width:150px">
-            <label>연자 소속 표시 <span class="hint-i" title="홈페이지에서 연자 옆에 병원명(소속) 대신 국적을 표시할지 선택합니다. 해외 연자 룸에 유용. 국적은 '연자 관리'에서 입력하세요.">ⓘ</span></label>
-            <div class="lang-btns">
-                <button type="button" class="lang-btn ${!room.showNationality ? 'active' : ''}" onclick="updateRoom('showNationality', false)">소속</button>
-                <button type="button" class="lang-btn ${room.showNationality ? 'active' : ''}" onclick="updateRoom('showNationality', true)">국적</button>
+        <div class="rs-row rs-detail" style="${open ? '' : 'display:none'}">
+            <div class="field grow" style="min-width:150px">
+                <label>룸 이름(영문) <span class="hint-i" title="영어 버튼일 때 표시됩니다. 비우면 국문 이름이 그대로 표시됩니다.">ⓘ</span></label>
+                <input type="text" value="${escapeHtml(room.nameEn || '')}" onchange="updateRoom('nameEn', this.value)" placeholder="비우면 국문 그대로">
             </div>
+            <div class="field grow" style="min-width:160px">
+                <label>주제 <span class="hint-i" title="홈페이지에서 룸 이름 아래에 부제(카테고리)로 표시됩니다. 예: K-trend. 비워두면 표시되지 않습니다.">ⓘ</span></label>
+                <input type="text" value="${escapeHtml(room.topic || '')}" onchange="updateRoom('topic', this.value)" placeholder="예: K-trend (부제)">
+            </div>
+            <div class="field grow" style="min-width:150px">
+                <label>주제(영문) <span class="hint-i" title="영어 버튼일 때 표시됩니다. 비우면 국문 주제가 그대로 표시됩니다.">ⓘ</span></label>
+                <input type="text" value="${escapeHtml(room.topicEn || '')}" onchange="updateRoom('topicEn', this.value)" placeholder="비우면 국문 그대로">
+            </div>
+            <div class="field" style="min-width:150px">
+                <label>표시 언어 (이 룸)</label>
+                <div class="lang-btns">
+                    <button type="button" class="lang-btn ${roomLang(room) === 'ko' ? 'active' : ''}" onclick="updateRoom('lang','ko')">한글</button>
+                    <button type="button" class="lang-btn ${roomLang(room) === 'en' ? 'active' : ''}" onclick="updateRoom('lang','en')">영어(EN)</button>
+                </div>
+            </div>
+            <div class="field" style="min-width:130px">
+                <label>연자 소속 표시 <span class="hint-i" title="홈페이지에서 연자 옆에 병원명(소속) 대신 국적을 표시할지 선택합니다. 해외 연자 룸에 유용.">ⓘ</span></label>
+                <div class="lang-btns">
+                    <button type="button" class="lang-btn ${!room.showNationality ? 'active' : ''}" onclick="updateRoom('showNationality', false)">소속</button>
+                    <button type="button" class="lang-btn ${room.showNationality ? 'active' : ''}" onclick="updateRoom('showNationality', true)">국적</button>
+                </div>
+            </div>
+            <div class="field" style="min-width:140px">
+                <label>아젠다담당</label>
+                <input type="text" list="agendaOwnerList" value="${escapeHtml(room.agendaOwner || '')}" placeholder="연자 이름 선택/입력" onchange="updateRoom('agendaOwner', this.value.trim())">
+                <datalist id="agendaOwnerList">${agendaOwnerOptions()}</datalist>
+            </div>
+            <div class="field grow" style="min-width:200px">
+                <label>📝 메모 <span class="hint-i" title="내부용 메모입니다. 홈페이지·출력물에는 표시되지 않습니다.">ⓘ</span></label>
+                <input type="text" value="${escapeHtml(room.memo || '')}" onchange="updateRoom('memo', this.value)" placeholder="내부용 메모 (예: GCP룸-업체 & 중국인허가)">
+            </div>
+            <div class="settings-hint" style="flex-basis:100%"><b>홈페이지 표시</b>: <b>룸 이름</b>은 룸 제목, <b>주제</b>는 그 아래 부제(예: A Room / K-trend). 영문칸을 비우면 국문이 그대로 표시됩니다. · <b>연자 소속 표시</b>를 ‘국적’으로 하면 해외 연자 룸에서 병원명 대신 국적이 나옵니다. · <b>홈페이지 공개</b>를 켠 룸만 홈페이지에 나옵니다. · <b>의협제출</b> 체크 시 의협 제출용 프린트에 이 룸 강의만 출력됩니다.</div>
         </div>
-        <div class="field" style="min-width:150px">
-            <label>아젠다담당</label>
-            <input type="text" list="agendaOwnerList" value="${escapeHtml(room.agendaOwner || '')}" placeholder="연자 이름 선택/입력" onchange="updateRoom('agendaOwner', this.value.trim())">
-            <datalist id="agendaOwnerList">${agendaOwnerOptions()}</datalist>
-        </div>
-        <div class="field grow" style="min-width:220px">
-            <label>📝 메모 <span class="hint-i" title="내부용 메모입니다. 홈페이지·출력물에는 표시되지 않습니다. 룸 이름에 섞어 적던 내용을 여기에 적으세요.">ⓘ</span></label>
-            <input type="text" value="${escapeHtml(room.memo || '')}" onchange="updateRoom('memo', this.value)" placeholder="내부용 메모 (예: GCP룸-업체 & 중국인허가)">
-        </div>
-        <div class="field" style="min-width:160px">
-            <label>홈페이지 공개</label>
-            ${(AdminAuth.canPublish && AdminAuth.canPublish())
-            ? `<button type="button" class="pub-toggle ${room.publicOpen ? 'on' : ''}"
-                    onclick="updateRoom('publicOpen', ${room.publicOpen ? 'false' : 'true'})"
-                    title="켜면 홈페이지(공개 시간표)에 이 룸이 표시됩니다">
-                    ${room.publicOpen ? '🌐 공개 중' : '⛔ 비공개'}
-                </button>`
-            : `<button type="button" class="pub-toggle locked ${room.publicOpen ? 'on' : ''}" disabled
-                    title="홈페이지 공개 권한이 있는 계정만 변경할 수 있습니다">
-                    ${room.publicOpen ? '🌐 공개 중' : '⛔ 비공개'} 🔒
-                </button>`}
-        </div>
-        <label class="check-inline">
-            <input type="checkbox" ${room.kmaSubmit ? 'checked' : ''} onchange="updateRoom('kmaSubmit', this.checked)">
-            의협제출
-        </label>
-        <button class="btn btn-sm" onclick="duplicateRoom()">📑 다른 날짜로 복제</button>
-        <button class="btn btn-danger-ghost btn-sm" onclick="deleteRoom('${room.id}')">룸 삭제</button>
-        <div class="settings-hint"><b>홈페이지 표시</b>: <b>룸 이름</b>은 홈페이지 룸 제목으로, <b>주제</b>는 그 아래 부제(예: A Room / K-trend)로 나옵니다. 영문칸을 비우면 국문이 그대로 표시됩니다. · <b>연자 소속 표시</b>를 ‘국적’으로 하면 해외 연자 룸에서 병원명 대신 국적이 나옵니다. · <b>홈페이지 공개</b>를 켠 룸만 홈페이지에 나옵니다(기본값: 비공개). · <b>의협제출</b> 체크 시 의협 제출용 프린트에 이 룸 강의만 출력합니다.</div>
     `;
 }
 
