@@ -27,20 +27,81 @@ database.ref('/adminBoothBenefits').once('value').then(s => {
     if (v && Array.isArray(v.columns) && Array.isArray(v.grades)) GLOBAL_TEMPLATE = v;
 }).catch(() => { });
 
-// 행사 목록 → 셀렉트
-database.ref('/adminConferences').once('value').then(snap => {
-    CONFS = toOrderedArray(snap.val());
+// 행사 목록 → 셀렉트 (제목·정렬값만 가볍게 조회. shallow 실패 시 전체 로드 폴백)
+(function loadBoothConfs() {
+    const DB = (window.AppConfig && AppConfig.firebase && AppConfig.firebase.databaseURL) || '';
     const sel = document.getElementById('boothConfSelect');
-    if (!CONFS.length) {
-        if (sel) sel.innerHTML = '<option value="">등록된 행사가 없습니다</option>';
-        document.getElementById('boothArea').style.display = 'none';
-        return;
-    }
-    if (!CONF_ID) { try { CONF_ID = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { } }  // 마지막 보던 행사
-    if (!CONF_ID || !CONFS.find(c => c.id === CONF_ID)) CONF_ID = CONFS[0].id;
-    if (sel) sel.innerHTML = CONFS.map(c => `<option value="${c.id}" ${c.id === CONF_ID ? 'selected' : ''}>${escapeHtml(c.title || '(제목 없음)')}</option>`).join('');
-    subscribeConf();
-});
+    const done = () => {
+        if (!CONFS.length) {
+            if (sel) sel.innerHTML = '<option value="">등록된 행사가 없습니다</option>';
+            document.getElementById('boothArea').style.display = 'none';
+            return;
+        }
+        if (!CONF_ID) { try { CONF_ID = localStorage.getItem('asls_lastConfId') || ''; } catch (e) { } }  // 마지막 보던 행사
+        if (!CONF_ID || !CONFS.find(c => c.id === CONF_ID)) CONF_ID = CONFS[0].id;
+        if (sel) sel.innerHTML = CONFS.map(c => `<option value="${c.id}" ${c.id === CONF_ID ? 'selected' : ''}>${escapeHtml(c.title || '(제목 없음)')}</option>`).join('');
+        subscribeConf();
+    };
+    fetch(DB + '/adminConferences.json?shallow=true&_=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(keymap => {
+            if (!keymap) throw new Error('shallow unavailable');
+            const ids = Object.keys(keymap);
+            return Promise.all(ids.map(id => Promise.all([
+                database.ref('/adminConferences/' + id + '/title').once('value').then(s => s.val()).catch(() => ''),
+                database.ref('/adminConferences/' + id + '/order').once('value').then(s => s.val()).catch(() => null)
+            ]).then(([title, order]) => ({ id, title: title || '', order: order == null ? 9999 : order }))));
+        })
+        .then(arr => { CONFS = arr.sort((a, b) => a.order - b.order || (a.title || '').localeCompare(b.title || '', 'ko')); done(); })
+        .catch(() => { database.ref('/adminConferences').once('value').then(s => { CONFS = toOrderedArray(s.val() || {}); done(); }).catch(() => { }); });
+})();
+
+/* ---------- 다른 행사에서 등급·혜택표만 불러오기 (참여사는 그대로) ---------- */
+window.copyBoothFrom = function () {
+    if (!AdminAuth.requireEdit() || !requireConf()) return;
+    const others = CONFS.filter(c => c.id !== CONF_ID);
+    if (!others.length) { Toast.info('불러올 다른 행사가 없습니다.'); return; }
+    const ov = document.createElement('div');
+    ov.className = 'modal-overlay open';
+    ov.innerHTML = `
+        <div class="modal" style="max-width:420px">
+            <h3>다른 행사 등급·혜택 불러오기</h3>
+            <p style="margin:0 0 12px;color:var(--text-dim);font-size:0.88rem;line-height:1.55">
+                고른 행사의 <b>등급 종류와 혜택표</b>만 <b>${escapeHtml(ctitle() || '이 행사')}</b>(으)로 불러옵니다.
+                <b>참여사·등급 지정은 그대로</b> 두고, 이 행사의 기존 등급·혜택표만 대체됩니다.<br>
+                (예: 해외 행사끼리 MEGA·GOLD·SILVER 세트 재사용)
+            </p>
+            <div class="modal-field">
+                <label>불러올 행사</label>
+                <select id="boothSrcSel">${others.map(c => `<option value="${c.id}">${escapeHtml(c.title || '(제목 없음)')}</option>`).join('')}</select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" data-no>취소</button>
+                <button class="btn btn-primary" data-yes>불러오기</button>
+            </div>
+        </div>`;
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.querySelector('[data-no]').onclick = close;
+    ov.onclick = e => { if (e.target === ov) close(); };
+    ov.querySelector('[data-yes]').onclick = () => { const id = ov.querySelector('#boothSrcSel').value; close(); doCopyBooth(id); };
+};
+
+async function doCopyBooth(sourceId) {
+    if (!sourceId || sourceId === CONF_ID) return;
+    const srcTitle = (CONFS.find(c => c.id === sourceId) || {}).title || '선택 행사';
+    const ok = await confirmDialog(`"${srcTitle}"의 등급·혜택표를 "${ctitle() || '이 행사'}"(으)로 불러올까요?\n이 행사의 기존 등급·혜택표는 대체됩니다. (참여사는 그대로)`, { danger: true, okText: '불러오기' });
+    if (!ok) return;
+    try {
+        const v = (await database.ref('/adminConferences/' + sourceId + '/boothBenefits').once('value')).val();
+        if (!v || !Array.isArray(v.columns) || !Array.isArray(v.grades)) { Toast.warning('그 행사에 등급·혜택표가 없습니다.'); return; }
+        const copy = { columns: v.columns.slice(), grades: v.grades.slice(), cells: JSON.parse(JSON.stringify(v.cells || {})) };
+        await boothRef().set(copy);
+        BOOTH = copy; renderTable();
+        logActivity('update', 'booth', `"${srcTitle}" 등급·혜택표 불러오기 (등급 ${copy.grades.length})`, { confId: CONF_ID, confTitle: ctitle() });
+        Toast.success(`불러왔습니다: 등급 ${copy.grades.length}개 · 혜택 ${copy.columns.length}열`);
+    } catch (e) { Toast.error('불러오기 실패: ' + (e.message || e)); }
+}
 
 window.onBoothConfChange = function () {
     CONF_ID = document.getElementById('boothConfSelect').value;
